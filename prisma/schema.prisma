@@ -1,0 +1,316 @@
+// stock-opname. Matches migrations/20261015000000_init/migration.sql exactly.
+// Read 03-data-model.md before changing anything here.
+//
+// Three tables are APPEND ONLY: Count, TagSubmission, UnknownItem.
+// Never call update, upsert, delete or deleteMany on them. A correction is a
+// new row, and the current value is the latest row by clientCreatedAt.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")   // pooled
+  directUrl = env("DIRECT_URL")     // migrations
+}
+
+enum Role {
+  admin
+  reviewer
+  counter
+}
+
+enum SessionStatus {
+  draft
+  open
+  counting
+  review
+  approved
+  closed
+}
+
+enum Kondisi {
+  baik
+  rusak
+  kadaluarsa
+}
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  nama         String
+  username     String?   @unique
+  passwordHash String?   @map("password_hash")   // null for every counter, deliberately
+  role         Role
+  retiredAt    DateTime? @map("retired_at") @db.Timestamptz(6)
+
+  sessionsCreated OpnameSession[] @relation("SessionCreatedBy")
+  assignments     TagAssignment[]
+  counts          Count[]
+  submissions     TagSubmission[]
+  unknownItems    UnknownItem[]
+  devices         UserDevice[]    @relation("DeviceUser")
+  devicesBound    UserDevice[]    @relation("DeviceBoundBy")
+  approvals       Approval[]
+
+  @@map("users")
+}
+
+model Gudang {
+  id        String    @id @default(uuid()) @db.Uuid
+  kode      String    @unique
+  nama      String // must equal Nama_Gudang in the export, byte for byte
+  urutan    Int       @default(0)
+  retiredAt DateTime? @map("retired_at") @db.Timestamptz(6)
+
+  lokasi        Lokasi[]
+  snapshotItems SnapshotItem[]
+
+  @@map("gudang")
+}
+
+model Lokasi {
+  id        String    @id @default(uuid()) @db.Uuid
+  gudangId  String    @map("gudang_id") @db.Uuid
+  nama      String
+  urutan    Int       @default(0)
+  retiredAt DateTime? @map("retired_at") @db.Timestamptz(6)
+
+  gudang Gudang @relation(fields: [gudangId], references: [id])
+  tags   Tag[]
+
+  @@unique([gudangId, nama])
+  @@map("lokasi")
+}
+
+model Tag {
+  id        String    @id @default(uuid()) @db.Uuid
+  lokasiId  String    @map("lokasi_id") @db.Uuid
+  nomor     String // immutable once it appears in any SessionTag
+  weight    Int       @default(1) // 3 besar, 2 sedang, 1 kecil
+  urutan    Int       @default(0)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  retiredAt DateTime? @map("retired_at") @db.Timestamptz(6)
+
+  lokasi       Lokasi          @relation(fields: [lokasiId], references: [id])
+  sessionTags  SessionTag[]
+  assignments  TagAssignment[]
+  counts       Count[]
+  submissions  TagSubmission[]
+  unknownItems UnknownItem[]
+
+  @@unique([lokasiId, nomor])
+  @@map("tags")
+}
+
+model OpnameSession {
+  id          String        @id @default(uuid()) @db.Uuid
+  nama        String
+  periode     String
+  snapshotAt  DateTime      @map("snapshot_at") @db.Timestamptz(6)
+  scopeFilter Json          @default("{}") @map("scope_filter")
+  sourceQuery String?       @map("source_query")
+  status      SessionStatus @default(draft)
+  createdById String?       @map("created_by") @db.Uuid
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  createdBy     User?           @relation("SessionCreatedBy", fields: [createdById], references: [id])
+  sessionTags   SessionTag[]
+  importRows    ImportRow[]
+  snapshotItems SnapshotItem[]
+  assignments   TagAssignment[]
+  counts        Count[]
+  submissions   TagSubmission[]
+  unknownItems  UnknownItem[]
+  devices       UserDevice[]
+  approvals     Approval[]
+
+  @@map("opname_sessions")
+}
+
+/// The per session pin. Written once at draft -> open, never updated.
+/// Reports, exports and the denah read this. Never read `tags` for a report.
+model SessionTag {
+  sessionId  String @map("session_id") @db.Uuid
+  tagId      String @map("tag_id") @db.Uuid
+  nomor      String
+  lokasiNama String @map("lokasi_nama")
+  gudangNama String @map("gudang_nama")
+  weight     Int
+  urutan     Int
+
+  session OpnameSession @relation(fields: [sessionId], references: [id])
+  tag     Tag           @relation(fields: [tagId], references: [id])
+
+  @@id([sessionId, tagId])
+  @@index([sessionId, gudangNama, lokasiNama, urutan], map: "session_tags_render_idx")
+  @@map("session_tags")
+}
+
+/// Raw landing table. Every column as text, nothing coerced, so "0123" survives.
+model ImportRow {
+  id        String   @id @default(uuid()) @db.Uuid
+  sessionId String   @map("session_id") @db.Uuid
+  rowNumber Int      @map("row_number")
+  raw       Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  session OpnameSession @relation(fields: [sessionId], references: [id])
+
+  @@map("import_rows")
+}
+
+model SnapshotItem {
+  id             String   @id @default(uuid()) @db.Uuid
+  sessionId      String   @map("session_id") @db.Uuid
+  gudangId       String   @map("gudang_id") @db.Uuid
+  kodeBarang     String   @map("kode_barang")
+  barcode4       String?  @map("barcode_4") // text, never int
+  namaBarang     String   @map("nama_barang")
+  kodeBrand      String?  @map("kode_brand")
+  namaBrand      String?  @map("nama_brand")
+  kodeGroup      String?  @map("kode_group")
+  namaGroup      String?  @map("nama_group")
+  uom            String?
+  qtyOnhand      Decimal  @map("qty_onhand") @db.Decimal(18, 4) // NEVER sent to a phone
+  hargaSatuan    Decimal? @map("harga_satuan") @db.Decimal(18, 2) // NEVER sent to a phone
+  sourceRowCount Int      @default(1) @map("source_row_count")
+
+  session OpnameSession @relation(fields: [sessionId], references: [id])
+  gudang  Gudang        @relation(fields: [gudangId], references: [id])
+  counts  Count[]
+
+  @@unique([sessionId, gudangId, kodeBarang])
+  @@index([sessionId, barcode4], map: "snapshot_items_barcode_idx")
+  @@map("snapshot_items")
+}
+
+// totalHarga is deliberately absent. It is qty x hargaSatuan, derived on read.
+
+model TagAssignment {
+  id         String   @id @default(uuid()) @db.Uuid
+  sessionId  String   @map("session_id") @db.Uuid
+  tagId      String   @map("tag_id") @db.Uuid
+  pass       Int      @db.SmallInt
+  userId     String   @map("user_id") @db.Uuid
+  assignedAt DateTime @default(now()) @map("assigned_at") @db.Timestamptz(6)
+
+  session OpnameSession @relation(fields: [sessionId], references: [id])
+  tag     Tag           @relation(fields: [tagId], references: [id])
+  user    User          @relation(fields: [userId], references: [id])
+
+  @@unique([sessionId, tagId, pass])
+  @@map("tag_assignments")
+}
+
+/// APPEND ONLY. No update, no upsert, no delete. Ever.
+model Count {
+  id              String   @id @default(uuid()) @db.Uuid
+  clientRowId     String   @unique @map("client_row_id") @db.Uuid // the idempotency key
+  sessionId       String   @map("session_id") @db.Uuid
+  tagId           String   @map("tag_id") @db.Uuid
+  pass            Int      @db.SmallInt
+  snapshotItemId  String   @map("snapshot_item_id") @db.Uuid
+  countedById     String   @map("counted_by") @db.Uuid
+  qty             Decimal  @db.Decimal(18, 4)
+  qtyNote         String?  @map("qty_note") // the calculator expression
+  kondisi         Kondisi
+  deviceId        String   @map("device_id") // the device pair rule reads this
+  clientCreatedAt DateTime @map("client_created_at") @db.Timestamptz(6) // ordering key
+  serverCreatedAt DateTime @default(now()) @map("server_created_at") @db.Timestamptz(6)
+
+  session      OpnameSession @relation(fields: [sessionId], references: [id])
+  tag          Tag           @relation(fields: [tagId], references: [id])
+  snapshotItem SnapshotItem  @relation(fields: [snapshotItemId], references: [id])
+  countedBy    User          @relation(fields: [countedById], references: [id])
+
+  @@index([sessionId, tagId, pass], map: "counts_session_tag_pass_idx")
+  @@map("counts")
+}
+
+/// APPEND ONLY. "I looked and there is nothing here" is a fact only a person
+/// can state, which is what makes zero tags unaccounted for provable.
+model TagSubmission {
+  id              String   @id @default(uuid()) @db.Uuid
+  clientRowId     String   @unique @map("client_row_id") @db.Uuid
+  sessionId       String   @map("session_id") @db.Uuid
+  tagId           String   @map("tag_id") @db.Uuid
+  pass            Int      @db.SmallInt
+  submittedById   String   @map("submitted_by") @db.Uuid
+  isEmpty         Boolean  @default(false) @map("is_empty")
+  deviceId        String   @map("device_id")
+  clientCreatedAt DateTime @map("client_created_at") @db.Timestamptz(6)
+  serverCreatedAt DateTime @default(now()) @map("server_created_at") @db.Timestamptz(6)
+
+  session     OpnameSession @relation(fields: [sessionId], references: [id])
+  tag         Tag           @relation(fields: [tagId], references: [id])
+  submittedBy User          @relation(fields: [submittedById], references: [id])
+
+  @@map("tag_submissions")
+}
+
+/// APPEND ONLY. A separate table rather than a nullable snapshotItemId on Count,
+/// so a forgotten IS NOT NULL can never contaminate the reconciliation.
+model UnknownItem {
+  id              String   @id @default(uuid()) @db.Uuid
+  clientRowId     String   @unique @map("client_row_id") @db.Uuid
+  sessionId       String   @map("session_id") @db.Uuid
+  tagId           String   @map("tag_id") @db.Uuid
+  pass            Int      @db.SmallInt
+  countedById     String   @map("counted_by") @db.Uuid
+  deviceId        String   @map("device_id")
+  kodeInput       String?  @map("kode_input")
+  namaInput       String?  @map("nama_input")
+  qty             Decimal  @db.Decimal(18, 4)
+  kondisi         Kondisi
+  clientCreatedAt DateTime @map("client_created_at") @db.Timestamptz(6)
+  serverCreatedAt DateTime @default(now()) @map("server_created_at") @db.Timestamptz(6)
+
+  session   OpnameSession @relation(fields: [sessionId], references: [id])
+  tag       Tag           @relation(fields: [tagId], references: [id])
+  countedBy User          @relation(fields: [countedById], references: [id])
+
+  @@map("unknown_items")
+}
+
+/// This table replaced the password.
+/// One phone is one counter for one session, and the partial unique index below
+/// says the converse: one counter has one live phone.
+model UserDevice {
+  sessionId           String    @map("session_id") @db.Uuid
+  deviceId            String    @map("device_id")
+  userId              String    @map("user_id") @db.Uuid
+  boundAt             DateTime  @default(now()) @map("bound_at") @db.Timestamptz(6)
+  boundById           String?   @map("bound_by") @db.Uuid
+  releasedAt          DateTime? @map("released_at") @db.Timestamptz(6)
+  lastSyncAt          DateTime? @map("last_sync_at") @db.Timestamptz(6)
+  lastReportedPending Int       @default(0) @map("last_reported_pending")
+
+  session OpnameSession @relation(fields: [sessionId], references: [id])
+  user    User          @relation("DeviceUser", fields: [userId], references: [id])
+  boundBy User?         @relation("DeviceBoundBy", fields: [boundById], references: [id])
+
+  @@id([sessionId, deviceId])
+  @@map("user_devices")
+}
+
+model Approval {
+  id           String   @id @default(uuid()) @db.Uuid
+  sessionId    String   @map("session_id") @db.Uuid
+  step         Int      @db.SmallInt // 1 reviewer, 2 accounting
+  approvedById String   @map("approved_by") @db.Uuid
+  approvedAt   DateTime @default(now()) @map("approved_at") @db.Timestamptz(6)
+  catatan      String?
+
+  session    OpnameSession @relation(fields: [sessionId], references: [id])
+  approvedBy User          @relation(fields: [approvedById], references: [id])
+
+  @@unique([sessionId, step])
+  @@map("approvals")
+}
+
+// Prisma cannot express these, so they live in the init migration SQL:
+//   CHECK (pass IN (1,2,3)), CHECK (qty >= 0), CHECK (step IN (1,2))
+//   CREATE UNIQUE INDEX user_devices_one_live_per_user
+//     ON user_devices (session_id, user_id) WHERE released_at IS NULL;
+// And the seven views live in migrations/20261015000100_views.
