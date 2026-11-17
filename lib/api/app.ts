@@ -4,6 +4,18 @@ import { prisma } from "@/lib/db";
 import { ADMIN_ID } from "@/lib/fixture";
 import { commitImport, parseImportFile, validateAndAggregate } from "@/lib/import";
 import { devicesForSession, sessionDenah } from "@/lib/monitor";
+import {
+  assignPass3,
+  daftarBarang,
+  kondisiReport,
+  pass3Compare,
+  petaBarang,
+  rekapTag,
+  selisihHitung,
+  selisihSistem,
+  tagCompare,
+  unknownItems,
+} from "@/lib/reports";
 import { DEFAULT_BRANDS, DEFAULT_GROUPS, liveTags, missingAssignments } from "@/lib/setup";
 import { syncCounts } from "@/lib/sync";
 
@@ -361,6 +373,8 @@ app.get("/sessions/:id/prepare", async (c) => {
     where: { sessionId: id, userId: binding.userId },
     select: { tagId: true, pass: true },
   });
+  const pass3Ids = assignments.filter((row) => row.pass === 3).map((row) => row.tagId);
+  const compareByTag = await pass3Compare(id, pass3Ids);
   const payload = {
     session: {
       id: session.id,
@@ -380,7 +394,11 @@ app.get("/sessions/:id/prepare", async (c) => {
       uom: item.uom,
     })),
     denah: [...denahMap.values()],
-    assignments: assignments.map((row) => ({ tag_id: row.tagId, pass: row.pass })),
+    assignments: assignments.map((row) => ({
+      tag_id: row.tagId,
+      pass: row.pass,
+      ...(row.pass === 3 ? { compare: compareByTag.get(row.tagId) ?? [] } : {}),
+    })),
   };
   return c.json(payload);
 });
@@ -573,62 +591,73 @@ app.openapi(syncRoute, async (c) => {
 });
 
 app.get("/sessions/:id/selisih-hitung", async (c) => {
-  const id = c.req.param("id");
-  const rows = await prisma.$queryRaw<
-    Array<{
-      tag_id: string;
-      snapshot_item_id: string;
-      qty_1: unknown;
-      qty_2: unknown;
-    }>
-  >`
-    SELECT tag_id, snapshot_item_id, qty_1, qty_2
-    FROM v_selisih_hitung
-    WHERE session_id = ${id}::uuid
-  `;
-  return c.json(
-    rows.map((row) => ({
-      tag_id: row.tag_id,
-      snapshot_item_id: row.snapshot_item_id,
-      qty_1: row.qty_1 == null ? null : String(row.qty_1),
-      qty_2: row.qty_2 == null ? null : String(row.qty_2),
-    })),
-  );
+  return c.json(await selisihHitung(c.req.param("id")));
 });
 
 app.get("/sessions/:id/selisih-sistem", async (c) => {
+  return c.json(await selisihSistem(c.req.param("id")));
+});
+
+app.get("/sessions/:id/compare/:tagId", async (c) => {
   const id = c.req.param("id");
-  const rows = await prisma.$queryRaw<
-    Array<{
-      barcode_4: string | null;
-      kode_barang: string;
-      nama_barang: string;
-      gudang_id: string;
-      qty_onhand: unknown;
-      qty_hitung: unknown;
-      selisih_qty: unknown;
-      selisih_nilai: unknown;
-      ada_selisih_hitung: boolean;
-    }>
-  >`
-    SELECT barcode_4, kode_barang, nama_barang, gudang_id,
-           qty_onhand, qty_hitung, selisih_qty, selisih_nilai, ada_selisih_hitung
-    FROM v_selisih_sistem
-    WHERE session_id = ${id}::uuid
-  `;
+  const tagId = c.req.param("tagId");
+  if (!(await requireSession(id))) {
+    return c.json({ error: "Sesi tidak ditemukan." }, 404);
+  }
+  return c.json({ items: await tagCompare(id, tagId) });
+});
+
+app.post("/sessions/:id/pass-3", async (c) => {
+  const id = c.req.param("id");
+  const body = await c.req.json<{ tag_id?: string; user_id?: string }>();
+  if (!body.tag_id || !body.user_id) {
+    return c.json({ error: "Tag dan petugas wajib." }, 400);
+  }
+  const result = await assignPass3(id, body.tag_id, body.user_id);
+  if ("error" in result) {
+    return c.json({ error: result.error }, result.status);
+  }
+  return c.json(result);
+});
+
+app.get("/sessions/:id/kondisi", async (c) => {
+  return c.json(await kondisiReport(c.req.param("id")));
+});
+
+app.get("/sessions/:id/unknown-items", async (c) => {
+  return c.json(await unknownItems(c.req.param("id")));
+});
+
+app.get("/sessions/:id/rekap-tag", async (c) => {
+  return c.json(await rekapTag(c.req.param("id")));
+});
+
+app.get("/sessions/:id/items", async (c) => {
+  const id = c.req.param("id");
+  if (!(await requireSession(id))) {
+    return c.json({ error: "Sesi tidak ditemukan." }, 404);
+  }
   return c.json(
-    rows.map((row) => ({
-      barcode_4: row.barcode_4,
-      kode_barang: row.kode_barang,
-      nama_barang: row.nama_barang,
-      gudang_id: row.gudang_id,
-      qty_onhand: String(row.qty_onhand),
-      qty_hitung: String(row.qty_hitung),
-      selisih_qty: String(row.selisih_qty),
-      selisih_nilai: String(row.selisih_nilai),
-      ada_selisih_hitung: row.ada_selisih_hitung,
-    })),
+    await daftarBarang(id, {
+      q: c.req.query("q") || undefined,
+      gudang_id: c.req.query("gudang_id") || undefined,
+      brand: c.req.query("brand") || undefined,
+      group: c.req.query("group") || undefined,
+      page: Number(c.req.query("page") ?? "1") || 1,
+    }),
   );
+});
+
+app.get("/sessions/:id/peta-barang", async (c) => {
+  const id = c.req.param("id");
+  if (!(await requireSession(id))) {
+    return c.json({ error: "Sesi tidak ditemukan." }, 404);
+  }
+  const kode = (c.req.query("kode") ?? "").trim();
+  if (!kode) {
+    return c.json({ items: [] });
+  }
+  return c.json({ items: await petaBarang(id, kode) });
 });
 
 app.get("/sessions/:id/zero-found", async (c) => {

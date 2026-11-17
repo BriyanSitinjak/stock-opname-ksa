@@ -7,6 +7,7 @@ import { ActionColumn, GhostButton, Overlay, Phone, PrimaryButton, TextLink, Top
 import { evaluateQtyNote } from "@/lib/calculator";
 import { SESSION_ID } from "@/lib/fixture";
 import { maybeActivate } from "@/lib/offline/register-sw";
+import { qtyOrDash } from "@/lib/qty-display";
 import {
   clearPrepare,
   enqueueCount,
@@ -89,9 +90,13 @@ export function CountApp() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [tagNomor, setTagNomor] = useState("");
-  const [activeTag, setActiveTag] = useState<{ id: string; nomor: string; lokasi: string; pass: number } | null>(
-    null,
-  );
+  const [activeTag, setActiveTag] = useState<{
+    id: string;
+    nomor: string;
+    lokasi: string;
+    pass: number;
+    compare?: PreparePayload["assignments"][number]["compare"];
+  } | null>(null);
   const [code, setCode] = useState("");
   const [qty, setQty] = useState("");
   const [qtyNote, setQtyNote] = useState<string | null>(null);
@@ -272,7 +277,7 @@ export function CountApp() {
     : [];
   const ready = ticks.length > 0 && ticks.every((tick) => tick.ok);
 
-  async function openTag(nomor: string) {
+  async function openTag(nomor: string, pass?: number) {
     if (!prepare) {
       return;
     }
@@ -281,12 +286,20 @@ export function CountApp() {
       setMessage(`Tag ${nomor} tidak ada di gudang ini. Periksa nomor pada kartu, atau pilih dari denah.`);
       return;
     }
-    const assignment = prepare.assignments.find((row) => row.tag_id === tag.id);
+    const mine = prepare.assignments.filter((row) => row.tag_id === tag.id);
+    const assignment =
+      pass != null ? mine.find((row) => row.pass === pass) : [...mine].sort((left, right) => right.pass - left.pass)[0];
     if (!assignment) {
       setMessage("Tag ini bukan tugas Anda.");
       return;
     }
-    setActiveTag({ id: tag.id, nomor: tag.nomor, lokasi: tag.lokasi, pass: assignment.pass });
+    setActiveTag({
+      id: tag.id,
+      nomor: tag.nomor,
+      lokasi: tag.lokasi,
+      pass: assignment.pass,
+      compare: assignment.pass === 3 ? assignment.compare : undefined,
+    });
     setLines(await linesForTag(tag.id, assignment.pass));
     setCode("");
     setQty("");
@@ -553,7 +566,7 @@ export function CountApp() {
               <button
                 type="button"
                 className="flex w-full items-center justify-between rounded-2xl bg-white px-4 py-4 text-left shadow-sm"
-                onClick={() => void openTag(tag.nomor)}
+                onClick={() => void openTag(tag.nomor, tag.pass)}
               >
                 <span>
                   <span className="block text-lg font-semibold">{tag.nomor}</span>
@@ -781,6 +794,18 @@ export function CountApp() {
         </span>
         <span>Hitung ke-{activeTag?.pass}</span>
       </div>
+      {activeTag?.pass === 3 && (activeTag.compare?.length ?? 0) > 0 ? (
+        <div className="mt-4 rounded-2xl bg-white p-4 text-[#1c1c1c]">
+          <p className="text-sm font-medium">Hitung ke-1 dan ke-2</p>
+          <ul className="mt-2 space-y-1 text-sm">
+            {activeTag.compare?.map((row) => (
+              <li key={row.snapshot_item_id}>
+                {row.barcode_4} {row.nama_barang} · Hitung 1: {qtyOrDash(row.qty_1)} · Hitung 2: {qtyOrDash(row.qty_2)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <p className="mt-6 text-xs uppercase tracking-wide text-white/40">Kode barang</p>
       <button
         type="button"

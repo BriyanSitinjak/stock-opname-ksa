@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { samePersonOnBothPasses } from "@/lib/assignment-rules";
 import { fetchJson } from "@/app/siap/api";
+import { ReportRow, ReportTable, Td } from "@/app/siap/report-table";
 import { BackLink, ErrorText, MissingList, OutlineButton, TealButton } from "@/app/siap/ui";
 
 type Counter = { id: string; nama: string };
@@ -172,32 +173,20 @@ export function TugasBoard({ id }: { id: string }) {
       {grouped.map(([gudang, tags]) => (
         <section key={gudang} className="mt-8">
           <h2 className="mb-3 font-medium">{gudang}</h2>
-          <div className="overflow-x-auto rounded-2xl bg-white shadow-sm">
-            <table className="w-full min-w-[640px] text-left text-sm">
-              <thead>
-                <tr className="border-b text-[#6b6b6b]">
-                  <th className="px-4 py-3">Tag</th>
-                  <th className="px-4 py-3">Lokasi</th>
-                  <th className="px-4 py-3">Hitung ke-1</th>
-                  <th className="px-4 py-3">Hitung ke-2</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tags.map((row) => (
-                  <tr key={row.tag_id} className="border-b last:border-0">
-                    <td className="px-4 py-2 font-medium">{row.nomor}</td>
-                    <td className="px-4 py-2">{row.lokasi}</td>
-                    <td className="px-4 py-2">
-                      <PassSelect counters={counters} value={row.pass_1} onChange={(userId) => setPass(row.tag_id, 1, userId)} />
-                    </td>
-                    <td className="px-4 py-2">
-                      <PassSelect counters={counters} value={row.pass_2} onChange={(userId) => setPass(row.tag_id, 2, userId)} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ReportTable headers={["Tag", "Lokasi", "Hitung ke-1", "Hitung ke-2"]}>
+            {tags.map((row) => (
+              <ReportRow key={row.tag_id}>
+                <Td className="font-medium">{row.nomor}</Td>
+                <Td>{row.lokasi}</Td>
+                <Td>
+                  <PassSelect counters={counters} value={row.pass_1} onChange={(userId) => setPass(row.tag_id, 1, userId)} />
+                </Td>
+                <Td>
+                  <PassSelect counters={counters} value={row.pass_2} onChange={(userId) => setPass(row.tag_id, 2, userId)} />
+                </Td>
+              </ReportRow>
+            ))}
+          </ReportTable>
         </section>
       ))}
       <ErrorText>{error}</ErrorText>

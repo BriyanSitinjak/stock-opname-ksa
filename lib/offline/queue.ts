@@ -46,7 +46,17 @@ export type PreparePayload = {
     uom: string | null;
   }[];
   denah: { lokasi: string; tags: { id: string; nomor: string; weight: number }[] }[];
-  assignments: { tag_id: string; pass: number }[];
+  assignments: {
+    tag_id: string;
+    pass: number;
+    compare?: {
+      snapshot_item_id: string;
+      barcode_4: string | null;
+      nama_barang: string;
+      qty_1: string | null;
+      qty_2: string | null;
+    }[];
+  }[];
 };
 
 export type LocalLine = {

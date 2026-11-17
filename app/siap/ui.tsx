@@ -48,20 +48,43 @@ export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={`mt-1 w-full rounded-xl border px-3 py-2 ${props.className ?? ""}`} />;
 }
 
+export function SearchForm({
+  action,
+  name,
+  defaultValue,
+  placeholder,
+}: {
+  action: string;
+  name: string;
+  defaultValue: string;
+  placeholder: string;
+}) {
+  return (
+    <form className="mt-4 flex max-w-xl gap-2" action={action}>
+      <input name={name} defaultValue={defaultValue} className="flex-1 rounded-xl border px-3 py-2 text-sm" placeholder={placeholder} />
+      <TealButton type="submit" className="px-5 py-2.5 text-sm">
+        Cari
+      </TealButton>
+    </form>
+  );
+}
+
 export function TealButton({
   children,
   onClick,
   disabled,
   className = "",
+  type = "button",
 }: {
   children: ReactNode;
   onClick?: () => void;
   disabled?: boolean;
   className?: string;
+  type?: "button" | "submit";
 }) {
   return (
     <button
-      type="button"
+      type={type}
       disabled={disabled}
       onClick={onClick}
       className={`rounded-full bg-ksa-teal font-medium text-white disabled:opacity-40 ${className}`}
