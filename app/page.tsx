@@ -1,14 +1,18 @@
+import Image from "next/image";
 import Link from "next/link";
 
 export default function Home() {
   return (
-    <main className="mx-auto flex min-h-full max-w-md flex-col gap-4 p-6">
-      <h1 className="text-2xl font-semibold">Stock Opname</h1>
-      <p className="text-sm text-zinc-600">Irisan vertikal: ikat perangkat, unduh, hitung, kirim.</p>
-      <Link className="underline" href="/hitung">
+    <main className="mx-auto flex min-h-dvh max-w-[390px] flex-col items-center justify-center gap-8 px-6 py-10">
+      <Image src="/brand/lockup-horizontal.png" alt="Stock Opname KSA" width={280} height={60} />
+      <p className="text-center text-sm text-[#6b6b6b]">Hitung stok di gudang, tanpa sinyal setelah persiapan.</p>
+      <Link
+        className="w-full rounded-full bg-ksa-teal py-3.5 text-center font-medium text-white"
+        href="/hitung"
+      >
         Buka layar hitung
       </Link>
-      <Link className="underline" href="/api/docs/ui">
+      <Link className="text-sm text-ksa-teal-deep" href="/api/docs/ui">
         Dokumentasi API
       </Link>
     </main>
