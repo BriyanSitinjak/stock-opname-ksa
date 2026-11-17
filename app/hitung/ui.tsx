@@ -67,20 +67,17 @@ export function PrimaryButton({
   children,
   onClick,
   disabled,
-  tone = "teal",
 }: {
   children: ReactNode;
   onClick?: () => void;
   disabled?: boolean;
-  tone?: "teal" | "light";
 }) {
-  const colors = tone === "light" ? "bg-white text-ksa-teal-deep" : "bg-ksa-teal text-white";
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className={`w-full rounded-full py-3.5 text-center text-base font-medium disabled:opacity-40 ${colors}`}
+      className="w-full rounded-full bg-ksa-teal py-3.5 text-center text-base font-medium text-white disabled:opacity-40"
     >
       {children}
     </button>
@@ -106,6 +103,26 @@ export function GhostButton({
       {children}
     </button>
   );
+}
+
+export function TextLink({
+  children,
+  onClick,
+  className = "",
+}: {
+  children: ReactNode;
+  onClick?: () => void;
+  className?: string;
+}) {
+  return (
+    <button type="button" className={`text-sm text-ksa-teal-deep ${className}`} onClick={onClick}>
+      {children}
+    </button>
+  );
+}
+
+export function ActionColumn({ children }: { children: ReactNode }) {
+  return <div className="mt-auto flex flex-col gap-3 pt-6">{children}</div>;
 }
 
 export function Overlay({ children }: { children: ReactNode }) {

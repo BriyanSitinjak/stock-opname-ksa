@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Image from "next/image";
+import { BrandIcon, BrandLockup } from "@/app/brand-lockup";
 import { NumericKeypad } from "@/app/hitung/keypad";
-import { GhostButton, Overlay, Phone, PrimaryButton, TopBar } from "@/app/hitung/ui";
+import { ActionColumn, GhostButton, Overlay, Phone, PrimaryButton, TextLink, TopBar } from "@/app/hitung/ui";
 import { evaluateQtyNote } from "@/lib/calculator";
 import { SESSION_ID } from "@/lib/fixture";
+import { maybeActivate } from "@/lib/offline/register-sw";
 import {
   clearPrepare,
   enqueueCount,
@@ -18,6 +19,7 @@ import {
   newClientRowId,
   newDeviceId,
   pendingCount,
+  queueSize,
   removeAccepted,
   savePrepare,
   snapshotQueue,
@@ -41,6 +43,27 @@ type Screen =
   | "about";
 
 type CounterOption = { user_id: string; nama: string; already_bound: boolean };
+
+function locateTag(prepare: PreparePayload, match: (tag: { id: string; nomor: string }) => boolean) {
+  for (const lokasi of prepare.denah) {
+    const tag = lokasi.tags.find(match);
+    if (tag) {
+      return { ...tag, lokasi: lokasi.lokasi };
+    }
+  }
+  return null;
+}
+
+async function fetchPrepare(sessionId: string, deviceId: string) {
+  const response = await fetch(`/api/sessions/${sessionId}/prepare`, {
+    headers: { "x-device-id": deviceId },
+  });
+  if (!response.ok) {
+    const json = (await response.json()) as { error?: string };
+    return { ok: false as const, error: json.error ?? "Tidak ada koneksi. Persiapan harus di area bersinyal." };
+  }
+  return { ok: true as const, payload: (await response.json()) as PreparePayload };
+}
 
 function deviceIdFromStore(): string {
   if (typeof window === "undefined") {
@@ -99,8 +122,7 @@ export function CountApp() {
   const syncNow = useCallback(
     async (silent = false) => {
       const queue = await snapshotQueue();
-      const remaining =
-        queue.counts.length + queue.submissions.length + queue.unknowns.length;
+      const remaining = queueSize(queue);
       const response = await fetch("/api/counts/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -127,6 +149,9 @@ export function CountApp() {
       await refreshPending();
       setRejected(json.rejected ?? []);
       const left = remaining - (json.accepted?.length ?? 0);
+      if (left === 0) {
+        void maybeActivate();
+      }
       if (!silent) {
         if ((json.rejected?.length ?? 0) > 0) {
           setMessage(
@@ -150,13 +175,10 @@ export function CountApp() {
         return;
       }
       try {
-        const response = await fetch(`/api/sessions/${sessionId}/prepare`, {
-          headers: { "x-device-id": deviceId },
-        });
-        if (response.ok) {
-          const payload = (await response.json()) as PreparePayload;
-          await savePrepare(payload);
-          setPrepare(payload);
+        const remote = await fetchPrepare(sessionId, deviceId);
+        if (remote.ok) {
+          await savePrepare(remote.payload);
+          setPrepare(remote.payload);
           setScreen("prepare");
           return;
         }
@@ -214,19 +236,15 @@ export function CountApp() {
     setMessage("");
     await clearPrepare();
     try {
-      const response = await fetch(`/api/sessions/${sessionId}/prepare`, {
-        headers: { "x-device-id": deviceId },
-      });
-      if (!response.ok) {
+      const remote = await fetchPrepare(sessionId, deviceId);
+      if (!remote.ok) {
         await clearPrepare();
-        const json = (await response.json()) as { error?: string };
-        setMessage(json.error ?? "Tidak ada koneksi. Persiapan harus di area bersinyal.");
+        setMessage(remote.error);
         setBusy(false);
         return;
       }
-      const payload = (await response.json()) as PreparePayload;
-      await savePrepare(payload);
-      setPrepare(payload);
+      await savePrepare(remote.payload);
+      setPrepare(remote.payload);
       try {
         const persisted = await navigator.storage?.persist?.();
         setStorageOk(persisted ?? false);
@@ -254,24 +272,11 @@ export function CountApp() {
     : [];
   const ready = ticks.length > 0 && ticks.every((tick) => tick.ok);
 
-  function findTag(nomor: string) {
-    if (!prepare) {
-      return null;
-    }
-    for (const lokasi of prepare.denah) {
-      const tag = lokasi.tags.find((row) => row.nomor === nomor);
-      if (tag) {
-        return { ...tag, lokasi: lokasi.lokasi };
-      }
-    }
-    return null;
-  }
-
   async function openTag(nomor: string) {
     if (!prepare) {
       return;
     }
-    const tag = findTag(nomor);
+    const tag = locateTag(prepare, (row) => row.nomor === nomor);
     if (!tag) {
       setMessage(`Tag ${nomor} tidak ada di gudang ini. Periksa nomor pada kartu, atau pilih dari denah.`);
       return;
@@ -379,13 +384,8 @@ export function CountApp() {
       return [];
     }
     return prepare.assignments.flatMap((row) => {
-      for (const lokasi of prepare.denah) {
-        const tag = lokasi.tags.find((item) => item.id === row.tag_id);
-        if (tag) {
-          return [{ ...row, nomor: tag.nomor, lokasi: lokasi.lokasi, weight: tag.weight }];
-        }
-      }
-      return [];
+      const tag = locateTag(prepare, (item) => item.id === row.tag_id);
+      return tag ? [{ ...row, nomor: tag.nomor, lokasi: tag.lokasi, weight: tag.weight }] : [];
     });
   }, [prepare]);
 
@@ -417,6 +417,11 @@ export function CountApp() {
       setQty((value) => value.slice(0, -1));
     }
   }
+
+  const calcResult = evaluateQtyNote(calcExpr);
+  const duplicateTotal = duplicate
+    ? String(Number(duplicate.existing.qty) + Number(duplicate.incoming))
+    : "";
 
   const bar = (
     <TopBar
@@ -455,13 +460,7 @@ export function CountApp() {
         {message ? (
           <p className="mt-4 rounded-2xl bg-[#f3d4a0] px-4 py-3 text-sm text-[#5a3b00]">{message}</p>
         ) : null}
-        <Image
-          src="/brand/lockup-horizontal.png"
-          alt="Stock Opname KSA"
-          width={192}
-          height={48}
-          className="mt-auto pt-10"
-        />
+        <BrandLockup className="mt-auto pt-10" />
       </Phone>
     );
   }
@@ -491,12 +490,12 @@ export function CountApp() {
             SIAP DIPAKAI TANPA SINYAL
           </p>
         ) : null}
-        <div className="mt-auto flex flex-col gap-3 pt-6">
+        <ActionColumn>
           <GhostButton onClick={() => void downloadPrepare()}>{busy ? "Mengunduh…" : "Unduh ulang"}</GhostButton>
           <PrimaryButton disabled={!ready || busy} onClick={() => setScreen("home")}>
             Mulai Menghitung
           </PrimaryButton>
-        </div>
+        </ActionColumn>
         {message ? <p className="mt-3 text-sm text-red-800">{message}</p> : null}
       </Phone>
     );
@@ -567,9 +566,9 @@ export function CountApp() {
             </li>
           ))}
         </ul>
-        <button type="button" className="mt-6 text-sm text-ksa-teal-deep" onClick={() => setScreen("home")}>
+        <TextLink className="mt-6" onClick={() => setScreen("home")}>
           Kembali
-        </button>
+        </TextLink>
       </Phone>
     );
   }
@@ -592,19 +591,17 @@ export function CountApp() {
             onBack={() => setTagNomor((value) => value.slice(0, -1))}
           />
         </div>
-        <div className="mt-auto flex flex-col gap-3 pt-6">
+        <ActionColumn>
           <PrimaryButton onClick={() => void openTag(tagNomor)}>Buka</PrimaryButton>
           <GhostButton onClick={() => setScreen("denah")}>Pilih dari Denah</GhostButton>
-          <button type="button" className="text-sm text-ksa-teal-deep" onClick={() => setScreen("home")}>
-            Kembali
-          </button>
-        </div>
+          <TextLink onClick={() => setScreen("home")}>Kembali</TextLink>
+        </ActionColumn>
         {message ? (
           <Overlay>
             <p className="text-sm font-medium">{message}</p>
-            <button type="button" className="mt-4 text-sm text-ksa-teal-deep" onClick={() => setMessage("")}>
+            <TextLink className="mt-4" onClick={() => setMessage("")}>
               Tutup
-            </button>
+            </TextLink>
           </Overlay>
         ) : null}
       </Phone>
@@ -634,9 +631,9 @@ export function CountApp() {
             </div>
           </section>
         ))}
-        <button type="button" className="mt-6 text-sm text-ksa-teal-deep" onClick={() => setScreen("open-tag")}>
+        <TextLink className="mt-6" onClick={() => setScreen("open-tag")}>
           Kembali
-        </button>
+        </TextLink>
         {message ? <p className="mt-3 text-sm">{message}</p> : null}
       </Phone>
     );
@@ -712,12 +709,10 @@ export function CountApp() {
             onChange={(e) => setUnknownQty(e.target.value)}
           />
         </label>
-        <div className="mt-auto flex flex-col gap-3 pt-8">
+        <ActionColumn>
           <PrimaryButton onClick={() => void saveUnknown()}>Simpan</PrimaryButton>
-          <button type="button" className="text-sm text-ksa-teal-deep" onClick={() => setScreen("count")}>
-            Batal
-          </button>
-        </div>
+          <TextLink onClick={() => setScreen("count")}>Batal</TextLink>
+        </ActionColumn>
         {message ? <p className="mt-3 text-sm">{message}</p> : null}
       </Phone>
     );
@@ -742,7 +737,7 @@ export function CountApp() {
             {row.reason}
           </p>
         ))}
-        <div className="mt-auto flex flex-col gap-3 pt-6">
+        <ActionColumn>
           <PrimaryButton onClick={() => void syncNow(false)}>Kirim Sekarang</PrimaryButton>
           <GhostButton
             onClick={() => {
@@ -752,7 +747,7 @@ export function CountApp() {
           >
             Kembali
           </GhostButton>
-        </div>
+        </ActionColumn>
         {message ? <p className="mt-3 text-sm">{message}</p> : null}
       </Phone>
     );
@@ -762,23 +757,17 @@ export function CountApp() {
     return (
       <Phone>
         {bar}
-        <Image src="/brand/icon-512.png" alt="" width={96} height={96} className="mx-auto" />
-        <Image
-          src="/brand/lockup-horizontal.png"
-          alt="Stock Opname KSA"
-          width={240}
-          height={52}
-          className="mx-auto mt-4"
-        />
+        <BrandIcon className="mx-auto" />
+        <BrandLockup width={240} height={52} className="mx-auto mt-4" />
         <p className="mt-6 text-sm leading-relaxed text-[#5c5c5c]">
           Aplikasi hitung stock opname. Satu HP, satu petugas, satu sesi.
         </p>
         <p className="mt-4 text-sm">Nama: {prepare?.counter.nama}</p>
         <p className="text-sm">Antrian: {pending}</p>
         <p className="text-sm">Penyimpanan permanen: {storageOk ? "ya" : "tidak / belum dicek"}</p>
-        <button type="button" className="mt-8 text-sm text-ksa-teal-deep" onClick={() => setScreen("home")}>
+        <TextLink className="mt-8" onClick={() => setScreen("home")}>
           Kembali
-        </button>
+        </TextLink>
       </Phone>
     );
   }
@@ -935,12 +924,11 @@ export function CountApp() {
             </GhostButton>
             <PrimaryButton
               onClick={() => {
-                const sum = String(Number(duplicate.existing.qty) + Number(duplicate.incoming));
                 setDuplicate(null);
-                void saveLine(sum, true);
+                void saveLine(duplicateTotal, true);
               }}
             >
-              Jadikan {String(Number(duplicate.existing.qty) + Number(duplicate.incoming))}
+              Jadikan {duplicateTotal}
             </PrimaryButton>
           </div>
         </Overlay>
@@ -961,26 +949,23 @@ export function CountApp() {
               </button>
             ))}
           </div>
-          <p className="mt-4 text-4xl font-semibold text-ksa-teal">{evaluateQtyNote(calcExpr) ?? "—"}</p>
+          <p className="mt-4 text-4xl font-semibold text-ksa-teal">{calcResult ?? "—"}</p>
           <div className="mt-5 flex flex-col gap-3">
             <PrimaryButton
               onClick={() => {
-                const result = evaluateQtyNote(calcExpr);
-                if (!result) {
+                if (!calcResult) {
                   setMessage("Ekspresi tidak sah.");
                   return;
                 }
-                setQty(result);
+                setQty(calcResult);
                 setQtyNote(calcExpr.replace(/\*/g, "×"));
                 setCalcOpen(false);
                 setFocusField("qty");
               }}
             >
-              Pakai {evaluateQtyNote(calcExpr) ?? ""}
+              Pakai {calcResult ?? ""}
             </PrimaryButton>
-            <button type="button" className="text-sm text-ksa-teal-deep" onClick={() => setCalcOpen(false)}>
-              Batal
-            </button>
+            <TextLink onClick={() => setCalcOpen(false)}>Batal</TextLink>
           </div>
         </Overlay>
       ) : null}

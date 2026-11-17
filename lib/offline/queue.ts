@@ -118,8 +118,17 @@ export async function enqueueUnknown(row: UnknownRow): Promise<void> {
   await (await db()).put("unknowns", row);
 }
 
-export async function listQueue(): Promise<CountRow[]> {
-  return (await db()).getAll("counts");
+export async function snapshotQueue() {
+  const database = await db();
+  return {
+    counts: await database.getAll("counts"),
+    submissions: await database.getAll("submissions"),
+    unknowns: await database.getAll("unknowns"),
+  };
+}
+
+export function queueSize(queue: Awaited<ReturnType<typeof snapshotQueue>>): number {
+  return queue.counts.length + queue.submissions.length + queue.unknowns.length;
 }
 
 export async function pendingCount(): Promise<number> {
@@ -128,15 +137,6 @@ export async function pendingCount(): Promise<number> {
   const submissions = await database.count("submissions");
   const unknowns = await database.count("unknowns");
   return counts + submissions + unknowns;
-}
-
-export async function snapshotQueue() {
-  const database = await db();
-  return {
-    counts: await database.getAll("counts"),
-    submissions: await database.getAll("submissions"),
-    unknowns: await database.getAll("unknowns"),
-  };
 }
 
 export async function removeAccepted(ids: string[]): Promise<void> {
