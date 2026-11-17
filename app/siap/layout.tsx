@@ -4,7 +4,7 @@ import { BrandLockup } from "@/app/brand-lockup";
 
 export default function SiapLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-dvh bg-ksa-cream text-[#1c1c1c]">
+    <div className="min-h-dvh overflow-x-hidden bg-ksa-cream text-[#1c1c1c]">
       <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
         <Link href="/siap">
           <BrandLockup width={220} height={48} />

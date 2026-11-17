@@ -111,7 +111,7 @@ describe("Phase 5 session setup", () => {
     );
     expect(opened.status).toBe(200);
     const openedBody = await jsonOf(opened);
-    expect(openedBody.session_tags).toBe(6);
+    expect(openedBody.session_tags).toBe(tags.length);
     const stored = await prisma.opnameSession.findUnique({ where: { id: session.id } });
     expect(stored?.status).toBe("counting");
   });

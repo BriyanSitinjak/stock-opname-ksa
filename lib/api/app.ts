@@ -1,6 +1,7 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import { samePersonOnBothPasses, type AssignmentInput } from "@/lib/assignment-rules";
 import { prisma } from "@/lib/db";
+import { releaseDevice } from "@/lib/devices";
 import { ADMIN_ID } from "@/lib/fixture";
 import { commitImport, parseImportFile, validateAndAggregate } from "@/lib/import";
 import { devicesForSession, sessionDenah } from "@/lib/monitor";
@@ -336,6 +337,22 @@ app.openapi(bindRoute, async (c) => {
     });
   }
   return c.json({ ok: true, device_id: body.device_id }, 200);
+});
+
+app.post("/sessions/:id/devices/release", async (c) => {
+  if (c.req.header("x-device-id")) {
+    return c.json({ error: "Perangkat hitung tidak boleh mengakses ini." }, 403);
+  }
+  const id = c.req.param("id");
+  const body = await c.req.json<{ device_id?: string }>();
+  if (!body.device_id) {
+    return c.json({ error: "device_id wajib." }, 400);
+  }
+  const result = await releaseDevice(id, body.device_id);
+  if ("error" in result) {
+    return c.json({ error: result.error }, result.status);
+  }
+  return c.json(result);
 });
 
 app.get("/sessions/:id/prepare", async (c) => {
