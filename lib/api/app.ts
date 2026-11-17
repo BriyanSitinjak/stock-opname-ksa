@@ -1,7 +1,9 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
+import { samePersonOnBothPasses, type AssignmentInput } from "@/lib/assignment-rules";
 import { prisma } from "@/lib/db";
 import { ADMIN_ID } from "@/lib/fixture";
 import { commitImport, parseImportFile, validateAndAggregate } from "@/lib/import";
+import { DEFAULT_BRANDS, DEFAULT_GROUPS, liveTags, missingAssignments } from "@/lib/setup";
 import { syncCounts } from "@/lib/sync";
 
 const KondisiSchema = z.enum(["baik", "rusak", "kadaluarsa"]);
@@ -27,6 +29,162 @@ const healthRoute = createRoute({
 app.openapi(healthRoute, async (c) => {
   await prisma.$queryRaw`SELECT 1`;
   return c.json({ ok: true }, 200);
+});
+
+app.get("/setup/catalog", async (c) => {
+  const gudang = await prisma.gudang.findMany({
+    where: { retiredAt: null },
+    orderBy: { urutan: "asc" },
+    select: { id: true, kode: true, nama: true },
+  });
+  const counters = await prisma.user.findMany({
+    where: { role: "counter", retiredAt: null },
+    orderBy: { nama: "asc" },
+    select: { id: true, nama: true, role: true },
+  });
+  return c.json({ brands: DEFAULT_BRANDS, groups: DEFAULT_GROUPS, gudang, counters });
+});
+
+app.get("/sessions", async (c) => {
+  const sessions = await prisma.opnameSession.findMany({
+    orderBy: { createdAt: "desc" },
+    select: { id: true, nama: true, periode: true, status: true, snapshotAt: true, scopeFilter: true },
+  });
+  return c.json(sessions);
+});
+
+app.post("/sessions", async (c) => {
+  const body = await c.req.json<{
+    nama?: string;
+    periode?: string;
+    snapshot_at?: string;
+    brands?: string[];
+    groups?: string[];
+  }>();
+  if (!body.nama?.trim() || !body.periode?.trim() || !body.snapshot_at) {
+    return c.json({ error: "Nama, periode, dan waktu cut off wajib." }, 400);
+  }
+  if (!body.brands?.length || !body.groups?.length) {
+    return c.json({ error: "Centang paling tidak satu brand dan satu group." }, 400);
+  }
+  const session = await prisma.opnameSession.create({
+    data: {
+      nama: body.nama.trim(),
+      periode: body.periode.trim(),
+      snapshotAt: new Date(body.snapshot_at),
+      scopeFilter: { brands: body.brands, groups: body.groups },
+      status: "draft",
+      createdById: ADMIN_ID,
+    },
+  });
+  return c.json({
+    id: session.id,
+    nama: session.nama,
+    periode: session.periode,
+    status: session.status,
+    scope_filter: session.scopeFilter,
+  });
+});
+
+app.get("/sessions/:id", async (c) => {
+  const id = c.req.param("id");
+  const session = await prisma.opnameSession.findUnique({ where: { id } });
+  if (!session) {
+    return c.json({ error: "Sesi tidak ditemukan." }, 404);
+  }
+  const [snapshotItems, sessionTags, missing] = await Promise.all([
+    prisma.snapshotItem.count({ where: { sessionId: id } }),
+    prisma.sessionTag.count({ where: { sessionId: id } }),
+    missingAssignments(id),
+  ]);
+  return c.json({
+    id: session.id,
+    nama: session.nama,
+    periode: session.periode,
+    status: session.status,
+    snapshot_at: session.snapshotAt.toISOString(),
+    scope_filter: session.scopeFilter,
+    snapshot_items: snapshotItems,
+    session_tags: sessionTags,
+    missing_assignments: missing,
+  });
+});
+
+app.post("/users", async (c) => {
+  const body = await c.req.json<{ nama?: string }>();
+  if (!body.nama?.trim()) {
+    return c.json({ error: "Nama wajib." }, 400);
+  }
+  const user = await prisma.user.create({
+    data: { nama: body.nama.trim(), role: "counter" },
+    select: { id: true, nama: true, role: true },
+  });
+  return c.json(user);
+});
+
+app.get("/sessions/:id/assignments", async (c) => {
+  const id = c.req.param("id");
+  const tags = await liveTags();
+  const rows = await prisma.tagAssignment.findMany({ where: { sessionId: id } });
+  const byKey = new Map(rows.map((row) => [`${row.tagId}:${row.pass}`, row.userId]));
+  return c.json(
+    tags.map((tag) => ({
+      tag_id: tag.id,
+      nomor: tag.nomor,
+      lokasi: tag.lokasi.nama,
+      gudang: tag.lokasi.gudang.nama,
+      gudang_id: tag.lokasi.gudangId,
+      pass_1: byKey.get(`${tag.id}:1`) ?? null,
+      pass_2: byKey.get(`${tag.id}:2`) ?? null,
+    })),
+  );
+});
+
+app.put("/sessions/:id/assignments", async (c) => {
+  const id = c.req.param("id");
+  const session = await prisma.opnameSession.findUnique({ where: { id } });
+  if (!session) {
+    return c.json({ error: "Sesi tidak ditemukan." }, 404);
+  }
+  if (session.status !== "draft") {
+    return c.json({ error: "Tugas hanya bisa diubah saat sesi masih draft." }, 409);
+  }
+  const body = await c.req.json<{ assignments?: AssignmentInput[] }>();
+  const assignments = body.assignments ?? [];
+  const same = samePersonOnBothPasses(assignments);
+  if (same) {
+    return c.json({ error: same }, 409);
+  }
+  const counters = await prisma.user.findMany({
+    where: { role: "counter", retiredAt: null },
+    select: { id: true },
+  });
+  const counterIds = new Set(counters.map((row) => row.id));
+  const tags = await liveTags();
+  const tagIds = new Set(tags.map((row) => row.id));
+  for (const row of assignments) {
+    if (!tagIds.has(row.tag_id)) {
+      return c.json({ error: "Ada tag yang tidak ada di denah." }, 400);
+    }
+    if (!counterIds.has(row.user_id)) {
+      return c.json({ error: "Hanya petugas hitung yang bisa ditugaskan." }, 400);
+    }
+  }
+  await prisma.$transaction(async (tx) => {
+    await tx.tagAssignment.deleteMany({ where: { sessionId: id } });
+    if (assignments.length > 0) {
+      await tx.tagAssignment.createMany({
+        data: assignments.map((row) => ({
+          sessionId: id,
+          tagId: row.tag_id,
+          pass: row.pass,
+          userId: row.user_id,
+        })),
+      });
+    }
+  });
+  const missing = await missingAssignments(id);
+  return c.json({ ok: true, missing_assignments: missing });
 });
 
 const countersRoute = createRoute({
@@ -260,6 +418,10 @@ app.post("/sessions/:id/open", async (c) => {
   if (tagCount === 0) {
     return c.json({ error: "Denah belum ada." }, 409);
   }
+  const missing = await missingAssignments(id);
+  if (missing.length > 0) {
+    return c.json({ error: "Belum bisa dibuka.", missing_assignments: missing }, 409);
+  }
   await prisma.$transaction(async (tx) => {
     await tx.sessionTag.createMany({
       data: (
@@ -277,10 +439,9 @@ app.post("/sessions/:id/open", async (c) => {
         urutan: tag.urutan,
       })),
     });
-    const assignments = await tx.tagAssignment.count({ where: { sessionId: id } });
     await tx.opnameSession.update({
       where: { id },
-      data: { status: assignments > 0 ? "counting" : "open" },
+      data: { status: "counting" },
     });
   });
   const written = await prisma.sessionTag.count({ where: { sessionId: id } });

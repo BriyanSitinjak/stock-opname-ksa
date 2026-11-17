@@ -12,6 +12,8 @@ export type ImportPreview = {
   filteredCount: number;
   gudangBreakdown: Record<string, number>;
   items: number;
+  emptyHargaCount: number;
+  missingBarcodeCount: number;
 };
 
 type ScopeFilter = { brands?: string[]; groups?: string[] };
@@ -162,7 +164,15 @@ export function validateAndAggregate(
 
   const aggregated = new Map<string, AggregatedItem>();
   const gudangBreakdown: Record<string, number> = {};
+  let emptyHargaCount = 0;
+  let missingBarcodeCount = 0;
   for (const row of kept) {
+    if (!(row.Harga_Satuan ?? "").trim()) {
+      emptyHargaCount += 1;
+    }
+    if (!barcodeOf(row)) {
+      missingBarcodeCount += 1;
+    }
     const gudangNama = row.Nama_Gudang ?? "";
     const gudang = gudangByNama.get(gudangNama);
     if (!gudang) {
@@ -202,6 +212,8 @@ export function validateAndAggregate(
       filteredCount,
       gudangBreakdown,
       items: aggregated.size,
+      emptyHargaCount,
+      missingBarcodeCount,
     },
     items: [...aggregated.values()],
     raw: rows,

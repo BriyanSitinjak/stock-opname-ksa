@@ -3,10 +3,7 @@ import { describe, expect, it } from "vitest";
 import { app } from "@/lib/api/app";
 import { prisma } from "@/lib/db";
 import { ADMIN_ID, ITEM_1234, SESSION_ID, TAG_11 } from "@/lib/fixture";
-
-async function jsonOf(response: Response) {
-  return response.json() as Promise<Record<string, unknown>>;
-}
+import { jsonOf } from "@/tests/json";
 
 describe("Phase 2 gates", () => {
   it("AC-2.1 /prepare JSON has no qty_onhand, harga_satuan, or total_harga", async () => {

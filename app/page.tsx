@@ -12,6 +12,9 @@ export default function Home() {
       >
         Buka layar hitung
       </Link>
+      <Link className="text-sm text-ksa-teal-deep" href="/siap">
+        Layar koordinator
+      </Link>
       <Link className="text-sm text-ksa-teal-deep" href="/api/docs/ui">
         Dokumentasi API
       </Link>
