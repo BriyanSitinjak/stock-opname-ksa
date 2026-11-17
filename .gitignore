@@ -39,6 +39,12 @@ yarn-error.log*
 # local Cursor rules (do not push)
 .cursor/
 
+# local markdown and agent skills (do not push)
+*.md
+.agents/
+skills-lock.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.neon

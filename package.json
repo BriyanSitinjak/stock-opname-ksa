@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@hono/zod-openapi": "^1.6.3",
+    "@neon/config": "^1.14.1",
+    "@neon/env": "^2.1.4",
     "@prisma/client": "^6.19.3",
     "hono": "^4.13.13",
     "idb": "^8.0.4",
