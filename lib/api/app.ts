@@ -3,6 +3,7 @@ import { samePersonOnBothPasses, type AssignmentInput } from "@/lib/assignment-r
 import { prisma } from "@/lib/db";
 import { ADMIN_ID } from "@/lib/fixture";
 import { commitImport, parseImportFile, validateAndAggregate } from "@/lib/import";
+import { devicesForSession, sessionDenah } from "@/lib/monitor";
 import { DEFAULT_BRANDS, DEFAULT_GROUPS, liveTags, missingAssignments } from "@/lib/setup";
 import { syncCounts } from "@/lib/sync";
 
@@ -108,6 +109,26 @@ app.get("/sessions/:id", async (c) => {
     session_tags: sessionTags,
     missing_assignments: missing,
   });
+});
+
+async function requireSession(id: string) {
+  return prisma.opnameSession.findUnique({ where: { id }, select: { id: true } });
+}
+
+app.get("/sessions/:id/denah", async (c) => {
+  const id = c.req.param("id");
+  if (!(await requireSession(id))) {
+    return c.json({ error: "Sesi tidak ditemukan." }, 404);
+  }
+  return c.json({ gudang: await sessionDenah(id) });
+});
+
+app.get("/sessions/:id/devices", async (c) => {
+  const id = c.req.param("id");
+  if (!(await requireSession(id))) {
+    return c.json({ error: "Sesi tidak ditemukan." }, 404);
+  }
+  return c.json({ devices: await devicesForSession(id) });
 });
 
 app.post("/users", async (c) => {

@@ -71,7 +71,7 @@ export function SesiDetail({ id }: { id: string }) {
       <p className="mt-2 text-sm text-[#6b6b6b]">
         Lingkup: {(scope.brands ?? []).join(", ")} · {(scope.groups ?? []).join(", ")}
       </p>
-      <div className="mt-6 grid gap-3 sm:grid-cols-3">
+      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Link href={`/siap/${id}/impor`} className="rounded-2xl bg-white p-5 shadow-sm">
           <p className="font-medium">Impor snapshot</p>
           <p className="mt-1 text-sm text-[#6b6b6b]">{detail.snapshot_items} barang</p>
@@ -82,10 +82,14 @@ export function SesiDetail({ id }: { id: string }) {
             {detail.missing_assignments.length === 0 ? "Semua tag terisi" : `${detail.missing_assignments.length} belum lengkap`}
           </p>
         </Link>
-        <div className="rounded-2xl bg-white p-5 shadow-sm">
-          <p className="font-medium">Pin denah</p>
+        <Link href={`/siap/${id}/pantau`} className="rounded-2xl bg-white p-5 shadow-sm">
+          <p className="font-medium">Pantau gudang</p>
           <p className="mt-1 text-sm text-[#6b6b6b]">{detail.session_tags} tag di sesi ini</p>
-        </div>
+        </Link>
+        <Link href={`/siap/${id}/petugas`} className="rounded-2xl bg-white p-5 shadow-sm">
+          <p className="font-medium">Status petugas</p>
+          <p className="mt-1 text-sm text-[#6b6b6b]">Sinkron terakhir dan laporan HP</p>
+        </Link>
       </div>
       <MissingList items={detail.missing_assignments} />
       {message ? <p className="mt-4 text-sm">{message}</p> : null}
