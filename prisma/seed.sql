@@ -4,7 +4,7 @@
 
 BEGIN;
 
-TRUNCATE approvals, user_devices, unknown_items, tag_submissions, counts,
+TRUNCATE session_reopens, approvals, user_devices, unknown_items, tag_submissions, counts,
          tag_assignments, snapshot_items, import_rows, session_tags,
          opname_sessions, tags, lokasi, gudang, users RESTART IDENTITY CASCADE;
 

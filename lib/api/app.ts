@@ -4,6 +4,15 @@ import { prisma } from "@/lib/db";
 import { ADMIN_ID } from "@/lib/fixture";
 import { commitImport, parseImportFile, validateAndAggregate } from "@/lib/import";
 import { devicesForSession, sessionDenah } from "@/lib/monitor";
+import { buildPdf, buildWorkbook } from "@/lib/export-workbook";
+import {
+  anotherLiveSession,
+  approveSession,
+  closeSession,
+  reopenSession,
+  sendToReview,
+  sessionPayload,
+} from "@/lib/lifecycle";
 import {
   assignPass3,
   daftarBarang,
@@ -100,28 +109,29 @@ app.post("/sessions", async (c) => {
 });
 
 app.get("/sessions/:id", async (c) => {
-  const id = c.req.param("id");
-  const session = await prisma.opnameSession.findUnique({ where: { id } });
-  if (!session) {
+  const payload = await sessionPayload(c.req.param("id"));
+  if (!payload) {
     return c.json({ error: "Sesi tidak ditemukan." }, 404);
   }
-  const [snapshotItems, sessionTags, missing] = await Promise.all([
-    prisma.snapshotItem.count({ where: { sessionId: id } }),
-    prisma.sessionTag.count({ where: { sessionId: id } }),
-    missingAssignments(id),
-  ]);
-  return c.json({
-    id: session.id,
-    nama: session.nama,
-    periode: session.periode,
-    status: session.status,
-    snapshot_at: session.snapshotAt.toISOString(),
-    scope_filter: session.scopeFilter,
-    snapshot_items: snapshotItems,
-    session_tags: sessionTags,
-    missing_assignments: missing,
-  });
+  return c.json(payload);
 });
+
+function refuseDevice(c: { req: { header: (name: string) => string | undefined } }) {
+  if (c.req.header("x-device-id")) {
+    return true;
+  }
+  return false;
+}
+
+function fileBody(buffer: Buffer, type: string, filename: string) {
+  return new Response(Uint8Array.from(buffer), {
+    status: 200,
+    headers: {
+      "Content-Type": type,
+      "Content-Disposition": `attachment; filename="${filename}"`,
+    },
+  });
+}
 
 async function requireSession(id: string) {
   return prisma.opnameSession.findUnique({ where: { id }, select: { id: true } });
@@ -415,6 +425,9 @@ app.post("/sessions/:id/import", async (c) => {
   if (!session) {
     return c.json({ error: "Sesi tidak ditemukan." }, 404);
   }
+  if (session.status === "approved" || session.status === "closed") {
+    return c.json({ error: "Sesi disetujui tidak bisa diubah." }, 409);
+  }
   const bytes = Buffer.from(await file.arrayBuffer());
   const parsed = await parseImportFile(file.name, bytes);
   if ("error" in parsed) {
@@ -460,6 +473,10 @@ app.post("/sessions/:id/open", async (c) => {
   const missing = await missingAssignments(id);
   if (missing.length > 0) {
     return c.json({ error: "Belum bisa dibuka.", missing_assignments: missing }, 409);
+  }
+  const live = await anotherLiveSession(id);
+  if (live) {
+    return c.json({ error: `Sesi ${live.nama} masih berjalan.` }, 409);
   }
   await prisma.$transaction(async (tx) => {
     await tx.sessionTag.createMany({
@@ -658,6 +675,100 @@ app.get("/sessions/:id/peta-barang", async (c) => {
     return c.json({ items: [] });
   }
   return c.json({ items: await petaBarang(id, kode) });
+});
+
+app.post("/sessions/:id/review", async (c) => {
+  if (refuseDevice(c)) {
+    return c.json({ error: "Perangkat hitung tidak boleh mengakses ini." }, 403);
+  }
+  const result = await sendToReview(c.req.param("id"));
+  if ("error" in result) {
+    return c.json(result, result.status);
+  }
+  return c.json(result);
+});
+
+app.post("/sessions/:id/approve", async (c) => {
+  if (refuseDevice(c)) {
+    return c.json({ error: "Perangkat hitung tidak boleh mengakses ini." }, 403);
+  }
+  const id = c.req.param("id");
+  const body = await c.req.json<{ actor_id?: string; step?: number; catatan?: string }>();
+  const actorId = c.req.header("x-actor-id") ?? body.actor_id;
+  if (!actorId || (body.step !== 1 && body.step !== 2)) {
+    return c.json({ error: "Petugas dan langkah wajib." }, 400);
+  }
+  const result = await approveSession(id, actorId, body.step, body.catatan?.trim() || null);
+  if ("error" in result) {
+    return c.json({ error: result.error }, result.status);
+  }
+  return c.json(result);
+});
+
+app.post("/sessions/:id/reopen", async (c) => {
+  if (refuseDevice(c)) {
+    return c.json({ error: "Perangkat hitung tidak boleh mengakses ini." }, 403);
+  }
+  const id = c.req.param("id");
+  const body = await c.req.json<{ actor_id?: string; reason?: string }>();
+  const actorId = c.req.header("x-actor-id") ?? body.actor_id;
+  if (!actorId) {
+    return c.json({ error: "Petugas wajib." }, 400);
+  }
+  const result = await reopenSession(id, actorId, body.reason ?? "");
+  if ("error" in result) {
+    return c.json({ error: result.error }, result.status);
+  }
+  return c.json(result);
+});
+
+app.post("/sessions/:id/close", async (c) => {
+  if (refuseDevice(c)) {
+    return c.json({ error: "Perangkat hitung tidak boleh mengakses ini." }, 403);
+  }
+  const result = await closeSession(c.req.param("id"));
+  if ("error" in result) {
+    return c.json({ error: result.error }, result.status);
+  }
+  return c.json(result);
+});
+
+app.get("/sessions/:id/export.xlsx", async (c) => {
+  if (refuseDevice(c)) {
+    return c.json({ error: "Perangkat hitung tidak boleh mengakses ini." }, 403);
+  }
+  const id = c.req.param("id");
+  const session = await prisma.opnameSession.findUnique({ where: { id } });
+  if (!session) {
+    return c.json({ error: "Sesi tidak ditemukan." }, 404);
+  }
+  if (session.status !== "approved" && session.status !== "closed") {
+    return c.json({ error: "Ekspor akhir hanya setelah disetujui." }, 409);
+  }
+  const file = await buildWorkbook(id);
+  if (!file) {
+    return c.json({ error: "Sesi tidak ditemukan." }, 404);
+  }
+  return fileBody(file.buffer, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", file.filename);
+});
+
+app.get("/sessions/:id/export.pdf", async (c) => {
+  if (refuseDevice(c)) {
+    return c.json({ error: "Perangkat hitung tidak boleh mengakses ini." }, 403);
+  }
+  const id = c.req.param("id");
+  const session = await prisma.opnameSession.findUnique({ where: { id } });
+  if (!session) {
+    return c.json({ error: "Sesi tidak ditemukan." }, 404);
+  }
+  if (session.status !== "approved" && session.status !== "closed") {
+    return c.json({ error: "Ekspor akhir hanya setelah disetujui." }, 409);
+  }
+  const file = await buildPdf(id);
+  if (!file) {
+    return c.json({ error: "Sesi tidak ditemukan." }, 404);
+  }
+  return fileBody(file.buffer, "application/pdf", file.filename);
 });
 
 app.get("/sessions/:id/zero-found", async (c) => {

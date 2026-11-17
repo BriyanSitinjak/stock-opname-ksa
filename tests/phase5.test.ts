@@ -97,7 +97,18 @@ describe("Phase 5 session setup", () => {
     });
     expect(saved.status).toBe(200);
 
+    const paused = await prisma.opnameSession.findMany({
+      where: { id: { not: session.id }, status: { in: ["counting", "review"] } },
+      select: { id: true, status: true },
+    });
+    await prisma.opnameSession.updateMany({
+      where: { id: { in: paused.map((row) => row.id) } },
+      data: { status: "draft" },
+    });
     const opened = await app.request(`/api/sessions/${session.id}/open`, { method: "POST" });
+    await Promise.all(
+      paused.map((row) => prisma.opnameSession.update({ where: { id: row.id }, data: { status: row.status } })),
+    );
     expect(opened.status).toBe(200);
     const openedBody = await jsonOf(opened);
     expect(openedBody.session_tags).toBe(6);

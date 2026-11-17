@@ -94,6 +94,10 @@ export function SesiDetail({ id }: { id: string }) {
           <p className="font-medium">Laporan</p>
           <p className="mt-1 text-sm text-[#6b6b6b]">Selisih, daftar, dan peta barang</p>
         </Link>
+        <Link href={`/siap/${id}/persetujuan`} className="rounded-2xl bg-white p-5 shadow-sm">
+          <p className="font-medium">Persetujuan</p>
+          <p className="mt-1 text-sm text-[#6b6b6b]">Penelaahan, ekspor, dan buka ulang</p>
+        </Link>
       </div>
       <MissingList items={detail.missing_assignments} />
       {message ? <p className="mt-4 text-sm">{message}</p> : null}

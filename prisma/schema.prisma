@@ -52,6 +52,7 @@ model User {
   devices         UserDevice[]    @relation("DeviceUser")
   devicesBound    UserDevice[]    @relation("DeviceBoundBy")
   approvals       Approval[]
+  reopens         SessionReopen[]
 
   @@map("users")
 }
@@ -124,6 +125,7 @@ model OpnameSession {
   unknownItems  UnknownItem[]
   devices       UserDevice[]
   approvals     Approval[]
+  reopens       SessionReopen[]
 
   @@map("opname_sessions")
 }
@@ -307,6 +309,19 @@ model Approval {
 
   @@unique([sessionId, step])
   @@map("approvals")
+}
+
+model SessionReopen {
+  id           String   @id @default(uuid()) @db.Uuid
+  sessionId    String   @map("session_id") @db.Uuid
+  reason       String
+  reopenedById String   @map("reopened_by") @db.Uuid
+  reopenedAt   DateTime @default(now()) @map("reopened_at") @db.Timestamptz(6)
+
+  session    OpnameSession @relation(fields: [sessionId], references: [id])
+  reopenedBy User          @relation(fields: [reopenedById], references: [id])
+
+  @@map("session_reopens")
 }
 
 // Prisma cannot express these, so they live in the init migration SQL:
