@@ -155,9 +155,11 @@ function cellToText(value: unknown): string {
   return String(value);
 }
 
+type GudangMatch = { id: string; nama: string };
+
 export function validateAndAggregate(
   rows: RawRow[],
-  gudangByNama: Map<string, { id: string; nama: string }>,
+  gudangByNama: Map<string, GudangMatch>,
   scope: ScopeFilter,
   known: { brands: readonly string[]; groups: readonly string[] } = { brands: [], groups: [] },
 ): { error: ImportError } | {
@@ -183,18 +185,17 @@ export function validateAndAggregate(
     }
   }
 
-  const unknown: { row: number; nama: string }[] = [];
-  rows.forEach((row, i) => {
-    const nama = row.Nama_Gudang ?? "";
-    if (!gudangByNama.has(nama)) {
-      unknown.push({ row: i + 2, nama });
-    }
-  });
+  const located = rows.map((row, index) => ({
+    row,
+    line: index + 2,
+    gudang: findGudang(row.Nama_Gudang ?? "", gudangByNama),
+  }));
+  const unknown = located.filter((item) => !item.gudang);
   if (unknown.length > 0) {
     return {
       error: {
         code: "unknown_gudang",
-        message: `Nama_Gudang tidak dikenal pada baris ${unknown[0]?.row}: ${unknown[0]?.nama}. Jumlah baris bermasalah: ${unknown.length}.`,
+        message: `Nama_Gudang tidak dikenal pada baris ${unknown[0]?.line}: ${unknown[0]?.row.Nama_Gudang ?? ""}. Jumlah baris bermasalah: ${unknown.length}.`,
       },
     };
   }
@@ -202,7 +203,9 @@ export function validateAndAggregate(
   const discovered = discoverScope(rows, scope, known);
   const brands = discovered.brands;
   const groups = discovered.groups;
-  const kept = rows.filter((row) => inScope(row, brands, groups));
+  const kept = located.flatMap((item) =>
+    item.gudang && inScope(item.row, brands, groups) ? [{ row: item.row, gudang: item.gudang }] : [],
+  );
   const filteredCount = rows.length - kept.length;
   if (kept.length === 0) {
     const foundBrands = uniqueValues(rows.map((row) => row.Nama_Brand));
@@ -216,9 +219,9 @@ export function validateAndAggregate(
   }
 
   const byBarcode = new Map<string, Set<string>>();
-  for (const row of kept) {
-    const barcode = barcodeOf(row);
-    const kode = row.Kode_Barang ?? "";
+  for (const item of kept) {
+    const barcode = barcodeOf(item.row);
+    const kode = item.row.Kode_Barang ?? "";
     if (!barcode) {
       continue;
     }
@@ -229,8 +232,8 @@ export function validateAndAggregate(
   for (const [barcode, kodes] of byBarcode) {
     if (kodes.size > 1) {
       const names = kept
-        .filter((row) => barcodeOf(row) === barcode)
-        .map((row) => row.Nama_Barang)
+        .filter((item) => barcodeOf(item.row) === barcode)
+        .map((item) => item.row.Nama_Barang)
         .filter((name, i, arr) => arr.indexOf(name) === i);
       return {
         error: {
@@ -245,19 +248,16 @@ export function validateAndAggregate(
   const gudangBreakdown: Record<string, number> = {};
   let emptyHargaCount = 0;
   let missingBarcodeCount = 0;
-  for (const row of kept) {
+  for (const item of kept) {
+    const row = item.row;
+    const gudang = item.gudang;
     if (!(row.Harga_Satuan ?? "").trim()) {
       emptyHargaCount += 1;
     }
     if (!barcodeOf(row)) {
       missingBarcodeCount += 1;
     }
-    const gudangNama = row.Nama_Gudang ?? "";
-    const gudang = gudangByNama.get(gudangNama);
-    if (!gudang) {
-      continue;
-    }
-    gudangBreakdown[gudangNama] = (gudangBreakdown[gudangNama] ?? 0) + 1;
+    gudangBreakdown[gudang.nama] = (gudangBreakdown[gudang.nama] ?? 0) + 1;
     const key = `${gudang.id}\0${row.Kode_Barang}`;
     const qty = new Prisma.Decimal(row.Qty_OnHand || "0");
     const harga = new Prisma.Decimal(row.Harga_Satuan || "0");
@@ -371,10 +371,29 @@ function uniqueValues(values: Array<string | undefined>): string {
   return uniqueNames(values).join(", ") || "-";
 }
 
+function findGudang(nama: string, gudangByNama: Map<string, GudangMatch>) {
+  const exact = gudangByNama.get(nama);
+  if (exact) {
+    return exact;
+  }
+  const folded = foldGudang(nama);
+  if (!folded) {
+    return undefined;
+  }
+  const matches = [...gudangByNama.values()].filter((row) => folded.includes(foldGudang(row.nama)));
+  return matches.length === 1 ? matches[0] : undefined;
+}
+
+function foldGudang(nama: string) {
+  return nama.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 function inScope(row: RawRow, brands: string[], groups: string[]): boolean {
-  const brandOk = brands.length === 0 || brands.includes(row.Nama_Brand ?? "");
-  const groupOk = groups.length === 0 || groups.includes(row.Nama_Group ?? "");
-  return brandOk && groupOk;
+  return listed(brands, row.Nama_Brand) && listed(groups, row.Nama_Group);
+}
+
+function listed(names: string[], value: string | undefined) {
+  return names.length === 0 || names.includes(value ?? "");
 }
 
 function barcodeOf(row: RawRow): string {
