@@ -6,7 +6,6 @@ import { prisma } from "@/lib/db";
 import { importFileList } from "@/lib/import-kinds";
 
 const MAX_BYTES = 10 * 1024 * 1024;
-const OLE_MAGIC = Buffer.from([0xd0, 0xcf, 0x11, 0xe0]);
 const REQUIRED = ["Nama_Gudang", "Kode_Barang", "Nama_Barang", "Qty_OnHand", "Harga_Satuan"] as const;
 
 export type ImportError = { code: string; message: string };
@@ -28,20 +27,18 @@ export async function parseImportFile(
   if (bytes.length > MAX_BYTES) {
     return { error: { code: "file_too_large", message: "Berkas terlalu besar (maksimum 10 MB)." } };
   }
-  const lower = filename.toLowerCase();
+  const lower = filename.trim().toLowerCase();
   const head = bytes.subarray(0, 4);
   const magic = head.toString("binary");
   if (lower.endsWith(".exe") || magic.startsWith("MZ")) {
     return fileTypeError();
   }
   if (lower.endsWith(".xls")) {
-    if (head.equals(OLE_MAGIC)) {
+    try {
       return { rows: parseXls(bytes) };
+    } catch {
+      return fileTypeError();
     }
-    if (magic.startsWith("PK")) {
-      return { rows: await parseXlsx(bytes) };
-    }
-    return fileTypeError();
   }
   if (lower.endsWith(".xlsx") || magic.startsWith("PK")) {
     if (!lower.endsWith(".xlsx")) {
@@ -61,16 +58,47 @@ function fileTypeError(): { error: ImportError } {
 
 function parseXls(bytes: Buffer): RawRow[] {
   const workbook = XLSX.read(bytes, { type: "buffer", cellDates: false });
-  const name = workbook.SheetNames[0];
-  if (!name) {
+  let fallback: RawRow[] = [];
+  for (const name of workbook.SheetNames) {
+    const rows = rowsFromMatrix(workbook.Sheets[name]);
+    if (rows.some((row) => hasRequiredColumns(Object.keys(row)))) {
+      return rows;
+    }
+    if (fallback.length === 0) {
+      fallback = rows;
+    }
+  }
+  return fallback;
+}
+
+function rowsFromMatrix(sheet: XLSX.WorkSheet | undefined): RawRow[] {
+  if (!sheet) {
     return [];
   }
-  const table = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[name], {
+  const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+    header: 1,
     raw: true,
     defval: "",
     blankrows: false,
   });
-  return table.map((row) => rawRow(Object.entries(row)));
+  const found = matrix.findIndex((row) =>
+    hasRequiredColumns((row ?? []).map((cell) => String(cell ?? "").trim())),
+  );
+  const headerIndex = found >= 0 ? found : 0;
+  const headers = (matrix[headerIndex] ?? []).map((cell) => String(cell ?? ""));
+  const rows: RawRow[] = [];
+  for (const line of matrix.slice(headerIndex + 1)) {
+    const raw = rawRow(headers, (column) => line?.[column]);
+    if (Object.keys(raw).length > 0) {
+      rows.push(raw);
+    }
+  }
+  return rows;
+}
+
+function hasRequiredColumns(names: Iterable<string>): boolean {
+  const present = new Set(names);
+  return REQUIRED.every((column) => present.has(column));
 }
 
 async function parseXlsx(bytes: Buffer): Promise<RawRow[]> {
@@ -90,24 +118,20 @@ async function parseXlsx(bytes: Buffer): Promise<RawRow[]> {
     if (number === 1) {
       return;
     }
-    const pairs: Array<[string, unknown]> = [];
-    headers.forEach((header, index) => {
-      pairs.push([header, row.getCell(index + 1).value]);
-    });
-    rows.push(rawRow(pairs));
+    rows.push(rawRow(headers, (index) => row.getCell(index + 1).value));
   });
   return rows;
 }
 
-function rawRow(pairs: Array<[string, unknown]>): RawRow {
+function rawRow(headers: string[], valueAt: (index: number) => unknown): RawRow {
   const raw: RawRow = {};
-  for (const [key, value] of pairs) {
-    const header = key.trim();
-    if (!header) {
-      continue;
+  headers.forEach((header, index) => {
+    const key = header.trim();
+    if (!key) {
+      return;
     }
-    raw[header] = cellToText(value);
-  }
+    raw[key] = cellToText(valueAt(index));
+  });
   return raw;
 }
 

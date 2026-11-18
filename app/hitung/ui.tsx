@@ -1,13 +1,17 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { PointerEvent, ReactNode } from "react";
 
 export function Phone({
   tone = "cream",
   children,
+  onPointerDown,
+  onPointerUp,
 }: {
   tone?: "cream" | "ink" | "sync";
   children: ReactNode;
+  onPointerDown?: (event: PointerEvent<HTMLDivElement>) => void;
+  onPointerUp?: (event: PointerEvent<HTMLDivElement>) => void;
 }) {
   const bg =
     tone === "ink"
@@ -16,7 +20,7 @@ export function Phone({
         ? "bg-[#f7f1e3] text-[#1c1c1c]"
         : "bg-ksa-cream text-[#1c1c1c]";
   return (
-    <div className={`min-h-dvh w-full ${bg}`}>
+    <div className={`min-h-dvh w-full ${bg}`} onPointerDown={onPointerDown} onPointerUp={onPointerUp}>
       <main className="mx-auto flex min-h-dvh w-full max-w-[390px] flex-col px-5 pb-8 pt-6">{children}</main>
     </div>
   );
@@ -123,6 +127,18 @@ export function TextLink({
 
 export function ActionColumn({ children }: { children: ReactNode }) {
   return <div className="mt-auto flex flex-col gap-3 pt-6">{children}</div>;
+}
+
+export function WaitNote({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className={`flex flex-col items-center justify-center gap-4 text-center ${compact ? "py-6" : "flex-1"}`}>
+      <span
+        className={`animate-spin rounded-full border-[#e7dfd2] border-t-ksa-teal ${compact ? "h-10 w-10 border-2" : "h-12 w-12 border-[3px]"}`}
+        aria-hidden
+      />
+      <p className="text-sm">Tunggu yaa rekan-rekan KSA</p>
+    </div>
+  );
 }
 
 export function Overlay({ children }: { children: ReactNode }) {

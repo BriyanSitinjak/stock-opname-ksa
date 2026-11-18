@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { BrandIcon, BrandLockup } from "@/app/brand-lockup";
 import { NumericKeypad } from "@/app/hitung/keypad";
-import { ActionColumn, GhostButton, Overlay, Phone, PrimaryButton, TextLink, TopBar } from "@/app/hitung/ui";
+import { ActionColumn, GhostButton, Overlay, Phone, PrimaryButton, TextLink, TopBar, WaitNote } from "@/app/hitung/ui";
 import { evaluateQtyNote } from "@/lib/calculator";
 import { SESSION_ID } from "@/lib/fixture";
 import { maybeActivate } from "@/lib/offline/register-sw";
@@ -109,6 +109,11 @@ export function CountApp() {
   const [duplicate, setDuplicate] = useState<{ existing: LocalLine; incoming: string } | null>(null);
   const [emptyConfirm, setEmptyConfirm] = useState(false);
   const [exitBlock, setExitBlock] = useState(false);
+  const [booting, setBooting] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [leaveOpen, setLeaveOpen] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const pullStart = useRef<number | null>(null);
   const [unknownNama, setUnknownNama] = useState("");
   const [unknownQty, setUnknownQty] = useState("");
   const [rejected, setRejected] = useState<{ client_row_id: string; reason: string }[]>([]);
@@ -179,26 +184,30 @@ export function CountApp() {
 
   useEffect(() => {
     void (async () => {
-      await refreshPending();
-      const cached = await loadPrepare();
-      if (cached) {
-        setPrepare(cached);
-        setScreen("home");
-        return;
-      }
       try {
-        const remote = await fetchPrepare(sessionId, deviceId);
-        if (remote.ok) {
-          await savePrepare(remote.payload);
-          setPrepare(remote.payload);
-          setScreen("prepare");
+        await refreshPending();
+        const cached = await loadPrepare();
+        if (cached) {
+          setPrepare(cached);
+          setScreen("home");
           return;
         }
-      } catch {
-        // stay on bind
+        try {
+          const remote = await fetchPrepare(sessionId, deviceId);
+          if (remote.ok) {
+            await savePrepare(remote.payload);
+            setPrepare(remote.payload);
+            setScreen("prepare");
+            return;
+          }
+        } catch {
+          // stay on bind
+        }
+        await loadCounters();
+        setScreen("bind");
+      } finally {
+        setBooting(false);
       }
-      await loadCounters();
-      setScreen("bind");
     })();
   }, [deviceId, loadCounters, refreshPending, sessionId]);
 
@@ -222,37 +231,64 @@ export function CountApp() {
     return () => window.removeEventListener("beforeunload", onLeave);
   }, [pending]);
 
+  function onPullDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (window.scrollY > 8 || (event.target instanceof Element && event.target.closest("button"))) {
+      pullStart.current = null;
+      return;
+    }
+    pullStart.current = event.clientY;
+  }
+
+  function onPullUp(event: ReactPointerEvent<HTMLDivElement>) {
+    if (pullStart.current == null) {
+      return;
+    }
+    const distance = event.clientY - pullStart.current;
+    pullStart.current = null;
+    if (distance > 72) {
+      setRefreshing(true);
+      void loadCounters().finally(() => setRefreshing(false));
+    }
+  }
+
   async function leaveToStart() {
+    setMessage("");
     if (pending > 0) {
       setExitBlock(true);
+      setLeaveOpen(false);
       setScreen("sync");
       return;
     }
-    setMessage("");
-    let response: Response;
+    setLeaving(true);
     try {
-      response = await fetch(`/api/sessions/${sessionId}/devices/release`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ device_id: deviceId }),
-      });
-    } catch {
-      setMessage("Tidak ada koneksi. Keluar membutuhkan sinyal.");
-      return;
+      let response: Response;
+      try {
+        response = await fetch(`/api/sessions/${sessionId}/devices/release`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ device_id: deviceId }),
+        });
+      } catch {
+        setMessage("Tidak ada koneksi. Keluar membutuhkan sinyal.");
+        return;
+      }
+      if (!response.ok && response.status !== 404) {
+        const json = (await response.json()) as { error?: string };
+        setMessage(json.error ?? "Gagal keluar.");
+        return;
+      }
+      await clearPrepare();
+      setPrepare(null);
+      setActiveTag(null);
+      setTagNomor("");
+      setLines([]);
+      setExitBlock(false);
+      await loadCounters();
+      setLeaveOpen(false);
+      setScreen("bind");
+    } finally {
+      setLeaving(false);
     }
-    if (!response.ok && response.status !== 404) {
-      const json = (await response.json()) as { error?: string };
-      setMessage(json.error ?? "Gagal keluar.");
-      return;
-    }
-    await clearPrepare();
-    setPrepare(null);
-    setActiveTag(null);
-    setTagNomor("");
-    setLines([]);
-    setExitBlock(false);
-    await loadCounters();
-    setScreen("bind");
   }
 
   async function bindName(userId: string) {
@@ -483,11 +519,20 @@ export function CountApp() {
     />
   );
 
-  if (screen === "bind") {
+  if (booting || (refreshing && screen === "bind")) {
     return (
       <Phone>
-        <p className="text-xs text-[#7a7a7a]">{prepare?.session.nama ?? "Stock Opname KSA"}</p>
-        <h1 className="mt-3 text-3xl font-semibold leading-tight">Siapa yang memakai HP ini?</h1>
+        <WaitNote />
+      </Phone>
+    );
+  }
+
+  if (screen === "bind") {
+    return (
+      <Phone onPointerDown={onPullDown} onPointerUp={onPullUp}>
+        <BrandLockup className="h-auto w-40" />
+        <h1 className="mt-6 text-3xl font-semibold leading-tight">Siapa yang memakai HP ini?</h1>
+        <p className="mt-2 text-sm text-[#6b6b6b]">Tarik ke bawah untuk memperbarui</p>
         <div className="mt-6 flex flex-col gap-3">
           {counters.map((counter) => (
             <button
@@ -510,7 +555,6 @@ export function CountApp() {
         {message ? (
           <p className="mt-4 rounded-2xl bg-[#f3d4a0] px-4 py-3 text-sm text-[#5a3b00]">{message}</p>
         ) : null}
-        <BrandLockup className="mt-auto pt-10" />
       </Phone>
     );
   }
@@ -573,10 +617,35 @@ export function CountApp() {
           <button type="button" onClick={() => setScreen("about")}>
             Tentang
           </button>
-          <button type="button" onClick={() => void leaveToStart()}>
+          <button
+            type="button"
+            onClick={() => {
+              setMessage("");
+              setLeaveOpen(true);
+            }}
+          >
             Keluar
           </button>
         </div>
+        {leaveOpen ? (
+          <Overlay>
+            {leaving ? (
+              <WaitNote compact />
+            ) : (
+              <>
+                <p className="text-lg font-semibold">Keluar dari HP ini?</p>
+                <p className="mt-2 text-sm text-[#5c5c5c]">
+                  HP ini kembali ke awal supaya rekan lain bisa memilih nama.
+                </p>
+                {message ? <p className="mt-3 text-sm text-red-800">{message}</p> : null}
+                <div className="mt-5 flex gap-3">
+                  <GhostButton onClick={() => setLeaveOpen(false)}>Batal</GhostButton>
+                  <PrimaryButton onClick={() => void leaveToStart()}>Keluar</PrimaryButton>
+                </div>
+              </>
+            )}
+          </Overlay>
+        ) : null}
       </Phone>
     );
   }
