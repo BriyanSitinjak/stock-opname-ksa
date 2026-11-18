@@ -124,6 +124,13 @@ export function CountApp() {
     setPending(await pendingCount());
   }, []);
 
+  const loadCounters = useCallback(async () => {
+    const list = await fetch(`/api/sessions/${sessionId}/counters`);
+    if (list.ok) {
+      setCounters((await list.json()) as CounterOption[]);
+    }
+  }, [sessionId]);
+
   const syncNow = useCallback(
     async (silent = false) => {
       const queue = await snapshotQueue();
@@ -190,13 +197,10 @@ export function CountApp() {
       } catch {
         // stay on bind
       }
-      const list = await fetch(`/api/sessions/${sessionId}/counters`);
-      if (list.ok) {
-        setCounters((await list.json()) as CounterOption[]);
-      }
+      await loadCounters();
       setScreen("bind");
     })();
-  }, [deviceId, refreshPending, sessionId]);
+  }, [deviceId, loadCounters, refreshPending, sessionId]);
 
   useEffect(() => {
     const onOnline = () => {
@@ -217,6 +221,39 @@ export function CountApp() {
     window.addEventListener("beforeunload", onLeave);
     return () => window.removeEventListener("beforeunload", onLeave);
   }, [pending]);
+
+  async function leaveToStart() {
+    if (pending > 0) {
+      setExitBlock(true);
+      setScreen("sync");
+      return;
+    }
+    setMessage("");
+    let response: Response;
+    try {
+      response = await fetch(`/api/sessions/${sessionId}/devices/release`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ device_id: deviceId }),
+      });
+    } catch {
+      setMessage("Tidak ada koneksi. Keluar membutuhkan sinyal.");
+      return;
+    }
+    if (!response.ok && response.status !== 404) {
+      const json = (await response.json()) as { error?: string };
+      setMessage(json.error ?? "Gagal keluar.");
+      return;
+    }
+    await clearPrepare();
+    setPrepare(null);
+    setActiveTag(null);
+    setTagNomor("");
+    setLines([]);
+    setExitBlock(false);
+    await loadCounters();
+    setScreen("bind");
+  }
 
   async function bindName(userId: string) {
     setBusy(true);
@@ -536,17 +573,7 @@ export function CountApp() {
           <button type="button" onClick={() => setScreen("about")}>
             Tentang
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (pending > 0) {
-                setExitBlock(true);
-                setScreen("sync");
-                return;
-              }
-              setMessage("Antrian kosong. Silakan simpan HP.");
-            }}
-          >
+          <button type="button" onClick={() => void leaveToStart()}>
             Keluar
           </button>
         </div>

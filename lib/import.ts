@@ -1,9 +1,12 @@
 import { Prisma } from "@prisma/client";
 import ExcelJS from "exceljs";
+import * as XLSX from "xlsx";
 import { parseCsv, type RawRow } from "@/lib/csv";
 import { prisma } from "@/lib/db";
+import { importFileList } from "@/lib/import-kinds";
 
 const MAX_BYTES = 10 * 1024 * 1024;
+const OLE_MAGIC = Buffer.from([0xd0, 0xcf, 0x11, 0xe0]);
 const REQUIRED = ["Nama_Gudang", "Kode_Barang", "Nama_Barang", "Qty_OnHand", "Harga_Satuan"] as const;
 
 export type ImportError = { code: string; message: string };
@@ -26,20 +29,48 @@ export async function parseImportFile(
     return { error: { code: "file_too_large", message: "Berkas terlalu besar (maksimum 10 MB)." } };
   }
   const lower = filename.toLowerCase();
-  const magic = bytes.subarray(0, 4).toString("binary");
+  const head = bytes.subarray(0, 4);
+  const magic = head.toString("binary");
   if (lower.endsWith(".exe") || magic.startsWith("MZ")) {
-    return { error: { code: "file_type", message: "Hanya .csv dan .xlsx yang diterima." } };
+    return fileTypeError();
+  }
+  if (lower.endsWith(".xls")) {
+    if (head.equals(OLE_MAGIC)) {
+      return { rows: parseXls(bytes) };
+    }
+    if (magic.startsWith("PK")) {
+      return { rows: await parseXlsx(bytes) };
+    }
+    return fileTypeError();
   }
   if (lower.endsWith(".xlsx") || magic.startsWith("PK")) {
     if (!lower.endsWith(".xlsx")) {
-      return { error: { code: "file_type", message: "Hanya .csv dan .xlsx yang diterima." } };
+      return fileTypeError();
     }
     return { rows: await parseXlsx(bytes) };
   }
   if (!lower.endsWith(".csv")) {
-    return { error: { code: "file_type", message: "Hanya .csv dan .xlsx yang diterima." } };
+    return fileTypeError();
   }
   return { rows: parseCsv(bytes.toString("utf8")) };
+}
+
+function fileTypeError(): { error: ImportError } {
+  return { error: { code: "file_type", message: `Hanya ${importFileList("dan")} yang diterima.` } };
+}
+
+function parseXls(bytes: Buffer): RawRow[] {
+  const workbook = XLSX.read(bytes, { type: "buffer", cellDates: false });
+  const name = workbook.SheetNames[0];
+  if (!name) {
+    return [];
+  }
+  const table = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[name], {
+    raw: true,
+    defval: "",
+    blankrows: false,
+  });
+  return table.map((row) => rawRow(Object.entries(row)));
 }
 
 async function parseXlsx(bytes: Buffer): Promise<RawRow[]> {
@@ -59,14 +90,25 @@ async function parseXlsx(bytes: Buffer): Promise<RawRow[]> {
     if (number === 1) {
       return;
     }
-    const raw: RawRow = {};
+    const pairs: Array<[string, unknown]> = [];
     headers.forEach((header, index) => {
-      const value = row.getCell(index + 1).value;
-      raw[header] = cellToText(value);
+      pairs.push([header, row.getCell(index + 1).value]);
     });
-    rows.push(raw);
+    rows.push(rawRow(pairs));
   });
   return rows;
+}
+
+function rawRow(pairs: Array<[string, unknown]>): RawRow {
+  const raw: RawRow = {};
+  for (const [key, value] of pairs) {
+    const header = key.trim();
+    if (!header) {
+      continue;
+    }
+    raw[header] = cellToText(value);
+  }
+  return raw;
 }
 
 function cellToText(value: unknown): string {

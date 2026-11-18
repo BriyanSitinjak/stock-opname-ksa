@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { fetchJson } from "@/app/siap/api";
+import { IMPORT_ACCEPT, importFileList } from "@/lib/import-kinds";
 import { BackLink, Card, ErrorText, OutlineButton, TealButton } from "@/app/siap/ui";
 
 type Preview = {
@@ -24,7 +25,7 @@ export function ImporForm({ id }: { id: string }) {
 
   async function post(confirm: boolean) {
     if (!file) {
-      setError("Pilih berkas .csv atau .xlsx.");
+      setError(`Pilih berkas ${importFileList("atau")}.`);
       return;
     }
     setBusy(true);
@@ -57,7 +58,7 @@ export function ImporForm({ id }: { id: string }) {
       <Card className="mt-6 max-w-xl">
         <input
           type="file"
-          accept=".csv,.xlsx"
+          accept={IMPORT_ACCEPT}
           onChange={(event) => {
             setFile(event.target.files?.[0] ?? null);
             setPreview(null);
