@@ -4,9 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { samePersonOnBothPasses } from "@/lib/assignment-rules";
 import { fetchJson } from "@/app/siap/api";
 import { ReportRow, ReportTable, Td } from "@/app/siap/report-table";
-import { BackLink, ErrorText, MissingList, OutlineButton, TealButton } from "@/app/siap/ui";
+import { BackLink, ErrorText, MissingList, TealButton } from "@/app/siap/ui";
+import { ROLE_LABEL, type StaffRole } from "@/lib/roles";
 
-type Counter = { id: string; nama: string };
+type Counter = { id: string; nama: string; role?: StaffRole };
 type Row = {
   tag_id: string;
   nomor: string;
@@ -41,7 +42,7 @@ function PassSelect({
       <option value="">—</option>
       {counters.map((counter) => (
         <option key={counter.id} value={counter.id}>
-          {counter.nama}
+          {counter.role ? `${counter.nama} · ${ROLE_LABEL[counter.role] ?? counter.role}` : counter.nama}
         </option>
       ))}
     </select>
@@ -51,16 +52,9 @@ function PassSelect({
 export function TugasBoard({ id }: { id: string }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [counters, setCounters] = useState<Counter[]>([]);
-  const [namaBaru, setNamaBaru] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [missing, setMissing] = useState<string[]>([]);
-
-  async function refresh() {
-    const board = await fetchBoard(id);
-    setRows(board.rows);
-    setCounters(board.counters);
-  }
 
   useEffect(() => {
     let cancelled = false;
@@ -137,39 +131,11 @@ export function TugasBoard({ id }: { id: string }) {
     setMessage("Tugas tersimpan.");
   }
 
-  async function addCounter() {
-    if (!namaBaru.trim()) {
-      return;
-    }
-    const { ok } = await fetchJson("/api/users", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nama: namaBaru.trim() }),
-    });
-    if (!ok) {
-      setError("Gagal menambah petugas.");
-      return;
-    }
-    setNamaBaru("");
-    await refresh();
-  }
-
   return (
     <>
       <BackLink href={`/siap/${id}`} />
       <h1 className="mt-3 text-2xl font-semibold">Bagi tugas</h1>
-      <p className="mt-1 text-sm text-[#6b6b6b]">Dua kolom per tag. Orang yang sama ditolak di kedua pass.</p>
-      <div className="mt-4 flex max-w-md gap-2">
-        <input
-          className="flex-1 rounded-xl border px-3 py-2 text-sm"
-          placeholder="Nama petugas baru"
-          value={namaBaru}
-          onChange={(e) => setNamaBaru(e.target.value)}
-        />
-        <OutlineButton className="px-4" onClick={() => void addCounter()}>
-          Tambah
-        </OutlineButton>
-      </div>
+      <p className="mt-1 text-sm text-[#6b6b6b]">Dua kolom per tag. Orang yang sama ditolak di kedua pass. Nama baru ditambah di Pengguna.</p>
       {grouped.map(([gudang, tags]) => (
         <section key={gudang} className="mt-8">
           <h2 className="mb-3 font-medium">{gudang}</h2>

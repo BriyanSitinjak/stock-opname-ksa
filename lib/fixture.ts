@@ -1,7 +1,7 @@
 export const SESSION_ID = "ses-1";
 export const ADMIN_ID = "usr-1";
-// Parmadi. Kept as the step-2 reviewer the approval tests sign in as.
-export const DEWI_ID = "usr-2";
+// Ardian. The step-2 reviewer the approval test signs in as.
+export const DEWI_ID = "usr-16";
 export const BUDI_ID = "usr-3";
 export const SARI_ID = "usr-4";
 export const AGUS_ID = "usr-5";

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { releaseDevice } from "@/lib/devices";
 import { ADMIN_ID } from "@/lib/fixture";
 import { idPattern, parseId } from "@/lib/ids";
+import { parseRole } from "@/lib/roles";
 import { commitImport, parseImportFile, validateAndAggregate } from "@/lib/import";
 import { devicesForSession, sessionDenah } from "@/lib/monitor";
 import { buildPdf, buildWorkbook } from "@/lib/export-workbook";
@@ -62,7 +63,7 @@ app.get("/setup/catalog", async (c) => {
     select: { id: true, kode: true, nama: true },
   });
   const counters = await prisma.user.findMany({
-    where: { role: "counter", retiredAt: null },
+    where: { retiredAt: null },
     orderBy: { nama: "asc" },
     select: { id: true, nama: true, role: true },
   });
@@ -165,16 +166,62 @@ app.get("/sessions/:id/devices", async (c) => {
   return c.json({ devices: await devicesForSession(id) });
 });
 
+const deviceBlocked = { error: "Perangkat hitung tidak boleh mengakses ini." } as const;
+
+app.get("/users", async (c) => {
+  const users = await prisma.user.findMany({
+    where: { retiredAt: null },
+    orderBy: { nama: "asc" },
+    select: { id: true, nama: true, role: true },
+  });
+  return c.json({ users });
+});
+
 app.post("/users", async (c) => {
-  const body = await c.req.json<{ nama?: string }>();
-  if (!body.nama?.trim()) {
-    return c.json({ error: "Nama wajib." }, 400);
+  if (refuseDevice(c)) {
+    return c.json(deviceBlocked, 403);
+  }
+  const body = await c.req.json<{ nama?: string; role?: string }>();
+  const role = parseRole(body.role);
+  if (!body.nama?.trim() || role == null) {
+    return c.json({ error: "Nama dan peran wajib." }, 400);
   }
   const user = await prisma.user.create({
-    data: { nama: body.nama.trim(), role: "counter" },
+    data: { nama: body.nama.trim(), role },
     select: { id: true, nama: true, role: true },
   });
   return c.json(user);
+});
+
+app.patch("/users/:id", async (c) => {
+  if (refuseDevice(c)) {
+    return c.json(deviceBlocked, 403);
+  }
+  const id = parseId(c.req.param("id"), "usr");
+  if (id == null) {
+    return c.json({ error: "Pengguna tidak ditemukan." }, 404);
+  }
+  const body = await c.req.json<{ role?: string; retired?: boolean }>();
+  const role = body.role == null ? undefined : parseRole(body.role);
+  if (body.role != null && role == null) {
+    return c.json({ error: "Peran tidak dikenal." }, 400);
+  }
+  if (role == null && body.retired !== true) {
+    return c.json({ error: "Tidak ada perubahan." }, 400);
+  }
+  const existing = await prisma.user.findFirst({ where: { id, retiredAt: null }, select: { id: true } });
+  if (!existing) {
+    return c.json({ error: "Pengguna tidak ditemukan." }, 404);
+  }
+  const user = await prisma.user.update({
+    where: { id },
+    data: {
+      ...(role ? { role } : {}),
+      ...(body.retired === true ? { retiredAt: new Date() } : {}),
+    },
+    select: { id: true, nama: true, role: true, retiredAt: true },
+  });
+  return c.json({ id: user.id, nama: user.nama, role: user.role, retired: user.retiredAt != null });
 });
 
 app.get("/sessions/:id/assignments", async (c) => {
@@ -213,7 +260,7 @@ app.put("/sessions/:id/assignments", async (c) => {
     return c.json({ error: same }, 409);
   }
   const counters = await prisma.user.findMany({
-    where: { role: "counter", retiredAt: null },
+    where: { retiredAt: null },
     select: { id: true },
   });
   const counterIds = new Set(counters.map((row) => row.id));
@@ -227,7 +274,7 @@ app.put("/sessions/:id/assignments", async (c) => {
       return c.json({ error: "Ada tag yang tidak ada di denah." }, 400);
     }
     if (userId == null || !counterIds.has(userId)) {
-      return c.json({ error: "Hanya petugas hitung yang bisa ditugaskan." }, 400);
+      return c.json({ error: "Petugas tidak ditemukan." }, 400);
     }
     parsed.push({ tagId, userId, pass: row.pass });
   }
@@ -329,8 +376,8 @@ app.openapi(bindRoute, async (c) => {
   const { id } = c.req.valid("param");
   const body = c.req.valid("json");
   const user = await prisma.user.findUnique({ where: { id: body.user_id } });
-  if (!user || user.role !== "counter") {
-    return c.json({ error: "Pengguna bukan petugas hitung." }, 409);
+  if (!user || user.retiredAt) {
+    return c.json({ error: "Petugas tidak ditemukan." }, 409);
   }
   const existing = await prisma.userDevice.findFirst({
     where: { sessionId: id, userId: body.user_id, releasedAt: null },

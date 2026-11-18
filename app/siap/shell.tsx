@@ -42,6 +42,11 @@ const GROUPS: { label: string; items: (sessionId: string | null) => NavItem[] }[
         href: sessionId ? `/siap/${sessionId}/laporan/daftar-barang` : "/siap",
         match: (pathname) => pathname.endsWith("/daftar-barang"),
       },
+      {
+        label: "Pengguna",
+        href: "/siap/pengguna",
+        match: (pathname) => pathname === "/siap/pengguna",
+      },
     ],
   },
   {

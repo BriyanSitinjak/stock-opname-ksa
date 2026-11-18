@@ -1,8 +1,8 @@
 -- stock-opname seed. Tags and snapshot items stay the Stage 7
 -- acceptance-criteria fixture (item 9001).
 -- Admin and reviewer rows are the real roster. A user has one role.
--- Ardian is listed as both, so the account is admin.
--- Counters are maintained as users and are not part of this seed.
+-- Briyan is the only admin. Ardian and Kepala Gudang are reviewers.
+-- The other named staff are counters.
 -- Ids are prefix-number text: usr-1, ses-1, tag-11, itm-1234.
 
 BEGIN;
@@ -14,18 +14,18 @@ TRUNCATE session_reopens, approvals, user_devices, unknown_items, tag_submission
 -- ---------------------------------------------------------------- pengguna
 INSERT INTO users (id, nama, username, password_hash, role) VALUES
  ('usr-1','Briyan',         'briyan',       '$argon2id$PLACEHOLDER','admin'),
- ('usr-16','Ardian',         'ardian',       '$argon2id$PLACEHOLDER','admin'),
- ('usr-17','Kepala Gudang',  'kepalagudang', '$argon2id$PLACEHOLDER','admin'),
- ('usr-2','Parmadi',        'parmadi',      '$argon2id$PLACEHOLDER','reviewer'),
- ('usr-7','Dufi',           'dufi',         '$argon2id$PLACEHOLDER','reviewer'),
- ('usr-8','Yulius',         'yulius',       '$argon2id$PLACEHOLDER','reviewer'),
- ('usr-9','Nelly',          'nelly',        '$argon2id$PLACEHOLDER','reviewer'),
- ('usr-10','Kenny',          'kenny',        '$argon2id$PLACEHOLDER','reviewer'),
- ('usr-11','Okky',           'okky',         '$argon2id$PLACEHOLDER','reviewer'),
- ('usr-12','Aisia',          'aisia',        '$argon2id$PLACEHOLDER','reviewer'),
- ('usr-13','Afang',          'afang',        '$argon2id$PLACEHOLDER','reviewer'),
- ('usr-14','Natalia',        'natalia',      '$argon2id$PLACEHOLDER','reviewer'),
- ('usr-15','Mukcin',         'mukcin',       '$argon2id$PLACEHOLDER','reviewer');
+ ('usr-16','Ardian',         'ardian',       '$argon2id$PLACEHOLDER','reviewer'),
+ ('usr-17','Kepala Gudang',  'kepalagudang', '$argon2id$PLACEHOLDER','reviewer'),
+ ('usr-2','Parmadi',        'parmadi',      '$argon2id$PLACEHOLDER','counter'),
+ ('usr-7','Dufi',           'dufi',         '$argon2id$PLACEHOLDER','counter'),
+ ('usr-8','Yulius',         'yulius',       '$argon2id$PLACEHOLDER','counter'),
+ ('usr-9','Nelly',          'nelly',        '$argon2id$PLACEHOLDER','counter'),
+ ('usr-10','Kenny',          'kenny',        '$argon2id$PLACEHOLDER','counter'),
+ ('usr-11','Okky',           'okky',         '$argon2id$PLACEHOLDER','counter'),
+ ('usr-12','Aisia',          'aisia',        '$argon2id$PLACEHOLDER','counter'),
+ ('usr-13','Afang',          'afang',        '$argon2id$PLACEHOLDER','counter'),
+ ('usr-14','Natalia',        'natalia',      '$argon2id$PLACEHOLDER','counter'),
+ ('usr-15','Mukcin',         'mukcin',       '$argon2id$PLACEHOLDER','counter');
 
 -- ------------------------------------------------------------------ gudang
 INSERT INTO gudang (id, kode, nama, urutan) VALUES
