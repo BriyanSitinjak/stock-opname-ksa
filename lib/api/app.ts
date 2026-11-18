@@ -6,7 +6,7 @@ import { ADMIN_ID } from "@/lib/fixture";
 import { idPattern, parseId } from "@/lib/ids";
 import { parseRole } from "@/lib/roles";
 import { commitImport, parseImportFile, validateAndAggregate } from "@/lib/import";
-import { devicesForSession, sessionDenah } from "@/lib/monitor";
+import { coordinatorDenah, devicesForSession } from "@/lib/monitor";
 import { buildPdf, buildWorkbook } from "@/lib/export-workbook";
 import {
   anotherLiveSession,
@@ -56,17 +56,21 @@ app.openapi(healthRoute, async (c) => {
   return c.json({ ok: true }, 200);
 });
 
+function activeStaff() {
+  return prisma.user.findMany({
+    where: { retiredAt: null },
+    orderBy: { nama: "asc" },
+    select: { id: true, nama: true, role: true },
+  });
+}
+
 app.get("/setup/catalog", async (c) => {
   const gudang = await prisma.gudang.findMany({
     where: { retiredAt: null },
     orderBy: { urutan: "asc" },
     select: { id: true, kode: true, nama: true },
   });
-  const counters = await prisma.user.findMany({
-    where: { retiredAt: null },
-    orderBy: { nama: "asc" },
-    select: { id: true, nama: true, role: true },
-  });
+  const counters = await activeStaff();
   return c.json({ brands: DEFAULT_BRANDS, groups: DEFAULT_GROUPS, gudang, counters });
 });
 
@@ -154,7 +158,8 @@ app.get("/sessions/:id/denah", async (c) => {
   if (!(await requireSession(id))) {
     return c.json(sessionMissing, 404);
   }
-  return c.json({ gudang: await sessionDenah(id) });
+  const denah = await coordinatorDenah(id);
+  return c.json(denah);
 });
 
 app.get("/sessions/:id/devices", async (c) => {
@@ -169,12 +174,7 @@ app.get("/sessions/:id/devices", async (c) => {
 const deviceBlocked = { error: "Perangkat hitung tidak boleh mengakses ini." } as const;
 
 app.get("/users", async (c) => {
-  const users = await prisma.user.findMany({
-    where: { retiredAt: null },
-    orderBy: { nama: "asc" },
-    select: { id: true, nama: true, role: true },
-  });
-  return c.json({ users });
+  return c.json({ users: await activeStaff() });
 });
 
 app.post("/users", async (c) => {
@@ -259,11 +259,7 @@ app.put("/sessions/:id/assignments", async (c) => {
   if (same) {
     return c.json({ error: same }, 409);
   }
-  const counters = await prisma.user.findMany({
-    where: { retiredAt: null },
-    select: { id: true },
-  });
-  const counterIds = new Set(counters.map((row) => row.id));
+  const counterIds = new Set((await activeStaff()).map((row) => row.id));
   const tags = await liveTags();
   const tagIds = new Set(tags.map((row) => row.id));
   const parsed: { tagId: string; userId: string; pass: number }[] = [];
@@ -404,8 +400,8 @@ app.openapi(bindRoute, async (c) => {
 });
 
 app.post("/sessions/:id/devices/release", async (c) => {
-  if (c.req.header("x-device-id")) {
-    return c.json({ error: "Perangkat hitung tidak boleh mengakses ini." }, 403);
+  if (refuseDevice(c)) {
+    return c.json(deviceBlocked, 403);
   }
   const id = sessionId(c);
   if (id == null) return c.json(sessionMissing, 404);
@@ -551,8 +547,8 @@ app.post("/sessions/:id/open", async (c) => {
   if (snapshotCount === 0) {
     return c.json({ error: "Snapshot belum diimpor." }, 409);
   }
-  const tagCount = await prisma.tag.count({ where: { retiredAt: null } });
-  if (tagCount === 0) {
+  const tags = await liveTags();
+  if (tags.length === 0) {
     return c.json({ error: "Denah belum ada." }, 409);
   }
   const missing = await missingAssignments(id);
@@ -565,12 +561,7 @@ app.post("/sessions/:id/open", async (c) => {
   }
   await prisma.$transaction(async (tx) => {
     await tx.sessionTag.createMany({
-      data: (
-        await tx.tag.findMany({
-          where: { retiredAt: null, lokasi: { retiredAt: null, gudang: { retiredAt: null } } },
-          include: { lokasi: { include: { gudang: true } } },
-        })
-      ).map((tag) => ({
+      data: tags.map((tag) => ({
         sessionId: id,
         tagId: tag.id,
         nomor: tag.nomor,
@@ -780,7 +771,7 @@ app.get("/sessions/:id/peta-barang", async (c) => {
 
 app.post("/sessions/:id/review", async (c) => {
   if (refuseDevice(c)) {
-    return c.json({ error: "Perangkat hitung tidak boleh mengakses ini." }, 403);
+    return c.json(deviceBlocked, 403);
   }
   const id = sessionId(c);
   if (id == null) return c.json(sessionMissing, 404);
@@ -793,7 +784,7 @@ app.post("/sessions/:id/review", async (c) => {
 
 app.post("/sessions/:id/approve", async (c) => {
   if (refuseDevice(c)) {
-    return c.json({ error: "Perangkat hitung tidak boleh mengakses ini." }, 403);
+    return c.json(deviceBlocked, 403);
   }
   const id = sessionId(c);
   if (id == null) return c.json(sessionMissing, 404);
@@ -811,7 +802,7 @@ app.post("/sessions/:id/approve", async (c) => {
 
 app.post("/sessions/:id/reopen", async (c) => {
   if (refuseDevice(c)) {
-    return c.json({ error: "Perangkat hitung tidak boleh mengakses ini." }, 403);
+    return c.json(deviceBlocked, 403);
   }
   const id = sessionId(c);
   if (id == null) return c.json(sessionMissing, 404);
@@ -829,7 +820,7 @@ app.post("/sessions/:id/reopen", async (c) => {
 
 app.post("/sessions/:id/close", async (c) => {
   if (refuseDevice(c)) {
-    return c.json({ error: "Perangkat hitung tidak boleh mengakses ini." }, 403);
+    return c.json(deviceBlocked, 403);
   }
   const id = sessionId(c);
   if (id == null) return c.json(sessionMissing, 404);
@@ -842,7 +833,7 @@ app.post("/sessions/:id/close", async (c) => {
 
 app.get("/sessions/:id/export.xlsx", async (c) => {
   if (refuseDevice(c)) {
-    return c.json({ error: "Perangkat hitung tidak boleh mengakses ini." }, 403);
+    return c.json(deviceBlocked, 403);
   }
   const id = sessionId(c);
   if (id == null) return c.json(sessionMissing, 404);
@@ -862,7 +853,7 @@ app.get("/sessions/:id/export.xlsx", async (c) => {
 
 app.get("/sessions/:id/export.pdf", async (c) => {
   if (refuseDevice(c)) {
-    return c.json({ error: "Perangkat hitung tidak boleh mengakses ini." }, 403);
+    return c.json(deviceBlocked, 403);
   }
   const id = sessionId(c);
   if (id == null) return c.json(sessionMissing, 404);

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { fetchJson } from "@/app/siap/api";
+import { SAMPLE_DENAH_NOTE } from "@/lib/monitor";
 import { MissingList, TealButton } from "@/app/siap/ui";
 
 type Detail = {
@@ -23,6 +24,11 @@ type GudangProgress = {
   selisih_hitung: number;
 };
 
+type DenahPayload = {
+  gudang: GudangProgress[];
+  pinned: boolean;
+};
+
 const STATUS_LABEL: Record<string, string> = {
   draft: "Draf",
   counting: "Sedang berjalan",
@@ -39,6 +45,7 @@ async function fetchSession(id: string) {
 export function SesiDetail({ id }: { id: string }) {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [gudang, setGudang] = useState<GudangProgress[]>([]);
+  const [pinned, setPinned] = useState(true);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -48,9 +55,10 @@ export function SesiDetail({ id }: { id: string }) {
         setDetail(next);
       }
     });
-    void fetchJson<{ gudang: GudangProgress[] }>(`/api/sessions/${id}/denah`).then(({ ok, data }) => {
+    void fetchJson<DenahPayload>(`/api/sessions/${id}/denah`).then(({ ok, data }) => {
       if (!cancelled && ok) {
         setGudang(data.gudang);
+        setPinned(data.pinned);
       }
     });
     return () => {
@@ -114,6 +122,8 @@ export function SesiDetail({ id }: { id: string }) {
         {gudang.length === 0 ? (
           <p className="mt-4 text-sm text-[#6b6b6b]">Denah muncul setelah sesi dibuka.</p>
         ) : (
+          <>
+            {pinned ? null : <p className="mt-3 text-sm text-[#6b6b6b]">{SAMPLE_DENAH_NOTE}</p>}
           <ul className="mt-4 space-y-4">
             {gudang.map((row) => {
               const width = row.total === 0 ? 0 : Math.round((row.selesai / row.total) * 100);
@@ -133,6 +143,7 @@ export function SesiDetail({ id }: { id: string }) {
               );
             })}
           </ul>
+          </>
         )}
       </section>
 

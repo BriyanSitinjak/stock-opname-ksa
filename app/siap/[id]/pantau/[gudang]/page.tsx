@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { MissingPin, SiapSubpage } from "@/app/siap/pantau-shell";
 import { AwaitParams } from "@/app/siap/session-id";
-import { pantauHref, selesaiCaption, sessionDenah } from "@/lib/monitor";
+import { coordinatorGudang, pantauHref, selesaiCaption } from "@/lib/monitor";
 
 export default function Page({ params }: { params: Promise<{ id: string; gudang: string }> }) {
   return <AwaitParams params={params}>{(value) => <PantauGudang id={value.id} gudang={value.gudang} />}</AwaitParams>;
@@ -9,7 +9,7 @@ export default function Page({ params }: { params: Promise<{ id: string; gudang:
 
 async function PantauGudang({ id, gudang }: { id: string; gudang: string }) {
   const nama = decodeURIComponent(gudang);
-  const match = (await sessionDenah(id)).find((row) => row.nama === nama);
+  const match = await coordinatorGudang(id, nama);
   if (!match) {
     return <MissingPin href={pantauHref(id)}>Gudang tidak ada di pin sesi ini.</MissingPin>;
   }

@@ -8,6 +8,39 @@ import { ROLE_LABEL, ROLES, type StaffRole } from "@/lib/roles";
 
 type Person = { id: string; nama: string; role: StaffRole };
 
+function RoleSelect({
+  value,
+  onChange,
+  className,
+}: {
+  value: StaffRole;
+  onChange: (role: StaffRole) => void;
+  className: string;
+}) {
+  return (
+    <select className={className} value={value} onChange={(event) => onChange(event.target.value as StaffRole)}>
+      {ROLES.map((item) => (
+        <option key={item} value={item}>
+          {ROLE_LABEL[item]}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+async function readUsers() {
+  const { ok, data } = await fetchJson<{ users: Person[] }>("/api/users");
+  return ok ? data.users : null;
+}
+
+function patchUser(id: string, body: { role?: StaffRole; retired?: boolean }) {
+  return fetchJson<{ error?: string }>(`/api/users/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
 export function PenggunaBoard() {
   const [people, setPeople] = useState<Person[]>([]);
   const [nama, setNama] = useState("");
@@ -15,18 +48,11 @@ export function PenggunaBoard() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  async function load() {
-    const { ok, data } = await fetchJson<{ users: Person[] }>("/api/users");
-    if (ok) {
-      setPeople(data.users);
-    }
-  }
-
   useEffect(() => {
     let cancelled = false;
-    void fetchJson<{ users: Person[] }>("/api/users").then(({ ok, data }) => {
-      if (!cancelled && ok) {
-        setPeople(data.users);
+    void readUsers().then((users) => {
+      if (!cancelled && users) {
+        setPeople(users);
       }
     });
     return () => {
@@ -52,17 +78,16 @@ export function PenggunaBoard() {
     }
     setNama("");
     setMessage("Pengguna tersimpan.");
-    await load();
+    const users = await readUsers();
+    if (users) {
+      setPeople(users);
+    }
   }
 
   async function changeRole(person: Person, next: StaffRole) {
     setError("");
     setMessage("");
-    const { ok, data } = await fetchJson<{ error?: string }>(`/api/users/${person.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ role: next }),
-    });
+    const { ok, data } = await patchUser(person.id, { role: next });
     if (!ok) {
       setError(data.error ?? "Gagal mengubah peran.");
       return;
@@ -73,11 +98,7 @@ export function PenggunaBoard() {
   async function retire(person: Person) {
     setError("");
     setMessage("");
-    const { ok, data } = await fetchJson<{ error?: string }>(`/api/users/${person.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ retired: true }),
-    });
+    const { ok, data } = await patchUser(person.id, { retired: true });
     if (!ok) {
       setError(data.error ?? "Gagal menonaktifkan.");
       return;
@@ -99,13 +120,7 @@ export function PenggunaBoard() {
           value={nama}
           onChange={(e) => setNama(e.target.value)}
         />
-        <select className="rounded-xl border px-3 py-2 text-sm" value={role} onChange={(e) => setRole(e.target.value as StaffRole)}>
-          {ROLES.map((item) => (
-            <option key={item} value={item}>
-              {ROLE_LABEL[item]}
-            </option>
-          ))}
-        </select>
+        <RoleSelect className="rounded-xl border px-3 py-2 text-sm" value={role} onChange={setRole} />
         <TealButton className="px-5 py-2 text-sm" onClick={() => void addPerson()}>
           Tambah
         </TealButton>
@@ -115,17 +130,7 @@ export function PenggunaBoard() {
           <ReportRow key={person.id}>
             <Td className="font-medium">{person.nama}</Td>
             <Td>
-              <select
-                className="rounded-lg border px-2 py-1"
-                value={person.role}
-                onChange={(e) => void changeRole(person, e.target.value as StaffRole)}
-              >
-                {ROLES.map((item) => (
-                  <option key={item} value={item}>
-                    {ROLE_LABEL[item]}
-                  </option>
-                ))}
-              </select>
+              <RoleSelect className="rounded-lg border px-2 py-1" value={person.role} onChange={(next) => void changeRole(person, next)} />
             </Td>
             <Td>
               <OutlineButton className="px-3 py-1" onClick={() => void retire(person)}>

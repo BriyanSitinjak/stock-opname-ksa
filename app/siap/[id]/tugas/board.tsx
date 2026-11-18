@@ -42,7 +42,7 @@ function PassSelect({
       <option value="">—</option>
       {counters.map((counter) => (
         <option key={counter.id} value={counter.id}>
-          {counter.role ? `${counter.nama} · ${ROLE_LABEL[counter.role] ?? counter.role}` : counter.nama}
+          {counter.role ? `${counter.nama} · ${ROLE_LABEL[counter.role]}` : counter.nama}
         </option>
       ))}
     </select>

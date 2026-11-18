@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { liveTags } from "@/lib/setup";
 
 export const TAG_STATUSES = ["belum", "menunggu_hitung_2", "selisih_hitung", "selesai", "kosong"] as const;
 export type TagStatus = (typeof TAG_STATUSES)[number];
@@ -134,13 +135,7 @@ function groupDenah(tags: DenahTag[]): DenahGudang[] {
   });
 }
 
-async function denahForSession(sessionId: string): Promise<DenahTag[]> {
-  const rows = await prisma.$queryRaw<StatusRow[]>`
-    SELECT tag_id, nomor, lokasi_nama, gudang_nama, weight, urutan, status
-    FROM v_tag_status
-    WHERE session_id = ${sessionId}
-    ORDER BY gudang_nama ASC, lokasi_nama ASC, urutan ASC
-  `;
+async function passNames(sessionId: string) {
   const assignments = await prisma.tagAssignment.findMany({
     where: { sessionId, pass: { in: [1, 2] } },
     include: { user: { select: { nama: true } } },
@@ -149,24 +144,88 @@ async function denahForSession(sessionId: string): Promise<DenahTag[]> {
   for (const row of assignments) {
     names.set(`${row.tagId}:${row.pass}`, row.user.nama);
   }
-  return rows.map((row) => {
-    const status = isTagStatus(row.status) ? row.status : "belum";
-    return {
-      tag_id: row.tag_id,
-      nomor: row.nomor,
-      lokasi_nama: row.lokasi_nama,
-      gudang_nama: row.gudang_nama,
-      weight: Number(row.weight),
-      urutan: Number(row.urutan),
-      status,
-      pass_1_nama: names.get(`${row.tag_id}:1`) ?? null,
-      pass_2_nama: names.get(`${row.tag_id}:2`) ?? null,
-    };
-  });
+  return names;
+}
+
+function withPassNames(tag: Omit<DenahTag, "pass_1_nama" | "pass_2_nama">, names: Map<string, string>): DenahTag {
+  return {
+    ...tag,
+    pass_1_nama: names.get(`${tag.tag_id}:1`) ?? null,
+    pass_2_nama: names.get(`${tag.tag_id}:2`) ?? null,
+  };
+}
+
+async function denahForSession(sessionId: string): Promise<DenahTag[]> {
+  const rows = await prisma.$queryRaw<StatusRow[]>`
+    SELECT tag_id, nomor, lokasi_nama, gudang_nama, weight, urutan, status
+    FROM v_tag_status
+    WHERE session_id = ${sessionId}
+    ORDER BY gudang_nama ASC, lokasi_nama ASC, urutan ASC
+  `;
+  const names = await passNames(sessionId);
+  return rows.map((row) =>
+    withPassNames(
+      {
+        tag_id: row.tag_id,
+        nomor: row.nomor,
+        lokasi_nama: row.lokasi_nama,
+        gudang_nama: row.gudang_nama,
+        weight: Number(row.weight),
+        urutan: Number(row.urutan),
+        status: isTagStatus(row.status) ? row.status : "belum",
+      },
+      names,
+    ),
+  );
 }
 
 export async function sessionDenah(sessionId: string) {
   return groupDenah(await denahForSession(sessionId));
+}
+
+async function masterPreview(sessionId: string): Promise<DenahTag[]> {
+  const tags = await liveTags();
+  const names = await passNames(sessionId);
+  return tags.map((tag) =>
+    withPassNames(
+      {
+        tag_id: tag.id,
+        nomor: tag.nomor,
+        lokasi_nama: tag.lokasi.nama,
+        gudang_nama: tag.lokasi.gudang.nama,
+        weight: tag.weight,
+        urutan: tag.urutan,
+        status: "belum",
+      },
+      names,
+    ),
+  );
+}
+
+// Draft sessions have no pin yet. The board may show the current master
+// layout so the sample denah can be walked and replaced before open.
+// Reports keep sessionDenah, which reads session_tags only.
+export const SAMPLE_DENAH_NOTE =
+  "Denah contoh, belum dipin. Layout ini bisa diganti selama sesi masih draf. Pin terjadi saat sesi dibuka.";
+
+export async function coordinatorDenah(sessionId: string) {
+  const pinnedCount = await prisma.sessionTag.count({ where: { sessionId } });
+  if (pinnedCount > 0) {
+    return { gudang: await sessionDenah(sessionId), pinned: true };
+  }
+  const session = await prisma.opnameSession.findUnique({
+    where: { id: sessionId },
+    select: { status: true },
+  });
+  if (session?.status !== "draft") {
+    return { gudang: [], pinned: false };
+  }
+  return { gudang: groupDenah(await masterPreview(sessionId)), pinned: false };
+}
+
+export async function coordinatorGudang(sessionId: string, nama: string) {
+  const { gudang } = await coordinatorDenah(sessionId);
+  return gudang.find((row) => row.nama === nama) ?? null;
 }
 
 export async function devicesForSession(sessionId: string) {
