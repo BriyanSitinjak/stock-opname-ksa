@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { parseId } from "@/lib/ids";
 import { sessionDenah } from "@/lib/monitor";
 import { decString } from "@/lib/qty-display";
 
@@ -34,7 +35,7 @@ export async function selisihHitung(sessionId: string) {
            si.barcode_4, si.kode_barang, si.nama_barang,
            u1.nama AS pass_1_nama,
            u2.nama AS pass_2_nama,
-           a3.user_id::text AS pass_3_user_id
+           a3.user_id AS pass_3_user_id
     FROM v_selisih_hitung sh
     JOIN session_tags st
       ON st.session_id = sh.session_id AND st.tag_id = sh.tag_id
@@ -47,7 +48,7 @@ export async function selisihHitung(sessionId: string) {
     LEFT JOIN users u2 ON u2.id = a2.user_id
     LEFT JOIN tag_assignments a3
       ON a3.session_id = sh.session_id AND a3.tag_id = sh.tag_id AND a3.pass = 3
-    WHERE sh.session_id = ${sessionId}::uuid
+    WHERE sh.session_id = ${sessionId}
     ORDER BY st.gudang_nama, st.lokasi_nama, st.urutan, si.nama_barang
   `;
   return rows.map((row) => ({
@@ -95,7 +96,7 @@ export async function pass3Compare(sessionId: string, tagIds: string[]): Promise
     SELECT sh.tag_id, sh.snapshot_item_id, si.barcode_4, si.nama_barang, sh.qty_1, sh.qty_2
     FROM v_selisih_hitung sh
     JOIN snapshot_items si ON si.id = sh.snapshot_item_id
-    WHERE sh.session_id = ${sessionId}::uuid
+    WHERE sh.session_id = ${sessionId}
     ORDER BY si.nama_barang
   `;
   const wanted = new Set(tagIds);
@@ -133,7 +134,7 @@ export async function selisihSistem(sessionId: string) {
            vs.qty_onhand, vs.qty_hitung, vs.selisih_qty, vs.selisih_nilai, vs.ada_selisih_hitung
     FROM v_selisih_sistem vs
     JOIN gudang g ON g.id = vs.gudang_id
-    WHERE vs.session_id = ${sessionId}::uuid
+    WHERE vs.session_id = ${sessionId}
     ORDER BY g.urutan, vs.nama_barang
   `;
   return rows.map((row) => ({
@@ -163,7 +164,7 @@ export async function kondisiReport(sessionId: string) {
     SELECT si.barcode_4, si.nama_barang, cc.kondisi::text AS kondisi, SUM(cc.qty) AS qty
     FROM v_current_counts cc
     JOIN snapshot_items si ON si.id = cc.snapshot_item_id
-    WHERE cc.session_id = ${sessionId}::uuid
+    WHERE cc.session_id = ${sessionId}
     GROUP BY si.barcode_4, si.nama_barang, cc.kondisi
     ORDER BY si.nama_barang, cc.kondisi
   `;
@@ -233,7 +234,7 @@ export async function daftarBarang(
   const take = 50;
   const where = {
     sessionId,
-    ...(query.gudang_id ? { gudangId: query.gudang_id } : {}),
+    ...(parseId(query.gudang_id, "gdg") ? { gudangId: query.gudang_id } : {}),
     ...(query.brand ? { namaBrand: query.brand } : {}),
     ...(query.group ? { namaGroup: query.group } : {}),
     ...(query.q
@@ -282,7 +283,7 @@ export async function petaBarang(sessionId: string, kode: string) {
     FROM v_agreed a
     JOIN session_tags st ON st.session_id = a.session_id AND st.tag_id = a.tag_id
     JOIN snapshot_items si ON si.id = a.snapshot_item_id
-    WHERE a.session_id = ${sessionId}::uuid
+    WHERE a.session_id = ${sessionId}
       AND si.barcode_4 = ${kode}
       AND a.qty_agreed IS NOT NULL
     GROUP BY st.gudang_nama, st.lokasi_nama, st.nomor

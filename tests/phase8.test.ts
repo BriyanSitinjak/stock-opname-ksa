@@ -67,7 +67,7 @@ async function submit(sessionId: string, tagId: string, pass: number, userId: st
       qty,
       qtyNote: note ?? null,
       kondisi: "baik",
-      deviceId: `DEV-${pass}-${tagId.slice(0, 4)}`,
+      deviceId: `DEV-${pass}-${tagId}`,
       clientCreatedAt: new Date(),
     },
   });
@@ -79,7 +79,7 @@ async function submit(sessionId: string, tagId: string, pass: number, userId: st
       pass,
       submittedById: userId,
       isEmpty: false,
-      deviceId: `DEV-${pass}-${tagId.slice(0, 4)}`,
+      deviceId: `DEV-${pass}-${tagId}`,
       clientCreatedAt: new Date(),
     },
   });
@@ -122,7 +122,7 @@ describe("Phase 8 lifecycle and export", () => {
     const { session } = await seedSession("draft");
     const response = await app.request(`/api/sessions/${session.id}/approve`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-actor-id": ADMIN_ID },
+      headers: { "Content-Type": "application/json", "x-actor-id": String(ADMIN_ID) },
       body: JSON.stringify({ step: 1 }),
     });
     expect(response.status).toBe(409);
@@ -149,13 +149,13 @@ describe("Phase 8 lifecycle and export", () => {
     expect((await app.request(`/api/sessions/${session.id}/review`, { method: "POST" })).status).toBe(200);
     const step1 = await app.request(`/api/sessions/${session.id}/approve`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-actor-id": ADMIN_ID },
+      headers: { "Content-Type": "application/json", "x-actor-id": String(ADMIN_ID) },
       body: JSON.stringify({ step: 1, catatan: FORMULA }),
     });
     expect(step1.status).toBe(200);
     const step2 = await app.request(`/api/sessions/${session.id}/approve`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-actor-id": DEWI_ID },
+      headers: { "Content-Type": "application/json", "x-actor-id": String(DEWI_ID) },
       body: JSON.stringify({ step: 2 }),
     });
     expect(step2.status).toBe(200);

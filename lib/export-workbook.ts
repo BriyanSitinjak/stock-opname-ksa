@@ -42,7 +42,7 @@ export async function exportSummary(sessionId: string) {
   const unknown = await unknownItems(sessionId);
   const notes = await prisma.$queryRaw<Array<{ qty_note: string | null }>>`
     SELECT qty_note FROM v_current_counts
-    WHERE session_id = ${sessionId}::uuid AND qty_note IS NOT NULL
+    WHERE session_id = ${sessionId} AND qty_note IS NOT NULL
     ORDER BY qty_note
   `;
   const approvals = await prisma.approval.findMany({

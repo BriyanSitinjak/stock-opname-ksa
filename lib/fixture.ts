@@ -1,11 +1,12 @@
-export const SESSION_ID = "55555555-5555-5555-5555-000000000001";
-export const ADMIN_ID = "11111111-1111-1111-1111-000000000001";
-export const DEWI_ID = "11111111-1111-1111-1111-000000000002";
-export const BUDI_ID = "11111111-1111-1111-1111-000000000003";
-export const SARI_ID = "11111111-1111-1111-1111-000000000004";
-export const AGUS_ID = "11111111-1111-1111-1111-000000000005";
-export const RINA_ID = "11111111-1111-1111-1111-000000000006";
-export const TAG_11 = "44444444-4444-4444-4444-000000000011";
-export const TAG_13 = "44444444-4444-4444-4444-000000000013";
-export const ITEM_1234 = "66666666-6666-6666-6666-000000001234";
-export const GUDANG_01 = "22222222-2222-2222-2222-000000000001";
+export const SESSION_ID = "ses-1";
+export const ADMIN_ID = "usr-1";
+// Parmadi. Kept as the step-2 reviewer the approval tests sign in as.
+export const DEWI_ID = "usr-2";
+export const BUDI_ID = "usr-3";
+export const SARI_ID = "usr-4";
+export const AGUS_ID = "usr-5";
+export const RINA_ID = "usr-6";
+export const TAG_11 = "tag-11";
+export const TAG_13 = "tag-13";
+export const ITEM_1234 = "itm-1234";
+export const GUDANG_01 = "gdg-1";

@@ -73,16 +73,15 @@ export async function syncCounts(input: {
     }
     await prisma.$executeRaw`
       INSERT INTO counts (
-        id, client_row_id, session_id, tag_id, pass, snapshot_item_id,
+        client_row_id, session_id, tag_id, pass, snapshot_item_id,
         counted_by, qty, qty_note, kondisi, device_id, client_created_at
       ) VALUES (
-        gen_random_uuid(),
         ${row.client_row_id}::uuid,
-        ${binding.sessionId}::uuid,
-        ${row.tag_id}::uuid,
+        ${binding.sessionId},
+        ${row.tag_id},
         ${row.pass},
-        ${row.snapshot_item_id}::uuid,
-        ${binding.userId}::uuid,
+        ${row.snapshot_item_id},
+        ${binding.userId},
         ${row.qty}::numeric,
         ${row.qty_note},
         ${row.kondisi}::"Kondisi",
@@ -102,15 +101,14 @@ export async function syncCounts(input: {
     }
     await prisma.$executeRaw`
       INSERT INTO tag_submissions (
-        id, client_row_id, session_id, tag_id, pass, submitted_by,
+        client_row_id, session_id, tag_id, pass, submitted_by,
         is_empty, device_id, client_created_at
       ) VALUES (
-        gen_random_uuid(),
         ${row.client_row_id}::uuid,
-        ${binding.sessionId}::uuid,
-        ${row.tag_id}::uuid,
+        ${binding.sessionId},
+        ${row.tag_id},
         ${row.pass},
-        ${binding.userId}::uuid,
+        ${binding.userId},
         ${row.is_empty},
         ${input.deviceId},
         ${row.client_created_at}::timestamptz
@@ -128,15 +126,14 @@ export async function syncCounts(input: {
     }
     await prisma.$executeRaw`
       INSERT INTO unknown_items (
-        id, client_row_id, session_id, tag_id, pass, counted_by, device_id,
+        client_row_id, session_id, tag_id, pass, counted_by, device_id,
         kode_input, nama_input, qty, kondisi, client_created_at
       ) VALUES (
-        gen_random_uuid(),
         ${row.client_row_id}::uuid,
-        ${binding.sessionId}::uuid,
-        ${row.tag_id}::uuid,
+        ${binding.sessionId},
+        ${row.tag_id},
         ${row.pass},
-        ${binding.userId}::uuid,
+        ${binding.userId},
         ${input.deviceId},
         ${row.kode_input},
         ${row.nama_input},

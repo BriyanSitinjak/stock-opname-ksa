@@ -21,7 +21,7 @@ describe("Phase 9 verification", () => {
     await expect(
       prisma.$executeRaw`
         INSERT INTO user_devices (session_id, device_id, user_id, bound_by)
-        VALUES (${SESSION_ID}::uuid, ${`DUP-${randomUUID()}`}, ${BUDI_ID}::uuid, ${ADMIN_ID}::uuid)
+        VALUES (${SESSION_ID}, ${`DUP-${randomUUID()}`}, ${BUDI_ID}, ${ADMIN_ID})
       `,
     ).rejects.toThrow(/23505|already exists/i);
   });
@@ -37,8 +37,8 @@ describe("Phase 9 verification", () => {
         createdById: ADMIN_ID,
       },
     });
-    const first = `REL-A-${session.id.slice(0, 8)}`;
-    const second = `REL-B-${session.id.slice(0, 8)}`;
+    const first = `REL-A-${String(session.id)}`;
+    const second = `REL-B-${String(session.id)}`;
     await prisma.userDevice.create({
       data: { sessionId: session.id, deviceId: first, userId: BUDI_ID, boundById: ADMIN_ID, lastReportedPending: 4 },
     });
@@ -126,7 +126,7 @@ describe("Phase 9 verification", () => {
         data: {
           sessionId: session.id,
           gudangId: GUDANG_01,
-          kodeBarang: `LOAD-${session.id.slice(0, 8)}`,
+          kodeBarang: `LOAD-${String(session.id)}`,
           barcode4: "9999",
           namaBarang: "BEBAN SINKRON",
           qtyOnhand: "0",
@@ -144,7 +144,7 @@ describe("Phase 9 verification", () => {
           prisma.tag.create({
             data: {
               lokasiId: lokasi.id,
-              nomor: `L${session.id.slice(0, 6)}-${i + 1}`,
+              nomor: `L${session.id}-${i + 1}`,
               weight: 1,
               urutan: 80 + i,
               retiredAt: new Date(),
@@ -171,7 +171,7 @@ describe("Phase 9 verification", () => {
           userId: users[i]!.id,
         })),
       });
-      const devices = users.map((user, i) => `LOAD-${i}-${session.id.slice(0, 8)}`);
+      const devices = users.map((user, i) => `LOAD-${i}-${String(session.id)}`);
       await prisma.userDevice.createMany({
         data: devices.map((deviceId, i) => ({
           sessionId: session.id,

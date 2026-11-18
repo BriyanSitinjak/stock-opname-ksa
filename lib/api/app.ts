@@ -3,6 +3,7 @@ import { samePersonOnBothPasses, type AssignmentInput } from "@/lib/assignment-r
 import { prisma } from "@/lib/db";
 import { releaseDevice } from "@/lib/devices";
 import { ADMIN_ID } from "@/lib/fixture";
+import { idPattern, parseId } from "@/lib/ids";
 import { commitImport, parseImportFile, validateAndAggregate } from "@/lib/import";
 import { devicesForSession, sessionDenah } from "@/lib/monitor";
 import { buildPdf, buildWorkbook } from "@/lib/export-workbook";
@@ -109,10 +110,18 @@ app.post("/sessions", async (c) => {
   });
 });
 
+const sessionMissing = { error: "Sesi tidak ditemukan." } as const;
+
+function sessionId(c: { req: { param: (name: string) => string } }) {
+  return parseId(c.req.param("id"), "ses");
+}
+
 app.get("/sessions/:id", async (c) => {
-  const payload = await sessionPayload(c.req.param("id"));
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
+  const payload = await sessionPayload(id);
   if (!payload) {
-    return c.json({ error: "Sesi tidak ditemukan." }, 404);
+    return c.json(sessionMissing, 404);
   }
   return c.json(payload);
 });
@@ -139,17 +148,19 @@ async function requireSession(id: string) {
 }
 
 app.get("/sessions/:id/denah", async (c) => {
-  const id = c.req.param("id");
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
   if (!(await requireSession(id))) {
-    return c.json({ error: "Sesi tidak ditemukan." }, 404);
+    return c.json(sessionMissing, 404);
   }
   return c.json({ gudang: await sessionDenah(id) });
 });
 
 app.get("/sessions/:id/devices", async (c) => {
-  const id = c.req.param("id");
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
   if (!(await requireSession(id))) {
-    return c.json({ error: "Sesi tidak ditemukan." }, 404);
+    return c.json(sessionMissing, 404);
   }
   return c.json({ devices: await devicesForSession(id) });
 });
@@ -167,7 +178,8 @@ app.post("/users", async (c) => {
 });
 
 app.get("/sessions/:id/assignments", async (c) => {
-  const id = c.req.param("id");
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
   const tags = await liveTags();
   const rows = await prisma.tagAssignment.findMany({ where: { sessionId: id } });
   const byKey = new Map(rows.map((row) => [`${row.tagId}:${row.pass}`, row.userId]));
@@ -185,10 +197,11 @@ app.get("/sessions/:id/assignments", async (c) => {
 });
 
 app.put("/sessions/:id/assignments", async (c) => {
-  const id = c.req.param("id");
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
   const session = await prisma.opnameSession.findUnique({ where: { id } });
   if (!session) {
-    return c.json({ error: "Sesi tidak ditemukan." }, 404);
+    return c.json(sessionMissing, 404);
   }
   if (session.status !== "draft") {
     return c.json({ error: "Tugas hanya bisa diubah saat sesi masih draft." }, 409);
@@ -206,23 +219,27 @@ app.put("/sessions/:id/assignments", async (c) => {
   const counterIds = new Set(counters.map((row) => row.id));
   const tags = await liveTags();
   const tagIds = new Set(tags.map((row) => row.id));
+  const parsed: { tagId: string; userId: string; pass: number }[] = [];
   for (const row of assignments) {
-    if (!tagIds.has(row.tag_id)) {
+    const tagId = parseId(row.tag_id, "tag");
+    const userId = parseId(row.user_id, "usr");
+    if (tagId == null || !tagIds.has(tagId)) {
       return c.json({ error: "Ada tag yang tidak ada di denah." }, 400);
     }
-    if (!counterIds.has(row.user_id)) {
+    if (userId == null || !counterIds.has(userId)) {
       return c.json({ error: "Hanya petugas hitung yang bisa ditugaskan." }, 400);
     }
+    parsed.push({ tagId, userId, pass: row.pass });
   }
   await prisma.$transaction(async (tx) => {
     await tx.tagAssignment.deleteMany({ where: { sessionId: id } });
-    if (assignments.length > 0) {
+    if (parsed.length > 0) {
       await tx.tagAssignment.createMany({
-        data: assignments.map((row) => ({
+        data: parsed.map((row) => ({
           sessionId: id,
-          tagId: row.tag_id,
+          tagId: row.tagId,
           pass: row.pass,
-          userId: row.user_id,
+          userId: row.userId,
         })),
       });
     }
@@ -235,7 +252,7 @@ const countersRoute = createRoute({
   method: "get",
   path: "/sessions/{id}/counters",
   request: {
-    params: z.object({ id: z.string().min(8) }),
+    params: z.object({ id: z.string().regex(idPattern("ses")) }),
   },
   responses: {
     200: {
@@ -280,12 +297,12 @@ const bindRoute = createRoute({
   method: "post",
   path: "/sessions/{id}/bind",
   request: {
-    params: z.object({ id: z.string().min(8) }),
+    params: z.object({ id: z.string().regex(idPattern("ses")) }),
     body: {
       content: {
         "application/json": {
           schema: z.object({
-            user_id: z.string().min(8),
+            user_id: z.string().regex(idPattern("usr")),
             device_id: z.string().min(1),
           }),
         },
@@ -343,7 +360,8 @@ app.post("/sessions/:id/devices/release", async (c) => {
   if (c.req.header("x-device-id")) {
     return c.json({ error: "Perangkat hitung tidak boleh mengakses ini." }, 403);
   }
-  const id = c.req.param("id");
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
   const body = await c.req.json<{ device_id?: string }>();
   if (!body.device_id) {
     return c.json({ error: "device_id wajib." }, 400);
@@ -356,7 +374,8 @@ app.post("/sessions/:id/devices/release", async (c) => {
 });
 
 app.get("/sessions/:id/prepare", async (c) => {
-  const id = c.req.param("id");
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
   const deviceId = c.req.header("x-device-id");
   if (!deviceId) {
     return c.json({ error: "x-device-id wajib." }, 401);
@@ -370,7 +389,7 @@ app.get("/sessions/:id/prepare", async (c) => {
   }
   const session = await prisma.opnameSession.findUnique({ where: { id } });
   if (!session) {
-    return c.json({ error: "Sesi tidak ditemukan." }, 404);
+    return c.json(sessionMissing, 404);
   }
   const scope = session.scopeFilter as { brands?: string[]; groups?: string[] };
   const items = await prisma.snapshotItem.findMany({
@@ -431,7 +450,8 @@ app.get("/sessions/:id/prepare", async (c) => {
 });
 
 app.post("/sessions/:id/import", async (c) => {
-  const id = c.req.param("id");
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
   const confirm = c.req.query("confirm") === "1";
   const body = await c.req.parseBody();
   const file = body.file;
@@ -440,7 +460,7 @@ app.post("/sessions/:id/import", async (c) => {
   }
   const session = await prisma.opnameSession.findUnique({ where: { id } });
   if (!session) {
-    return c.json({ error: "Sesi tidak ditemukan." }, 404);
+    return c.json(sessionMissing, 404);
   }
   if (session.status === "approved" || session.status === "closed") {
     return c.json({ error: "Sesi disetujui tidak bisa diubah." }, 409);
@@ -471,10 +491,11 @@ app.post("/sessions/:id/import", async (c) => {
 });
 
 app.post("/sessions/:id/open", async (c) => {
-  const id = c.req.param("id");
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
   const session = await prisma.opnameSession.findUnique({ where: { id } });
   if (!session) {
-    return c.json({ error: "Sesi tidak ditemukan." }, 404);
+    return c.json(sessionMissing, 404);
   }
   if (session.status !== "draft") {
     return c.json({ error: "Sesi bukan draft." }, 409);
@@ -535,9 +556,9 @@ const syncRoute = createRoute({
               .array(
                 z.object({
                   client_row_id: z.string().min(8),
-                  tag_id: z.string().min(8),
+                  tag_id: z.string().regex(idPattern("tag")),
                   pass: z.number().int(),
-                  snapshot_item_id: z.string().min(8),
+                  snapshot_item_id: z.string().regex(idPattern("itm")),
                   qty: z.string(),
                   qty_note: z.string().nullable().optional(),
                   kondisi: KondisiSchema,
@@ -549,7 +570,7 @@ const syncRoute = createRoute({
               .array(
                 z.object({
                   client_row_id: z.string().min(8),
-                  tag_id: z.string().min(8),
+                  tag_id: z.string().regex(idPattern("tag")),
                   pass: z.number().int(),
                   is_empty: z.boolean(),
                   client_created_at: z.string(),
@@ -560,7 +581,7 @@ const syncRoute = createRoute({
               .array(
                 z.object({
                   client_row_id: z.string().min(8),
-                  tag_id: z.string().min(8),
+                  tag_id: z.string().regex(idPattern("tag")),
                   pass: z.number().int(),
                   kode_input: z.string().nullable().optional(),
                   nama_input: z.string().nullable().optional(),
@@ -625,29 +646,37 @@ app.openapi(syncRoute, async (c) => {
 });
 
 app.get("/sessions/:id/selisih-hitung", async (c) => {
-  return c.json(await selisihHitung(c.req.param("id")));
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
+  return c.json(await selisihHitung(id));
 });
 
 app.get("/sessions/:id/selisih-sistem", async (c) => {
-  return c.json(await selisihSistem(c.req.param("id")));
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
+  return c.json(await selisihSistem(id));
 });
 
 app.get("/sessions/:id/compare/:tagId", async (c) => {
-  const id = c.req.param("id");
-  const tagId = c.req.param("tagId");
-  if (!(await requireSession(id))) {
-    return c.json({ error: "Sesi tidak ditemukan." }, 404);
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
+  const tagId = parseId(c.req.param("tagId"), "tag");
+  if (tagId == null || !(await requireSession(id))) {
+    return c.json(sessionMissing, 404);
   }
   return c.json({ items: await tagCompare(id, tagId) });
 });
 
 app.post("/sessions/:id/pass-3", async (c) => {
-  const id = c.req.param("id");
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
   const body = await c.req.json<{ tag_id?: string; user_id?: string }>();
-  if (!body.tag_id || !body.user_id) {
+  const tagId = parseId(body.tag_id, "tag");
+  const userId = parseId(body.user_id, "usr");
+  if (tagId == null || userId == null) {
     return c.json({ error: "Tag dan petugas wajib." }, 400);
   }
-  const result = await assignPass3(id, body.tag_id, body.user_id);
+  const result = await assignPass3(id, tagId, userId);
   if ("error" in result) {
     return c.json({ error: result.error }, result.status);
   }
@@ -655,21 +684,28 @@ app.post("/sessions/:id/pass-3", async (c) => {
 });
 
 app.get("/sessions/:id/kondisi", async (c) => {
-  return c.json(await kondisiReport(c.req.param("id")));
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
+  return c.json(await kondisiReport(id));
 });
 
 app.get("/sessions/:id/unknown-items", async (c) => {
-  return c.json(await unknownItems(c.req.param("id")));
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
+  return c.json(await unknownItems(id));
 });
 
 app.get("/sessions/:id/rekap-tag", async (c) => {
-  return c.json(await rekapTag(c.req.param("id")));
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
+  return c.json(await rekapTag(id));
 });
 
 app.get("/sessions/:id/items", async (c) => {
-  const id = c.req.param("id");
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
   if (!(await requireSession(id))) {
-    return c.json({ error: "Sesi tidak ditemukan." }, 404);
+    return c.json(sessionMissing, 404);
   }
   return c.json(
     await daftarBarang(id, {
@@ -683,9 +719,10 @@ app.get("/sessions/:id/items", async (c) => {
 });
 
 app.get("/sessions/:id/peta-barang", async (c) => {
-  const id = c.req.param("id");
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
   if (!(await requireSession(id))) {
-    return c.json({ error: "Sesi tidak ditemukan." }, 404);
+    return c.json(sessionMissing, 404);
   }
   const kode = (c.req.query("kode") ?? "").trim();
   if (!kode) {
@@ -698,7 +735,9 @@ app.post("/sessions/:id/review", async (c) => {
   if (refuseDevice(c)) {
     return c.json({ error: "Perangkat hitung tidak boleh mengakses ini." }, 403);
   }
-  const result = await sendToReview(c.req.param("id"));
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
+  const result = await sendToReview(id);
   if ("error" in result) {
     return c.json(result, result.status);
   }
@@ -709,10 +748,11 @@ app.post("/sessions/:id/approve", async (c) => {
   if (refuseDevice(c)) {
     return c.json({ error: "Perangkat hitung tidak boleh mengakses ini." }, 403);
   }
-  const id = c.req.param("id");
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
   const body = await c.req.json<{ actor_id?: string; step?: number; catatan?: string }>();
-  const actorId = c.req.header("x-actor-id") ?? body.actor_id;
-  if (!actorId || (body.step !== 1 && body.step !== 2)) {
+  const actorId = parseId(c.req.header("x-actor-id") ?? body.actor_id, "usr");
+  if (actorId == null || (body.step !== 1 && body.step !== 2)) {
     return c.json({ error: "Petugas dan langkah wajib." }, 400);
   }
   const result = await approveSession(id, actorId, body.step, body.catatan?.trim() || null);
@@ -726,10 +766,11 @@ app.post("/sessions/:id/reopen", async (c) => {
   if (refuseDevice(c)) {
     return c.json({ error: "Perangkat hitung tidak boleh mengakses ini." }, 403);
   }
-  const id = c.req.param("id");
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
   const body = await c.req.json<{ actor_id?: string; reason?: string }>();
-  const actorId = c.req.header("x-actor-id") ?? body.actor_id;
-  if (!actorId) {
+  const actorId = parseId(c.req.header("x-actor-id") ?? body.actor_id, "usr");
+  if (actorId == null) {
     return c.json({ error: "Petugas wajib." }, 400);
   }
   const result = await reopenSession(id, actorId, body.reason ?? "");
@@ -743,7 +784,9 @@ app.post("/sessions/:id/close", async (c) => {
   if (refuseDevice(c)) {
     return c.json({ error: "Perangkat hitung tidak boleh mengakses ini." }, 403);
   }
-  const result = await closeSession(c.req.param("id"));
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
+  const result = await closeSession(id);
   if ("error" in result) {
     return c.json({ error: result.error }, result.status);
   }
@@ -754,17 +797,18 @@ app.get("/sessions/:id/export.xlsx", async (c) => {
   if (refuseDevice(c)) {
     return c.json({ error: "Perangkat hitung tidak boleh mengakses ini." }, 403);
   }
-  const id = c.req.param("id");
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
   const session = await prisma.opnameSession.findUnique({ where: { id } });
   if (!session) {
-    return c.json({ error: "Sesi tidak ditemukan." }, 404);
+    return c.json(sessionMissing, 404);
   }
   if (session.status !== "approved" && session.status !== "closed") {
     return c.json({ error: "Ekspor akhir hanya setelah disetujui." }, 409);
   }
   const file = await buildWorkbook(id);
   if (!file) {
-    return c.json({ error: "Sesi tidak ditemukan." }, 404);
+    return c.json(sessionMissing, 404);
   }
   return fileBody(file.buffer, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", file.filename);
 });
@@ -773,27 +817,29 @@ app.get("/sessions/:id/export.pdf", async (c) => {
   if (refuseDevice(c)) {
     return c.json({ error: "Perangkat hitung tidak boleh mengakses ini." }, 403);
   }
-  const id = c.req.param("id");
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
   const session = await prisma.opnameSession.findUnique({ where: { id } });
   if (!session) {
-    return c.json({ error: "Sesi tidak ditemukan." }, 404);
+    return c.json(sessionMissing, 404);
   }
   if (session.status !== "approved" && session.status !== "closed") {
     return c.json({ error: "Ekspor akhir hanya setelah disetujui." }, 409);
   }
   const file = await buildPdf(id);
   if (!file) {
-    return c.json({ error: "Sesi tidak ditemukan." }, 404);
+    return c.json(sessionMissing, 404);
   }
   return fileBody(file.buffer, "application/pdf", file.filename);
 });
 
 app.get("/sessions/:id/zero-found", async (c) => {
-  const id = c.req.param("id");
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
   const rows = await prisma.$queryRaw<Array<{ barcode_4: string | null; nama_barang: string; qty_onhand: unknown }>>`
     SELECT barcode_4, nama_barang, qty_onhand
     FROM v_selisih_sistem
-    WHERE session_id = ${id}::uuid
+    WHERE session_id = ${id}
       AND qty_hitung = 0
       AND qty_onhand > 0
   `;

@@ -20,7 +20,7 @@ export async function reviewBlockers(sessionId: string) {
   >`
     SELECT tag_id, nomor, gudang_nama, lokasi_nama, status
     FROM v_tag_status
-    WHERE session_id = ${sessionId}::uuid
+    WHERE session_id = ${sessionId}
       AND status IN ('belum', 'menunggu_hitung_2', 'selisih_hitung')
     ORDER BY gudang_nama, lokasi_nama, urutan
   `;

@@ -138,7 +138,7 @@ async function denahForSession(sessionId: string): Promise<DenahTag[]> {
   const rows = await prisma.$queryRaw<StatusRow[]>`
     SELECT tag_id, nomor, lokasi_nama, gudang_nama, weight, urutan, status
     FROM v_tag_status
-    WHERE session_id = ${sessionId}::uuid
+    WHERE session_id = ${sessionId}
     ORDER BY gudang_nama ASC, lokasi_nama ASC, urutan ASC
   `;
   const assignments = await prisma.tagAssignment.findMany({

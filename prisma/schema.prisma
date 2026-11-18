@@ -1,4 +1,5 @@
-// stock-opname. Matches migrations/20261015000000_init/migration.sql exactly.
+// stock-opname. Entity ids are prefix-number text (usr-1, ses-1).
+// client_row_id stays uuid.
 // Read 03-data-model.md before changing anything here.
 //
 // Three tables are APPEND ONLY: Count, TagSubmission, UnknownItem.
@@ -37,7 +38,7 @@ enum Kondisi {
 }
 
 model User {
-  id           String    @id @default(uuid()) @db.Uuid
+  id           String    @id @default(dbgenerated("('usr-' || nextval('users_id_seq'::regclass))"))
   nama         String
   username     String?   @unique
   passwordHash String?   @map("password_hash")   // null for every counter, deliberately
@@ -58,7 +59,7 @@ model User {
 }
 
 model Gudang {
-  id        String    @id @default(uuid()) @db.Uuid
+  id        String    @id @default(dbgenerated("('gdg-' || nextval('gudang_id_seq'::regclass))"))
   kode      String    @unique
   nama      String // must equal Nama_Gudang in the export, byte for byte
   urutan    Int       @default(0)
@@ -71,8 +72,8 @@ model Gudang {
 }
 
 model Lokasi {
-  id        String    @id @default(uuid()) @db.Uuid
-  gudangId  String    @map("gudang_id") @db.Uuid
+  id        String    @id @default(dbgenerated("('lok-' || nextval('lokasi_id_seq'::regclass))"))
+  gudangId  String    @map("gudang_id")
   nama      String
   urutan    Int       @default(0)
   retiredAt DateTime? @map("retired_at") @db.Timestamptz(6)
@@ -85,8 +86,8 @@ model Lokasi {
 }
 
 model Tag {
-  id        String    @id @default(uuid()) @db.Uuid
-  lokasiId  String    @map("lokasi_id") @db.Uuid
+  id        String    @id @default(dbgenerated("('tag-' || nextval('tags_id_seq'::regclass))"))
+  lokasiId  String    @map("lokasi_id")
   nomor     String // immutable once it appears in any SessionTag
   weight    Int       @default(1) // 3 besar, 2 sedang, 1 kecil
   urutan    Int       @default(0)
@@ -105,14 +106,14 @@ model Tag {
 }
 
 model OpnameSession {
-  id          String        @id @default(uuid()) @db.Uuid
+  id          String        @id @default(dbgenerated("('ses-' || nextval('opname_sessions_id_seq'::regclass))"))
   nama        String
   periode     String
   snapshotAt  DateTime      @map("snapshot_at") @db.Timestamptz(6)
   scopeFilter Json          @default("{}") @map("scope_filter")
   sourceQuery String?       @map("source_query")
   status      SessionStatus @default(draft)
-  createdById String?       @map("created_by") @db.Uuid
+  createdById String?       @map("created_by")
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
 
   createdBy     User?           @relation("SessionCreatedBy", fields: [createdById], references: [id])
@@ -133,8 +134,8 @@ model OpnameSession {
 /// The per session pin. Written once at draft -> open, never updated.
 /// Reports, exports and the denah read this. Never read `tags` for a report.
 model SessionTag {
-  sessionId  String @map("session_id") @db.Uuid
-  tagId      String @map("tag_id") @db.Uuid
+  sessionId  String @map("session_id")
+  tagId      String @map("tag_id")
   nomor      String
   lokasiNama String @map("lokasi_nama")
   gudangNama String @map("gudang_nama")
@@ -151,8 +152,8 @@ model SessionTag {
 
 /// Raw landing table. Every column as text, nothing coerced, so "0123" survives.
 model ImportRow {
-  id        String   @id @default(uuid()) @db.Uuid
-  sessionId String   @map("session_id") @db.Uuid
+  id        String   @id @default(dbgenerated("('imp-' || nextval('import_rows_id_seq'::regclass))"))
+  sessionId String   @map("session_id")
   rowNumber Int      @map("row_number")
   raw       Json
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -163,9 +164,9 @@ model ImportRow {
 }
 
 model SnapshotItem {
-  id             String   @id @default(uuid()) @db.Uuid
-  sessionId      String   @map("session_id") @db.Uuid
-  gudangId       String   @map("gudang_id") @db.Uuid
+  id             String   @id @default(dbgenerated("('itm-' || nextval('snapshot_items_id_seq'::regclass))"))
+  sessionId      String   @map("session_id")
+  gudangId       String   @map("gudang_id")
   kodeBarang     String   @map("kode_barang")
   barcode4       String?  @map("barcode_4") // text, never int
   namaBarang     String   @map("nama_barang")
@@ -190,11 +191,11 @@ model SnapshotItem {
 // totalHarga is deliberately absent. It is qty x hargaSatuan, derived on read.
 
 model TagAssignment {
-  id         String   @id @default(uuid()) @db.Uuid
-  sessionId  String   @map("session_id") @db.Uuid
-  tagId      String   @map("tag_id") @db.Uuid
+  id         String   @id @default(dbgenerated("('asg-' || nextval('tag_assignments_id_seq'::regclass))"))
+  sessionId  String   @map("session_id")
+  tagId      String   @map("tag_id")
   pass       Int      @db.SmallInt
-  userId     String   @map("user_id") @db.Uuid
+  userId     String   @map("user_id")
   assignedAt DateTime @default(now()) @map("assigned_at") @db.Timestamptz(6)
 
   session OpnameSession @relation(fields: [sessionId], references: [id])
@@ -207,13 +208,13 @@ model TagAssignment {
 
 /// APPEND ONLY. No update, no upsert, no delete. Ever.
 model Count {
-  id              String   @id @default(uuid()) @db.Uuid
+  id              String   @id @default(dbgenerated("('cnt-' || nextval('counts_id_seq'::regclass))"))
   clientRowId     String   @unique @map("client_row_id") @db.Uuid // the idempotency key
-  sessionId       String   @map("session_id") @db.Uuid
-  tagId           String   @map("tag_id") @db.Uuid
+  sessionId       String   @map("session_id")
+  tagId           String   @map("tag_id")
   pass            Int      @db.SmallInt
-  snapshotItemId  String   @map("snapshot_item_id") @db.Uuid
-  countedById     String   @map("counted_by") @db.Uuid
+  snapshotItemId  String   @map("snapshot_item_id")
+  countedById     String   @map("counted_by")
   qty             Decimal  @db.Decimal(18, 4)
   qtyNote         String?  @map("qty_note") // the calculator expression
   kondisi         Kondisi
@@ -233,12 +234,12 @@ model Count {
 /// APPEND ONLY. "I looked and there is nothing here" is a fact only a person
 /// can state, which is what makes zero tags unaccounted for provable.
 model TagSubmission {
-  id              String   @id @default(uuid()) @db.Uuid
+  id              String   @id @default(dbgenerated("('sub-' || nextval('tag_submissions_id_seq'::regclass))"))
   clientRowId     String   @unique @map("client_row_id") @db.Uuid
-  sessionId       String   @map("session_id") @db.Uuid
-  tagId           String   @map("tag_id") @db.Uuid
+  sessionId       String   @map("session_id")
+  tagId           String   @map("tag_id")
   pass            Int      @db.SmallInt
-  submittedById   String   @map("submitted_by") @db.Uuid
+  submittedById   String   @map("submitted_by")
   isEmpty         Boolean  @default(false) @map("is_empty")
   deviceId        String   @map("device_id")
   clientCreatedAt DateTime @map("client_created_at") @db.Timestamptz(6)
@@ -254,12 +255,12 @@ model TagSubmission {
 /// APPEND ONLY. A separate table rather than a nullable snapshotItemId on Count,
 /// so a forgotten IS NOT NULL can never contaminate the reconciliation.
 model UnknownItem {
-  id              String   @id @default(uuid()) @db.Uuid
+  id              String   @id @default(dbgenerated("('unk-' || nextval('unknown_items_id_seq'::regclass))"))
   clientRowId     String   @unique @map("client_row_id") @db.Uuid
-  sessionId       String   @map("session_id") @db.Uuid
-  tagId           String   @map("tag_id") @db.Uuid
+  sessionId       String   @map("session_id")
+  tagId           String   @map("tag_id")
   pass            Int      @db.SmallInt
-  countedById     String   @map("counted_by") @db.Uuid
+  countedById     String   @map("counted_by")
   deviceId        String   @map("device_id")
   kodeInput       String?  @map("kode_input")
   namaInput       String?  @map("nama_input")
@@ -279,11 +280,11 @@ model UnknownItem {
 /// One phone is one counter for one session, and the partial unique index below
 /// says the converse: one counter has one live phone.
 model UserDevice {
-  sessionId           String    @map("session_id") @db.Uuid
+  sessionId           String    @map("session_id")
   deviceId            String    @map("device_id")
-  userId              String    @map("user_id") @db.Uuid
+  userId              String    @map("user_id")
   boundAt             DateTime  @default(now()) @map("bound_at") @db.Timestamptz(6)
-  boundById           String?   @map("bound_by") @db.Uuid
+  boundById           String?   @map("bound_by")
   releasedAt          DateTime? @map("released_at") @db.Timestamptz(6)
   lastSyncAt          DateTime? @map("last_sync_at") @db.Timestamptz(6)
   lastReportedPending Int       @default(0) @map("last_reported_pending")
@@ -297,10 +298,10 @@ model UserDevice {
 }
 
 model Approval {
-  id           String   @id @default(uuid()) @db.Uuid
-  sessionId    String   @map("session_id") @db.Uuid
+  id           String   @id @default(dbgenerated("('apv-' || nextval('approvals_id_seq'::regclass))"))
+  sessionId    String   @map("session_id")
   step         Int      @db.SmallInt // 1 reviewer, 2 accounting
-  approvedById String   @map("approved_by") @db.Uuid
+  approvedById String   @map("approved_by")
   approvedAt   DateTime @default(now()) @map("approved_at") @db.Timestamptz(6)
   catatan      String?
 
@@ -312,10 +313,10 @@ model Approval {
 }
 
 model SessionReopen {
-  id           String   @id @default(uuid()) @db.Uuid
-  sessionId    String   @map("session_id") @db.Uuid
+  id           String   @id @default(dbgenerated("('rop-' || nextval('session_reopens_id_seq'::regclass))"))
+  sessionId    String   @map("session_id")
   reason       String
-  reopenedById String   @map("reopened_by") @db.Uuid
+  reopenedById String   @map("reopened_by")
   reopenedAt   DateTime @default(now()) @map("reopened_at") @db.Timestamptz(6)
 
   session    OpnameSession @relation(fields: [sessionId], references: [id])

@@ -140,8 +140,8 @@ describe("Phase 2 gates", () => {
         { sessionId: session.id, tagId: tag.id, pass: 2, userId: sari.id },
       ],
     });
-    const deviceBudi = `TEST-B-${session.id.slice(0, 8)}`;
-    const deviceSari = `TEST-S-${session.id.slice(0, 8)}`;
+    const deviceBudi = `TEST-B-${String(session.id)}`;
+    const deviceSari = `TEST-S-${String(session.id)}`;
     await prisma.userDevice.createMany({
       data: [
         { sessionId: session.id, deviceId: deviceBudi, userId: budi.id, boundById: ADMIN_ID },
@@ -291,8 +291,8 @@ describe("Phase 2 gates", () => {
     const coalesce = await prisma.$queryRaw<Array<{ snapshot_item_id: string; qty_2: unknown }>>`
       SELECT snapshot_item_id, qty_2
       FROM v_selisih_hitung
-      WHERE session_id = ${session.id}::uuid
-        AND snapshot_item_id = ${extraItem.id}::uuid
+      WHERE session_id = ${session.id}
+        AND snapshot_item_id = ${extraItem.id}
     `;
     expect(coalesce.length).toBe(1);
     expect(coalesce[0]?.qty_2).toBeNull();

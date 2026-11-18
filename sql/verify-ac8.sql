@@ -3,20 +3,20 @@
 -- Cases 5 and 6 are the two bugs that ship silently; if the SQL is wrong they
 -- are the ones that fail while everything else looks fine.
 
-\set S  '55555555-5555-5555-5555-000000000001'
-\set T11 '44444444-4444-4444-4444-000000000011'
-\set T12 '44444444-4444-4444-4444-000000000012'
-\set T13 '44444444-4444-4444-4444-000000000013'
-\set T21 '44444444-4444-4444-4444-000000000021'
-\set T22 '44444444-4444-4444-4444-000000000022'
-\set I1234 '66666666-6666-6666-6666-000000001234'
-\set I1243 '66666666-6666-6666-6666-000000001243'
-\set I1180 '66666666-6666-6666-6666-000000001180'
-\set I9001 '66666666-6666-6666-6666-000000009001'
-\set BUDI '11111111-1111-1111-1111-000000000003'
-\set SARI '11111111-1111-1111-1111-000000000004'
-\set AGUS '11111111-1111-1111-1111-000000000005'
-\set RINA '11111111-1111-1111-1111-000000000006'
+\set S  ses-1
+\set T11 tag-11
+\set T12 tag-12
+\set T13 tag-13
+\set T21 tag-21
+\set T22 tag-22
+\set I1234 itm-1234
+\set I1243 itm-1243
+\set I1180 itm-1180
+\set I9001 itm-9001
+\set BUDI usr-3
+\set SARI usr-4
+\set AGUS usr-5
+\set RINA usr-6
 
 BEGIN;
 
@@ -118,7 +118,7 @@ INSERT INTO tag_submissions (client_row_id, session_id, tag_id, pass, submitted_
  (gen_random_uuid(), :'S', :'T13', 1, :'SARI', false, 'DEV-B', '2026-12-16 09:25+07'),
  (gen_random_uuid(), :'S', :'T21', 1, :'AGUS', false, 'DEV-C', '2026-12-16 09:35+07'),
  (gen_random_uuid(), :'S', :'T22', 1, :'AGUS', false, 'DEV-C', '2026-12-16 09:45+07'),
- (gen_random_uuid(), :'S', '44444444-4444-4444-4444-000000000031', 1, :'RINA', true, 'DEV-D', '2026-12-16 09:55+07');
+ (gen_random_uuid(), :'S', 31, 1, :'RINA', true, 'DEV-D', '2026-12-16 09:55+07');
 
 SELECT 'AC-10.2 status after pass 1 only' AS case,
        CASE WHEN (SELECT status FROM v_tag_status WHERE tag_id = :'T11') = 'menunggu_hitung_2'
@@ -131,7 +131,7 @@ INSERT INTO tag_submissions (client_row_id, session_id, tag_id, pass, submitted_
  -- Pass 2 on tag 2.1 was completed, the counter simply never recorded item 1234.
  (gen_random_uuid(), :'S', :'T21', 2, :'RINA', false, 'DEV-D', '2026-12-16 11:35+07'),
  (gen_random_uuid(), :'S', :'T22', 2, :'RINA', false, 'DEV-D', '2026-12-16 11:45+07'),
- (gen_random_uuid(), :'S', '44444444-4444-4444-4444-000000000031', 2, :'BUDI', true, 'DEV-A', '2026-12-16 11:55+07');
+ (gen_random_uuid(), :'S', 31, 2, :'BUDI', true, 'DEV-A', '2026-12-16 11:55+07');
 
 -- Case 4: a third count resolves the disagreement on tag 1.3.
 INSERT INTO counts (client_row_id, session_id, tag_id, pass, snapshot_item_id, counted_by, qty, kondisi, device_id, client_created_at) VALUES
@@ -159,7 +159,7 @@ SELECT 'AC-10.2 selisih hitung shows on the denah',
 UNION ALL
 SELECT 'AC-6.3 an empty tag is kosong, not belum',
        CASE WHEN (SELECT status FROM v_tag_status
-                  WHERE tag_id = '44444444-4444-4444-4444-000000000031') = 'kosong'
+                  WHERE tag_id = 31) = 'kosong'
             THEN 'PASS' ELSE 'FAIL' END
 UNION ALL
 SELECT 'AC-10.2 agreed tags read selesai',

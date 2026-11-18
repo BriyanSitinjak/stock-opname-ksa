@@ -50,9 +50,9 @@ async function seedDisputedSession() {
   });
   await prisma.userDevice.createMany({
     data: [
-      { sessionId: session.id, deviceId: `P7-A-${session.id.slice(0, 8)}`, userId: BUDI_ID, boundById: ADMIN_ID },
-      { sessionId: session.id, deviceId: `P7-B-${session.id.slice(0, 8)}`, userId: SARI_ID, boundById: ADMIN_ID },
-      { sessionId: session.id, deviceId: `P7-D-${session.id.slice(0, 8)}`, userId: RINA_ID, boundById: ADMIN_ID },
+      { sessionId: session.id, deviceId: `P7-A-${String(session.id)}`, userId: BUDI_ID, boundById: ADMIN_ID },
+      { sessionId: session.id, deviceId: `P7-B-${String(session.id)}`, userId: SARI_ID, boundById: ADMIN_ID },
+      { sessionId: session.id, deviceId: `P7-D-${String(session.id)}`, userId: RINA_ID, boundById: ADMIN_ID },
     ],
   });
   const item = await prisma.snapshotItem.create({
@@ -94,13 +94,13 @@ async function seedDisputedSession() {
       },
     });
   }
-  const deviceBudi = `P7-A-${session.id.slice(0, 8)}`;
-  const deviceSari = `P7-B-${session.id.slice(0, 8)}`;
+  const deviceBudi = `P7-A-${String(session.id)}`;
+  const deviceSari = `P7-B-${String(session.id)}`;
   await line(tagAgree.id, 1, BUDI_ID, deviceBudi, "10");
   await line(tagAgree.id, 2, SARI_ID, deviceSari, "10");
   await line(tagDispute.id, 1, BUDI_ID, deviceBudi, "12");
   await line(tagDispute.id, 2, SARI_ID, deviceSari, "10");
-  return { session, tagAgree, tagDispute, item, deviceBudi, deviceRina: `P7-D-${session.id.slice(0, 8)}` };
+  return { session, tagAgree, tagDispute, item, deviceBudi, deviceRina: `P7-D-${String(session.id)}` };
 }
 
 describe("Phase 7 reports", () => {
