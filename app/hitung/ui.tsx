@@ -1,17 +1,15 @@
 "use client";
 
-import type { PointerEvent, ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 
 export function Phone({
   tone = "cream",
   children,
-  onPointerDown,
-  onPointerUp,
+  rootRef,
 }: {
   tone?: "cream" | "ink" | "sync";
   children: ReactNode;
-  onPointerDown?: (event: PointerEvent<HTMLDivElement>) => void;
-  onPointerUp?: (event: PointerEvent<HTMLDivElement>) => void;
+  rootRef?: Ref<HTMLDivElement>;
 }) {
   const bg =
     tone === "ink"
@@ -20,7 +18,7 @@ export function Phone({
         ? "bg-[#f7f1e3] text-[#1c1c1c]"
         : "bg-ksa-cream text-[#1c1c1c]";
   return (
-    <div className={`min-h-dvh w-full ${bg}`} onPointerDown={onPointerDown} onPointerUp={onPointerUp}>
+    <div ref={rootRef} className={`min-h-dvh w-full ${bg}`}>
       <main className="mx-auto flex min-h-dvh w-full max-w-[390px] flex-col px-5 pb-8 pt-6">{children}</main>
     </div>
   );

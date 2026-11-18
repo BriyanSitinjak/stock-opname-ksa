@@ -28,7 +28,8 @@ import {
   tagCompare,
   unknownItems,
 } from "@/lib/reports";
-import { DEFAULT_BRANDS, DEFAULT_GROUPS, liveTags, missingAssignments } from "@/lib/setup";
+import { readScope } from "@/lib/scope-display";
+import { catalogNames, liveTags, missingAssignments } from "@/lib/setup";
 import { syncCounts } from "@/lib/sync";
 
 const KondisiSchema = z.enum(["baik", "rusak", "kadaluarsa"]);
@@ -71,7 +72,8 @@ app.get("/setup/catalog", async (c) => {
     select: { id: true, kode: true, nama: true },
   });
   const counters = await activeStaff();
-  return c.json({ brands: DEFAULT_BRANDS, groups: DEFAULT_GROUPS, gudang, counters });
+  const names = await catalogNames();
+  return c.json({ brands: names.brands, groups: names.groups, gudang, counters });
 });
 
 app.get("/sessions", async (c) => {
@@ -93,15 +95,12 @@ app.post("/sessions", async (c) => {
   if (!body.nama?.trim() || !body.periode?.trim() || !body.snapshot_at) {
     return c.json({ error: "Nama, periode, dan waktu cut off wajib." }, 400);
   }
-  if (!body.brands?.length || !body.groups?.length) {
-    return c.json({ error: "Centang paling tidak satu brand dan satu group." }, 400);
-  }
   const session = await prisma.opnameSession.create({
     data: {
       nama: body.nama.trim(),
       periode: body.periode.trim(),
       snapshotAt: new Date(body.snapshot_at),
-      scopeFilter: { brands: body.brands, groups: body.groups },
+      scopeFilter: { brands: body.brands ?? [], groups: body.groups ?? [] },
       status: "draft",
       createdById: ADMIN_ID,
     },
@@ -434,7 +433,7 @@ app.get("/sessions/:id/prepare", async (c) => {
   if (!session) {
     return c.json(sessionMissing, 404);
   }
-  const scope = session.scopeFilter as { brands?: string[]; groups?: string[] };
+  const scope = readScope(session.scopeFilter);
   const items = await prisma.snapshotItem.findMany({
     where: { sessionId: id },
     select: {
@@ -472,7 +471,7 @@ app.get("/sessions/:id/prepare", async (c) => {
       status: session.status,
     },
     counter: { id: binding.user.id, nama: binding.user.nama },
-    scope: { brands: scope.brands ?? [], groups: scope.groups ?? [] },
+    scope,
     items: items.map((item) => ({
       id: item.id,
       kode_barang: item.kodeBarang,
@@ -515,8 +514,9 @@ app.post("/sessions/:id/import", async (c) => {
   }
   const gudang = await prisma.gudang.findMany();
   const gudangByNama = new Map(gudang.map((row) => [row.nama, { id: row.id, nama: row.nama }]));
-  const scope = session.scopeFilter as { brands?: string[]; groups?: string[] };
-  const result = validateAndAggregate(parsed.rows, gudangByNama, scope);
+  const scope = readScope(session.scopeFilter);
+  const names = await catalogNames();
+  const result = validateAndAggregate(parsed.rows, gudangByNama, scope, names);
   if ("error" in result) {
     return c.json({ error: result.error.message, code: result.error.code }, 400);
   }
@@ -525,7 +525,9 @@ app.post("/sessions/:id/import", async (c) => {
     return c.json({ ...result.preview, snapshot_items: existing, confirm_required: true });
   }
   try {
-    await commitImport(id, result.raw, result.items);
+    const widen =
+      result.preview.addedBrands.length > 0 || result.preview.addedGroups.length > 0 ? result.scope : undefined;
+    await commitImport(id, result.raw, result.items, widen);
   } catch (error) {
     console.error(error);
     return c.json({ error: "Impor gagal. Tidak ada perubahan." }, 500);

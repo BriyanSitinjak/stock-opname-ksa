@@ -1,7 +1,37 @@
 import { prisma } from "@/lib/db";
 
-export const DEFAULT_BRANDS = ["Asia", "Platinum", "Infinity", "Renovo", "Sherwin", "Sayer Lack", "Waroon"];
-export const DEFAULT_GROUPS = ["Material"];
+export function uniqueNames(values: Array<string | null | undefined>, blocked: readonly string[] = []) {
+  const seen = new Set<string>(blocked);
+  const names: string[] = [];
+  for (const name of values) {
+    const value = name?.trim() ?? "";
+    if (!value || seen.has(value)) {
+      continue;
+    }
+    seen.add(value);
+    names.push(value);
+  }
+  return names;
+}
+
+export async function catalogNames() {
+  const [brandRows, groupRows] = await Promise.all([
+    prisma.snapshotItem.findMany({
+      where: { namaBrand: { not: null } },
+      distinct: ["namaBrand"],
+      select: { namaBrand: true },
+    }),
+    prisma.snapshotItem.findMany({
+      where: { namaGroup: { not: null } },
+      distinct: ["namaGroup"],
+      select: { namaGroup: true },
+    }),
+  ]);
+  return {
+    brands: uniqueNames(brandRows.map((row) => row.namaBrand)),
+    groups: uniqueNames(groupRows.map((row) => row.namaGroup)),
+  };
+}
 
 export async function liveTags() {
   return prisma.tag.findMany({

@@ -4,6 +4,8 @@ import * as XLSX from "xlsx";
 import { parseCsv, type RawRow } from "@/lib/csv";
 import { prisma } from "@/lib/db";
 import { importFileList } from "@/lib/import-kinds";
+import { type ScopeFilter } from "@/lib/scope-display";
+import { uniqueNames } from "@/lib/setup";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const REQUIRED = ["Nama_Gudang", "Kode_Barang", "Nama_Barang", "Qty_OnHand", "Harga_Satuan"] as const;
@@ -16,9 +18,9 @@ export type ImportPreview = {
   items: number;
   emptyHargaCount: number;
   missingBarcodeCount: number;
+  addedBrands: string[];
+  addedGroups: string[];
 };
-
-type ScopeFilter = { brands?: string[]; groups?: string[] };
 
 export async function parseImportFile(
   filename: string,
@@ -28,8 +30,7 @@ export async function parseImportFile(
     return { error: { code: "file_too_large", message: "Berkas terlalu besar (maksimum 10 MB)." } };
   }
   const lower = filename.trim().toLowerCase();
-  const head = bytes.subarray(0, 4);
-  const magic = head.toString("binary");
+  const magic = bytes.subarray(0, 4).toString("binary");
   if (lower.endsWith(".exe") || magic.startsWith("MZ")) {
     return fileTypeError();
   }
@@ -139,7 +140,10 @@ function cellToText(value: unknown): string {
   if (value == null) {
     return "";
   }
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+  if (typeof value === "string") {
+    return value.trim();
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
     return String(value);
   }
   if (typeof value === "object" && "text" in value && typeof value.text === "string") {
@@ -155,7 +159,13 @@ export function validateAndAggregate(
   rows: RawRow[],
   gudangByNama: Map<string, { id: string; nama: string }>,
   scope: ScopeFilter,
-): { error: ImportError } | { preview: ImportPreview; items: AggregatedItem[]; raw: RawRow[] } {
+  known: { brands: readonly string[]; groups: readonly string[] } = { brands: [], groups: [] },
+): { error: ImportError } | {
+  preview: ImportPreview;
+  items: AggregatedItem[];
+  raw: RawRow[];
+  scope: { brands: string[]; groups: string[] };
+} {
   if (rows.length === 0) {
     return {
       error: {
@@ -189,15 +199,18 @@ export function validateAndAggregate(
     };
   }
 
-  const brands = scope.brands ?? [];
-  const groups = scope.groups ?? [];
+  const discovered = discoverScope(rows, scope, known);
+  const brands = discovered.brands;
+  const groups = discovered.groups;
   const kept = rows.filter((row) => inScope(row, brands, groups));
   const filteredCount = rows.length - kept.length;
   if (kept.length === 0) {
+    const foundBrands = uniqueValues(rows.map((row) => row.Nama_Brand));
+    const foundGroups = uniqueValues(rows.map((row) => row.Nama_Group));
     return {
       error: {
         code: "zero_rows",
-        message: `Tidak ada baris yang lolos filter merek (${brands.join(", ")}).`,
+        message: `Tidak ada baris yang lolos filter. Merek pada berkas: ${foundBrands}. Group pada berkas: ${foundGroups}. Lingkup sesi: ${brands.join(", ")} / ${groups.join(", ")}.`,
       },
     };
   }
@@ -280,14 +293,28 @@ export function validateAndAggregate(
       items: aggregated.size,
       emptyHargaCount,
       missingBarcodeCount,
+      addedBrands: discovered.addedBrands,
+      addedGroups: discovered.addedGroups,
     },
     items: [...aggregated.values()],
     raw: rows,
+    scope: { brands, groups },
   };
 }
 
-export async function commitImport(sessionId: string, raw: RawRow[], items: AggregatedItem[]) {
+export async function commitImport(
+  sessionId: string,
+  raw: RawRow[],
+  items: AggregatedItem[],
+  scope?: { brands: string[]; groups: string[] },
+) {
   await prisma.$transaction(async (tx) => {
+    if (scope) {
+      await tx.opnameSession.update({
+        where: { id: sessionId },
+        data: { scopeFilter: scope },
+      });
+    }
     await tx.importRow.createMany({
       data: raw.map((row, index) => ({
         sessionId,
@@ -327,6 +354,22 @@ export type AggregatedItem = {
   hargaSatuan: Prisma.Decimal;
   sourceRowCount: number;
 };
+
+function discoverScope(rows: RawRow[], scope: ScopeFilter, known: { brands: readonly string[]; groups: readonly string[] }) {
+  const brands = extendNames(scope.brands, known.brands, rows.map((row) => row.Nama_Brand));
+  const groups = extendNames(scope.groups, known.groups, rows.map((row) => row.Nama_Group));
+  return { brands: brands.values, groups: groups.values, addedBrands: brands.added, addedGroups: groups.added };
+}
+
+function extendNames(selected: string[] | undefined, known: readonly string[], incoming: Array<string | null | undefined>) {
+  const current = selected ?? [];
+  const added = uniqueNames(incoming, current.length > 0 ? [...known, ...current] : current);
+  return { values: [...current, ...added], added };
+}
+
+function uniqueValues(values: Array<string | undefined>): string {
+  return uniqueNames(values).join(", ") || "-";
+}
 
 function inScope(row: RawRow, brands: string[], groups: string[]): boolean {
   const brandOk = brands.length === 0 || brands.includes(row.Nama_Brand ?? "");

@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import ExcelJS from "exceljs";
 import { asExcelText } from "@/lib/excel-text";
 import { kondisiReport, selisihHitung, selisihSistem, unknownItems } from "@/lib/reports";
-import { scopeDisplay } from "@/lib/scope-display";
+import { displayedScope } from "@/lib/scope-display";
 import { prisma } from "@/lib/db";
 import { textPdf } from "@/lib/text-pdf";
 import { qtyOrDash } from "@/lib/qty-display";
@@ -34,7 +34,7 @@ export async function exportSummary(sessionId: string) {
   if (!session) {
     return null;
   }
-  const scope = scopeDisplay(session.scopeFilter as { brands?: string[]; groups?: string[] }, session.periode, session.snapshotAt);
+  const scope = await displayedScope(session);
   const sistem = (await selisihSistem(sessionId)).filter((row) => !row.ada_selisih_hitung);
   const hitung = await selisihHitung(sessionId);
   const zero = sistem.filter((row) => row.zero_found);

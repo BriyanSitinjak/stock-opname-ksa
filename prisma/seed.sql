@@ -31,7 +31,8 @@ INSERT INTO users (id, nama, username, password_hash, role) VALUES
 INSERT INTO gudang (id, kode, nama, urutan) VALUES
  ('gdg-1','G01','GUDANG 01',1),
  ('gdg-2','G02','GUDANG 02',2),
- ('gdg-3','G03','GUDANG 03',3);
+ ('gdg-3','G03','GUDANG 03',3),
+ ('gdg-4','LAB','LAB KOSAMBI',4);
 
 INSERT INTO lokasi (id, gudang_id, nama, urutan) VALUES
  ('lok-1','gdg-1','Lokasi I',  1),

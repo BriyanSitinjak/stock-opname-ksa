@@ -2,7 +2,7 @@ import type { Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { pantauHref } from "@/lib/monitor";
 import { selisihHitung } from "@/lib/reports";
-import { scopeDisplay } from "@/lib/scope-display";
+import { displayedScope } from "@/lib/scope-display";
 import { missingAssignments } from "@/lib/setup";
 
 export type OpenTag = {
@@ -159,8 +159,7 @@ export async function sessionPayload(sessionId: string) {
   if (!session) {
     return null;
   }
-  const scope = session.scopeFilter as { brands?: string[]; groups?: string[] };
-  const [snapshotItems, sessionTags, missing, blockers, approvals, actors] = await Promise.all([
+  const [snapshotItems, sessionTags, missing, blockers, approvals, actors, scope] = await Promise.all([
     prisma.snapshotItem.count({ where: { sessionId } }),
     prisma.sessionTag.count({ where: { sessionId } }),
     missingAssignments(sessionId),
@@ -175,6 +174,7 @@ export async function sessionPayload(sessionId: string) {
       orderBy: { nama: "asc" },
       select: { id: true, nama: true, role: true },
     }),
+    displayedScope(session),
   ]);
   return {
     id: session.id,
@@ -183,7 +183,7 @@ export async function sessionPayload(sessionId: string) {
     status: session.status,
     snapshot_at: session.snapshotAt.toISOString(),
     scope_filter: session.scopeFilter,
-    scope: scopeDisplay(scope, session.periode, session.snapshotAt),
+    scope,
     snapshot_items: snapshotItems,
     session_tags: sessionTags,
     missing_assignments: missing,

@@ -10,8 +10,8 @@ export default function SesiBaruPage() {
   const [nama, setNama] = useState("Stock Opname Tahunan 2026");
   const [periode, setPeriode] = useState("2026-12");
   const [snapshotAt, setSnapshotAt] = useState("2026-12-15T18:00");
-  const [brands, setBrands] = useState<string[]>(["Asia", "Platinum", "Infinity", "Renovo"]);
-  const [groups, setGroups] = useState<string[]>(["Material"]);
+  const [brands, setBrands] = useState<string[]>([]);
+  const [groups, setGroups] = useState<string[]>([]);
   const [catalog, setCatalog] = useState<{ brands: string[]; groups: string[] }>({ brands: [], groups: [] });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -63,8 +63,24 @@ export default function SesiBaruPage() {
         <Field label="Waktu cut off">
           <TextInput type="datetime-local" value={snapshotAt} onChange={(e) => setSnapshotAt(e.target.value)} />
         </Field>
-        <ScopeTicks legend="Brand yang dihitung" options={catalog.brands} selected={brands} onToggle={(v) => setBrands(toggleValue(brands, v))} />
-        <ScopeTicks legend="Group yang dihitung" options={catalog.groups} selected={groups} onToggle={(v) => setGroups(toggleValue(groups, v))} />
+        {catalog.brands.length === 0 && catalog.groups.length === 0 ? (
+          <p className="mt-4 text-sm text-[#6b6b6b]">Brand dan group muncul setelah berkas diimpor.</p>
+        ) : (
+          <>
+            <ScopeTicks
+              legend="Brand yang dihitung"
+              options={catalog.brands}
+              selected={brands}
+              onToggle={(value) => setBrands(toggleValue(brands, value))}
+            />
+            <ScopeTicks
+              legend="Group yang dihitung"
+              options={catalog.groups}
+              selected={groups}
+              onToggle={(value) => setGroups(toggleValue(groups, value))}
+            />
+          </>
+        )}
         <ErrorText>{error}</ErrorText>
         <TealButton disabled={busy} className="mt-6 w-full py-3" onClick={() => void submit()}>
           Simpan sesi

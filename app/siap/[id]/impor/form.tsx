@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { fetchJson } from "@/app/siap/api";
 import { IMPORT_ACCEPT, importFileList } from "@/lib/import-kinds";
 import { BackLink, Card, ErrorText, OutlineButton, TealButton } from "@/app/siap/ui";
 
@@ -12,6 +11,8 @@ type Preview = {
   gudangBreakdown: Record<string, number>;
   emptyHargaCount: number;
   missingBarcodeCount: number;
+  addedBrands?: string[];
+  addedGroups?: string[];
   error?: string;
   ok?: boolean;
 };
@@ -22,6 +23,8 @@ export function ImporForm({ id }: { id: string }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
+  const [progressLabel, setProgressLabel] = useState("");
 
   async function post(confirm: boolean) {
     if (!file) {
@@ -30,24 +33,44 @@ export function ImporForm({ id }: { id: string }) {
     }
     setBusy(true);
     setError("");
+    setSaved(false);
+    setProgress(4);
+    setProgressLabel(confirm ? "Menyimpan snapshot…" : "Mengunggah berkas…");
+    const creep = window.setInterval(() => {
+      setProgress((current) => (current == null || current >= 92 ? current : current + 1));
+    }, 350);
     const body = new FormData();
     body.append("file", file);
-    const { ok, data } = await fetchJson<Preview>(`/api/sessions/${id}/import${confirm ? "?confirm=1" : ""}`, {
-      method: "POST",
-      body,
-    });
-    setBusy(false);
-    if (!ok) {
-      setError(data.error ?? "Impor ditolak.");
+    try {
+      const { ok, data } = await uploadImport(`/api/sessions/${id}/import${confirm ? "?confirm=1" : ""}`, body, (ratio) => {
+        const uploaded = Math.round(ratio * 70);
+        setProgress((current) => Math.max(current ?? 0, uploaded));
+        if (ratio >= 1) {
+          setProgressLabel(confirm ? "Menyimpan snapshot…" : "Mengolah berkas…");
+        }
+      });
+      if (!ok) {
+        setError(data.error ?? "Impor ditolak.");
+        setPreview(null);
+        setProgress(null);
+        return;
+      }
+      setProgress(100);
+      setProgressLabel("Selesai");
+      if (confirm) {
+        setSaved(true);
+        setPreview(null);
+      } else {
+        setPreview(data);
+      }
+    } catch {
+      setError("Tidak ada koneksi. Impor harus dilakukan di area bersinyal.");
       setPreview(null);
-      return;
+      setProgress(null);
+    } finally {
+      window.clearInterval(creep);
+      setBusy(false);
     }
-    if (confirm) {
-      setSaved(true);
-      setPreview(null);
-      return;
-    }
-    setPreview(data);
   }
 
   return (
@@ -63,11 +86,13 @@ export function ImporForm({ id }: { id: string }) {
             setFile(event.target.files?.[0] ?? null);
             setPreview(null);
             setSaved(false);
+            setProgress(null);
           }}
         />
         <TealButton disabled={busy} className="mt-4 px-5 py-2.5 text-sm" onClick={() => void post(false)}>
           Baca berkas
         </TealButton>
+        <ImportProgress progress={progress} label={progressLabel} />
       </Card>
       <ErrorText>{error}</ErrorText>
       {saved ? <p className="mt-4 text-sm text-ksa-teal-deep">Snapshot tersimpan.</p> : null}
@@ -92,6 +117,8 @@ export function ImporForm({ id }: { id: string }) {
           {preview.missingBarcodeCount > 0 ? (
             <p className="mt-1 text-sm">⚠ Kolom barcode belum ada di {preview.missingBarcodeCount} baris</p>
           ) : null}
+          <AddedNames label="Merek baru" names={preview.addedBrands} />
+          <AddedNames label="Group baru" names={preview.addedGroups} />
           <div className="mt-6 flex gap-3">
             <OutlineButton className="px-5 py-2.5" onClick={() => setPreview(null)}>
               Batal
@@ -104,4 +131,59 @@ export function ImporForm({ id }: { id: string }) {
       ) : null}
     </>
   );
+}
+
+function AddedNames({ label, names }: { label: string; names?: string[] }) {
+  if (!names?.length) {
+    return null;
+  }
+  return (
+    <p className="mt-3 text-sm">
+      {label}: {names.join(", ")}. Masuk ke lingkup sesi saat Simpan Snapshot.
+    </p>
+  );
+}
+
+function ImportProgress({ progress, label }: { progress: number | null; label: string }) {
+  if (progress == null) {
+    return null;
+  }
+  return (
+    <div className="mt-4">
+      <div
+        className="h-2 overflow-hidden rounded-full bg-[#efe8dc]"
+        role="progressbar"
+        aria-valuenow={progress}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={label}
+      >
+        <div className="h-full rounded-full bg-ksa-teal transition-[width] duration-200" style={{ width: `${progress}%` }} />
+      </div>
+      <p className="mt-2 text-sm text-[#6b6b6b]">
+        {label} {progress}%
+      </p>
+    </div>
+  );
+}
+
+function uploadImport(url: string, body: FormData, onRatio: (ratio: number) => void) {
+  return new Promise<{ ok: boolean; data: Preview }>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) {
+        onRatio(event.loaded / event.total);
+      }
+    };
+    xhr.onerror = () => reject(new Error("network"));
+    xhr.onload = () => {
+      try {
+        resolve({ ok: xhr.status >= 200 && xhr.status < 300, data: JSON.parse(xhr.responseText) as Preview });
+      } catch {
+        reject(new Error("parse"));
+      }
+    };
+    xhr.send(body);
+  });
 }

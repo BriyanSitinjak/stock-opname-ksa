@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrandIcon, BrandLockup } from "@/app/brand-lockup";
 import { NumericKeypad } from "@/app/hitung/keypad";
 import { ActionColumn, GhostButton, Overlay, Phone, PrimaryButton, TextLink, TopBar, WaitNote } from "@/app/hitung/ui";
@@ -44,6 +44,90 @@ type Screen =
   | "about";
 
 type CounterOption = { user_id: string; nama: string; already_bound: boolean };
+
+const PULL_START = 12;
+const PULL_RELOAD = 64;
+
+function watchNamePull(node: HTMLDivElement, reload: () => void) {
+  const page = document.documentElement;
+  const previous = page.style.overscrollBehaviorY;
+  page.style.overscrollBehaviorY = "contain";
+  let startY = 0;
+  let tracking = false;
+
+  function atTop() {
+    return window.scrollY <= 2;
+  }
+
+  function begin(y: number) {
+    startY = y;
+    tracking = atTop();
+  }
+
+  function move(y: number, event: Event) {
+    if (tracking && atTop() && y - startY > PULL_START) {
+      event.preventDefault();
+    }
+  }
+
+  function end(y: number, event: Event) {
+    if (!tracking) {
+      return;
+    }
+    tracking = false;
+    if (y - startY > PULL_RELOAD) {
+      event.preventDefault();
+      reload();
+    }
+  }
+
+  function onTouchStart(event: TouchEvent) {
+    if (event.touches.length !== 1) {
+      tracking = false;
+      return;
+    }
+    begin(event.touches[0].clientY);
+  }
+
+  function onTouchMove(event: TouchEvent) {
+    move(event.touches[0].clientY, event);
+  }
+
+  function onTouchEnd(event: TouchEvent) {
+    end(event.changedTouches[0].clientY, event);
+  }
+
+  function onPointerDown(event: PointerEvent) {
+    if (event.pointerType !== "mouse" || event.button !== 0) {
+      return;
+    }
+    begin(event.clientY);
+    if (tracking) {
+      node.setPointerCapture(event.pointerId);
+    }
+  }
+
+  function onPointerUp(event: PointerEvent) {
+    if (event.pointerType !== "mouse") {
+      return;
+    }
+    end(event.clientY, event);
+  }
+
+  node.addEventListener("touchstart", onTouchStart, { passive: true });
+  node.addEventListener("touchmove", onTouchMove, { passive: false });
+  node.addEventListener("touchend", onTouchEnd, { passive: false });
+  node.addEventListener("pointerdown", onPointerDown);
+  node.addEventListener("pointerup", onPointerUp);
+  return () => {
+    page.style.overscrollBehaviorY = previous;
+    node.removeEventListener("touchstart", onTouchStart);
+    node.removeEventListener("touchmove", onTouchMove);
+    node.removeEventListener("touchend", onTouchEnd);
+    node.removeEventListener("pointerdown", onPointerDown);
+    node.removeEventListener("pointerup", onPointerUp);
+  };
+}
 
 function locateTag(prepare: PreparePayload, match: (tag: { id: string; nomor: string }) => boolean) {
   for (const lokasi of prepare.denah) {
@@ -113,7 +197,8 @@ export function CountApp() {
   const [refreshing, setRefreshing] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [leaving, setLeaving] = useState(false);
-  const pullStart = useRef<number | null>(null);
+  const bindRef = useRef<HTMLDivElement>(null);
+  const ignoreNameTap = useRef(false);
   const [unknownNama, setUnknownNama] = useState("");
   const [unknownQty, setUnknownQty] = useState("");
   const [rejected, setRejected] = useState<{ client_row_id: string; reason: string }[]>([]);
@@ -212,6 +297,18 @@ export function CountApp() {
   }, [deviceId, loadCounters, refreshPending, sessionId]);
 
   useEffect(() => {
+    const node = bindRef.current;
+    if (!node) {
+      return;
+    }
+    return watchNamePull(node, () => {
+      ignoreNameTap.current = true;
+      setRefreshing(true);
+      void loadCounters().finally(() => setRefreshing(false));
+    });
+  }, [loadCounters, screen, refreshing, booting]);
+
+  useEffect(() => {
     const onOnline = () => {
       void syncNow(true);
     };
@@ -230,26 +327,6 @@ export function CountApp() {
     window.addEventListener("beforeunload", onLeave);
     return () => window.removeEventListener("beforeunload", onLeave);
   }, [pending]);
-
-  function onPullDown(event: ReactPointerEvent<HTMLDivElement>) {
-    if (window.scrollY > 8 || (event.target instanceof Element && event.target.closest("button"))) {
-      pullStart.current = null;
-      return;
-    }
-    pullStart.current = event.clientY;
-  }
-
-  function onPullUp(event: ReactPointerEvent<HTMLDivElement>) {
-    if (pullStart.current == null) {
-      return;
-    }
-    const distance = event.clientY - pullStart.current;
-    pullStart.current = null;
-    if (distance > 72) {
-      setRefreshing(true);
-      void loadCounters().finally(() => setRefreshing(false));
-    }
-  }
 
   async function leaveToStart() {
     setMessage("");
@@ -529,7 +606,7 @@ export function CountApp() {
 
   if (screen === "bind") {
     return (
-      <Phone onPointerDown={onPullDown} onPointerUp={onPullUp}>
+      <Phone rootRef={bindRef}>
         <BrandLockup className="h-auto w-40" />
         <h1 className="mt-6 text-3xl font-semibold leading-tight">Siapa yang memakai HP ini?</h1>
         <p className="mt-2 text-sm text-[#6b6b6b]">Tarik ke bawah untuk memperbarui</p>
@@ -540,7 +617,13 @@ export function CountApp() {
               type="button"
               disabled={busy}
               className="flex items-center justify-between rounded-2xl bg-white px-4 py-4 text-left shadow-sm"
-              onClick={() => void bindName(counter.user_id)}
+              onClick={() => {
+                if (ignoreNameTap.current) {
+                  ignoreNameTap.current = false;
+                  return;
+                }
+                void bindName(counter.user_id);
+              }}
             >
               <span>
                 <span className="block font-medium">{counter.nama}</span>
