@@ -61,7 +61,7 @@ model User {
 model Gudang {
   id        String    @id @default(dbgenerated("('gdg-' || nextval('gudang_id_seq'::regclass))"))
   kode      String    @unique
-  nama      String // must equal Nama_Gudang in the export, byte for byte
+  nama      String // Nama_Gudang from an import; created when that name is not stored yet
   urutan    Int       @default(0)
   retiredAt DateTime? @map("retired_at") @db.Timestamptz(6)
 

@@ -20,6 +20,7 @@ export type ImportPreview = {
   missingBarcodeCount: number;
   addedBrands: string[];
   addedGroups: string[];
+  addedGudang: string[];
 };
 
 export async function parseImportFile(
@@ -185,20 +186,20 @@ export function validateAndAggregate(
     }
   }
 
-  const located = rows.flatMap((row, index) =>
-    isStockRow(row) ? [{ row, line: index + 2, gudang: findGudang(row.Nama_Gudang ?? "", gudangByNama) }] : [],
-  );
+  const planned = new Map<string, string>();
+  const located: Array<{ row: RawRow; line: number; gudang: GudangMatch | undefined }> = [];
+  rows.forEach((row, index) => {
+    if (!isStockRow(row)) {
+      return;
+    }
+    located.push({ row, line: index + 2, gudang: placeGudang(row.Nama_Gudang ?? "", gudangByNama, planned) });
+  });
   const unknown = located.filter((item) => !item.gudang);
   if (unknown.length > 0) {
-    const sample = (unknown[0]?.row.Nama_Gudang ?? "").trim();
-    const where = unknown[0]?.line;
-    const detail = sample
-      ? `Nama_Gudang tidak dikenal pada baris ${where}: ${sample}.`
-      : `Nama_Gudang kosong pada baris ${where}.`;
     return {
       error: {
         code: "unknown_gudang",
-        message: `${detail} Jumlah baris bermasalah: ${unknown.length}.`,
+        message: `Nama_Gudang kosong pada baris ${unknown[0]?.line}. Jumlah baris bermasalah: ${unknown.length}.`,
       },
     };
   }
@@ -262,13 +263,14 @@ export function validateAndAggregate(
       missingBarcodeCount += 1;
     }
     gudangBreakdown[gudang.nama] = (gudangBreakdown[gudang.nama] ?? 0) + 1;
-    const key = `${gudang.id}\0${row.Kode_Barang}`;
+    const key = `${gudang.id || gudang.nama}\0${row.Kode_Barang}`;
     const qty = new Prisma.Decimal(row.Qty_OnHand || "0");
     const harga = new Prisma.Decimal(row.Harga_Satuan || "0");
     const existing = aggregated.get(key);
     if (!existing) {
       aggregated.set(key, {
         gudangId: gudang.id,
+        gudangNama: gudang.nama,
         kodeBarang: row.Kode_Barang ?? "",
         barcode4: barcodeOf(row),
         namaBarang: row.Nama_Barang ?? "",
@@ -299,6 +301,7 @@ export function validateAndAggregate(
       missingBarcodeCount,
       addedBrands: discovered.addedBrands,
       addedGroups: discovered.addedGroups,
+      addedGudang: [...planned.values()],
     },
     items: [...aggregated.values()],
     raw: stockRows,
@@ -319,6 +322,10 @@ export async function commitImport(
         data: { scopeFilter: scope },
       });
     }
+    const createdGudang = await ensureGudang(
+      tx,
+      items.filter((item) => !item.gudangId).map((item) => item.gudangNama),
+    );
     await tx.importRow.createMany({
       data: raw.map((row, index) => ({
         sessionId,
@@ -329,7 +336,7 @@ export async function commitImport(
     await tx.snapshotItem.createMany({
       data: items.map((item) => ({
         sessionId,
-        gudangId: item.gudangId,
+        gudangId: item.gudangId || createdGudang.get(item.gudangNama) || missingGudang(item.gudangNama),
         kodeBarang: item.kodeBarang,
         barcode4: item.barcode4,
         namaBarang: item.namaBarang,
@@ -347,6 +354,7 @@ export async function commitImport(
 
 export type AggregatedItem = {
   gudangId: string;
+  gudangNama: string;
   kodeBarang: string;
   barcode4: string;
   namaBarang: string;
@@ -375,27 +383,62 @@ function uniqueValues(values: Array<string | undefined>): string {
   return uniqueNames(values).join(", ") || "-";
 }
 
-function findGudang(nama: string, gudangByNama: Map<string, GudangMatch>) {
-  const exact = gudangByNama.get(nama);
-  if (exact) {
-    return exact;
-  }
-  const folded = foldGudang(nama);
+function placeGudang(nama: string, known: Map<string, GudangMatch>, planned: Map<string, string>) {
+  const trimmed = nama.trim();
+  const folded = foldGudang(trimmed);
   if (!folded) {
     return undefined;
   }
-  const matches = [...gudangByNama.values()].filter((row) => {
-    const key = foldGudang(row.nama);
-    return key.length > 0 && folded.includes(key);
-  });
-  if (matches.length === 0) {
-    return undefined;
+  const exact = known.get(trimmed);
+  if (exact) {
+    return exact;
   }
-  const best = matches.reduce((longest, row) =>
-    foldGudang(row.nama).length > foldGudang(longest.nama).length ? row : longest,
-  );
-  const bestKey = foldGudang(best.nama);
-  return matches.filter((row) => foldGudang(row.nama) === bestKey).length === 1 ? best : undefined;
+  const same = [...known.values()].find((row) => foldGudang(row.nama) === folded);
+  if (same) {
+    return same;
+  }
+  const named = planned.get(folded) ?? trimmed;
+  planned.set(folded, named);
+  return { id: "", nama: named };
+}
+
+async function ensureGudang(tx: Prisma.TransactionClient, names: string[]) {
+  const wanted = uniqueNames(names);
+  const rows = await tx.gudang.findMany({ select: { id: true, kode: true, nama: true, urutan: true } });
+  const byFold = new Map(rows.map((row) => [foldGudang(row.nama), row]));
+  const taken = new Set(rows.map((row) => row.kode));
+  let urutan = rows.reduce((max, row) => Math.max(max, row.urutan), 0);
+  const ids = new Map<string, string>();
+  for (const nama of wanted) {
+    const folded = foldGudang(nama);
+    const found = byFold.get(folded);
+    if (found) {
+      ids.set(nama, found.id);
+      continue;
+    }
+    urutan += 1;
+    const kode = nextKode(nama, taken);
+    const created = await tx.gudang.create({ data: { kode, nama, urutan }, select: { id: true } });
+    ids.set(nama, created.id);
+    byFold.set(folded, { id: created.id, kode, nama, urutan });
+  }
+  return ids;
+}
+
+function nextKode(nama: string, taken: Set<string>) {
+  const stem = nama.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) || "GDG";
+  let kode = stem;
+  let n = 0;
+  while (taken.has(kode)) {
+    n += 1;
+    kode = `${stem}${n}`;
+  }
+  taken.add(kode);
+  return kode;
+}
+
+function missingGudang(nama: string): never {
+  throw new Error(`Gudang belum dibuat: ${nama}`);
 }
 
 function foldGudang(nama: string) {

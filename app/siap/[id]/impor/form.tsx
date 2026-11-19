@@ -13,6 +13,7 @@ type Preview = {
   missingBarcodeCount: number;
   addedBrands?: string[];
   addedGroups?: string[];
+  addedGudang?: string[];
   error?: string;
   ok?: boolean;
 };
@@ -117,8 +118,9 @@ export function ImporForm({ id }: { id: string }) {
           {preview.missingBarcodeCount > 0 ? (
             <p className="mt-1 text-sm">⚠ Kolom barcode belum ada di {preview.missingBarcodeCount} baris</p>
           ) : null}
-          <AddedNames label="Merek baru" names={preview.addedBrands} />
-          <AddedNames label="Group baru" names={preview.addedGroups} />
+          <AddedNames label="Gudang baru" names={preview.addedGudang} detail="Ditambahkan saat Simpan Snapshot." />
+          <AddedNames label="Merek baru" names={preview.addedBrands} detail="Masuk ke lingkup sesi saat Simpan Snapshot." />
+          <AddedNames label="Group baru" names={preview.addedGroups} detail="Masuk ke lingkup sesi saat Simpan Snapshot." />
           <div className="mt-6 flex gap-3">
             <OutlineButton className="px-5 py-2.5" onClick={() => setPreview(null)}>
               Batal
@@ -133,13 +135,13 @@ export function ImporForm({ id }: { id: string }) {
   );
 }
 
-function AddedNames({ label, names }: { label: string; names?: string[] }) {
+function AddedNames({ label, names, detail }: { label: string; names?: string[]; detail: string }) {
   if (!names?.length) {
     return null;
   }
   return (
     <p className="mt-3 text-sm">
-      {label}: {names.join(", ")}. Masuk ke lingkup sesi saat Simpan Snapshot.
+      {label}: {names.join(", ")}. {detail}
     </p>
   );
 }
