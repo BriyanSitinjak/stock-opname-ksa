@@ -11,7 +11,7 @@ async function PantauGudang({ id, gudang }: { id: string; gudang: string }) {
   const nama = decodeURIComponent(gudang);
   const match = await coordinatorGudang(id, nama);
   if (!match) {
-    return <MissingPin href={pantauHref(id)}>Gudang tidak ada di pin sesi ini.</MissingPin>;
+    return <MissingPin href={pantauHref(id)}>Gudang ini tidak ada di pin sesi.</MissingPin>;
   }
   return (
     <SiapSubpage backHref={pantauHref(id)} title={match.nama} subtitle={selesaiCaption(match)} legend>

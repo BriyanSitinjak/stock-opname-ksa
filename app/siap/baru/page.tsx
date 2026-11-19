@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fetchJson } from "@/app/siap/api";
 import { Card, ErrorText, Field, ScopeTicks, TealButton, TextInput, toggleValue } from "@/app/siap/ui";
+import { toast } from "@/app/toast";
 
 export default function SesiBaruPage() {
   const router = useRouter();
@@ -44,15 +45,16 @@ export default function SesiBaruPage() {
     });
     setBusy(false);
     if (!ok || !data.id) {
-      setError(data.error ?? "Gagal membuat sesi.");
+      toast(data.error ?? "Gagal membuat sesi.", setError);
       return;
     }
+    toast("Sesi tersimpan.");
     router.push(`/siap/${data.id}`);
   }
 
   return (
     <>
-      <h1 className="text-2xl font-semibold">Sesi opname baru</h1>
+      <h1 className="text-2xl font-semibold">Sesi baru</h1>
       <Card className="mt-6 max-w-xl">
         <Field label="Nama sesi">
           <TextInput value={nama} onChange={(e) => setNama(e.target.value)} />
@@ -64,7 +66,7 @@ export default function SesiBaruPage() {
           <TextInput type="datetime-local" value={snapshotAt} onChange={(e) => setSnapshotAt(e.target.value)} />
         </Field>
         {catalog.brands.length === 0 && catalog.groups.length === 0 ? (
-          <p className="mt-4 text-sm text-[#6b6b6b]">Brand dan group muncul setelah berkas diimpor.</p>
+          <p className="mt-4 text-sm text-[#6b6b6b]">Brand dan group muncul setelah file di-import.</p>
         ) : (
           <>
             <ScopeTicks

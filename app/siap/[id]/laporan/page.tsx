@@ -3,12 +3,12 @@ import { SiapSubpage } from "@/app/siap/pantau-shell";
 import { SessionIdPage } from "@/app/siap/session-id";
 
 const LINKS = [
-  { href: "selisih-hitung", title: "Selisih hitung", blurb: "Dua petugas tidak setuju. Tugaskan hitung ke-3." },
+  { href: "selisih-hitung", title: "Selisih hitung", blurb: "Dua petugas beda hasil. Tugaskan pass 3." },
   { href: "selisih-sistem", title: "Selisih sistem", blurb: "Hasil hitung vs qty on hand. Zero found ditandai." },
-  { href: "kondisi", title: "Kondisi", blurb: "Baik, rusak, kadaluarsa. Tidak memengaruhi selisih." },
-  { href: "tidak-dikenal", title: "Barang tidak dikenal", blurb: "Catatan HP yang tidak ada di snapshot." },
-  { href: "rekap-tag", title: "Rekap tag", blurb: "Jumlah tag per status turun dari pengumpulan." },
-  { href: "daftar-barang", title: "Daftar barang", blurb: "Snapshot sesi, bisa disaring." },
+  { href: "kondisi", title: "Kondisi", blurb: "Baik, rusak, kadaluarsa. Tidak mengubah selisih." },
+  { href: "tidak-dikenal", title: "Barang tidak dikenal", blurb: "Catatan dari HP yang tidak ada di snapshot." },
+  { href: "rekap-tag", title: "Rekap tag", blurb: "Jumlah tag per status, dari submission." },
+  { href: "daftar-barang", title: "Daftar barang", blurb: "Snapshot sesi, bisa difilter." },
   { href: "peta-barang", title: "Peta barang", blurb: "Lokasi pin dan qty yang sudah disepakati." },
 ];
 

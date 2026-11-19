@@ -303,7 +303,7 @@ export async function assignPass3(sessionId: string, tagId: string, userId: stri
     return { error: "Sesi tidak ditemukan.", status: 404 as const };
   }
   if (session.status !== "counting") {
-    return { error: "Hitung ke-3 hanya saat sesi counting.", status: 409 as const };
+    return { error: "Pass 3 hanya saat sesi counting.", status: 409 as const };
   }
   const disputes = await tagCompare(sessionId, tagId);
   if (disputes.length === 0) {

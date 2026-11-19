@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { fetchJson } from "@/app/siap/api";
-import { BackLink, ErrorText, Field, TealButton, TextInput } from "@/app/siap/ui";
+import { BackLink, ErrorText, Field, Select, TealButton, TextInput } from "@/app/siap/ui";
+import { toast } from "@/app/toast";
 
 type Actor = { id: string; nama: string; role: string };
 type Approval = { step: number; nama: string; approved_at: string; catatan: string | null };
@@ -29,7 +30,6 @@ export function PersetujuanBoard({ id }: { id: string }) {
   const [actorId, setActorId] = useState("");
   const [catatan, setCatatan] = useState("");
   const [reason, setReason] = useState("");
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   async function load() {
@@ -55,18 +55,17 @@ export function PersetujuanBoard({ id }: { id: string }) {
 
   async function post(path: string, body: Record<string, unknown>) {
     setError("");
-    setMessage("");
     const { ok, data } = await fetchJson<{ error?: string; status?: string }>(path, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-actor-id": actorId },
       body: JSON.stringify(body),
     });
     if (!ok) {
-      setError(data.error ?? "Gagal.");
+      toast(data.error ?? "Gagal.", setError);
       await load();
       return;
     }
-    setMessage("Tersimpan.");
+    toast("Tersimpan.");
     await load();
   }
 
@@ -75,9 +74,10 @@ export function PersetujuanBoard({ id }: { id: string }) {
     const response = await fetch(`/api/sessions/${id}/export.${kind}`);
     if (!response.ok) {
       const data = (await response.json()) as { error?: string };
-      setError(data.error ?? "Gagal mengunduh.");
+      toast(data.error ?? "Gagal download.", setError);
       return;
     }
+    toast("File sudah di-download.");
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -106,7 +106,7 @@ export function PersetujuanBoard({ id }: { id: string }) {
 
       <div className="mt-6 space-y-2 text-base">
         <p>Brand yang dihitung: {scope.included.join(", ") || "—"}</p>
-        <p>Brand yang tidak dihitung: {scope.excluded.join(", ") || "—"}</p>
+        <p>Brand di luar scope: {scope.excluded.join(", ") || "—"}</p>
         <p>Periode: {scope.periode}</p>
         <p>Cut off: {scope.snapshot_at}</p>
         <p>Group: {scope.groups.join(", ")}</p>
@@ -119,7 +119,7 @@ export function PersetujuanBoard({ id }: { id: string }) {
               <Link className="text-ksa-teal-deep" href={tag.href}>
                 Tag {tag.nomor}
               </Link>{" "}
-              belum selesai
+              count belum selesai
             </li>
           ))}
         </ul>
@@ -134,13 +134,13 @@ export function PersetujuanBoard({ id }: { id: string }) {
       ) : null}
 
       <Field label="Petugas">
-        <select className="mt-1 w-full rounded-xl border px-3 py-2" value={actorId} onChange={(event) => setActorId(event.target.value)}>
+        <Select className="mt-1 w-full" value={actorId} onChange={(event) => setActorId(event.target.value)}>
           {detail.actors.map((actor) => (
             <option key={actor.id} value={actor.id}>
               {actor.nama} ({actor.role})
             </option>
           ))}
-        </select>
+        </Select>
       </Field>
       <Field label="Catatan persetujuan">
         <TextInput value={catatan} onChange={(event) => setCatatan(event.target.value)} />
@@ -148,41 +148,41 @@ export function PersetujuanBoard({ id }: { id: string }) {
 
       <div className="mt-6 flex flex-wrap gap-3">
         <TealButton className="px-6 py-3" disabled={detail.status !== "counting"} onClick={() => void post(`/api/sessions/${id}/review`, {})}>
-          Kirim ke penelaahan
+          Kirim ke review
         </TealButton>
         <TealButton
           className="px-6 py-3"
           disabled={detail.status !== "review" || Boolean(step1)}
           onClick={() => void post(`/api/sessions/${id}/approve`, { step: 1, actor_id: actorId, catatan })}
         >
-          Setujui langkah 1
+          Approve step 1
         </TealButton>
         <TealButton
           className="px-6 py-3"
           disabled={detail.status !== "review" || !step1 || Boolean(step2)}
           onClick={() => void post(`/api/sessions/${id}/approve`, { step: 2, actor_id: actorId, catatan })}
         >
-          Setujui langkah 2
+          Approve step 2
         </TealButton>
       </div>
 
       <p className="mt-4 text-sm text-[#6b6b6b]">
-        {step1 ? `Langkah 1: ${step1.nama}` : "Langkah 1 belum ada."} · {step2 ? `Langkah 2: ${step2.nama}` : "Langkah 2 belum ada."}
+        {step1 ? `Step 1: ${step1.nama}` : "Step 1 belum ada."} · {step2 ? `Step 2: ${step2.nama}` : "Step 2 belum ada."}
       </p>
 
       <div className="mt-6 flex flex-wrap gap-3">
         <TealButton className="px-6 py-3" disabled={detail.status !== "approved" && detail.status !== "closed"} onClick={() => void download("xlsx")}>
-          Unduh Excel
+          Download Excel
         </TealButton>
         <TealButton className="px-6 py-3" disabled={detail.status !== "approved" && detail.status !== "closed"} onClick={() => void download("pdf")}>
-          Unduh PDF
+          Download PDF
         </TealButton>
         <TealButton className="px-6 py-3" disabled={detail.status !== "approved"} onClick={() => void post(`/api/sessions/${id}/close`, {})}>
           Tutup sesi
         </TealButton>
       </div>
 
-      <Field label="Alasan buka ulang">
+      <Field label="Alasan reopen">
         <TextInput value={reason} onChange={(event) => setReason(event.target.value)} />
       </Field>
       <TealButton
@@ -190,11 +190,10 @@ export function PersetujuanBoard({ id }: { id: string }) {
         disabled={detail.status !== "approved" && detail.status !== "closed"}
         onClick={() => void post(`/api/sessions/${id}/reopen`, { actor_id: actorId, reason })}
       >
-        Buka ulang
+        Reopen
       </TealButton>
 
       <ErrorText>{error}</ErrorText>
-      {message ? <p className="mt-4 text-sm">{message}</p> : null}
     </>
   );
 }

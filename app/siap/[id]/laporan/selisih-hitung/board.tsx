@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { ReportRow, ReportTable, Td } from "@/app/siap/report-table";
+import { Select } from "@/app/siap/ui";
+import { toast } from "@/app/toast";
 import { qtyOrDash } from "@/lib/qty-display";
 
 type Row = {
@@ -10,7 +12,7 @@ type Row = {
   nomor: string;
   lokasi_nama: string;
   gudang_nama: string;
-  barcode_4: string | null;
+  kode_barang: string;
   nama_barang: string;
   qty_1: string | null;
   qty_2: string | null;
@@ -30,7 +32,6 @@ export function SelisihHitungBoard({
   rows: Row[];
   counters: Counter[];
 }) {
-  const [message, setMessage] = useState("");
   const [assigned, setAssigned] = useState<Record<string, string>>(() => {
     const start: Record<string, string> = {};
     for (const row of rows) {
@@ -55,7 +56,6 @@ export function SelisihHitungBoard({
     if (!userId) {
       return;
     }
-    setMessage("");
     const response = await fetch(`/api/sessions/${id}/pass-3`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -63,11 +63,11 @@ export function SelisihHitungBoard({
     });
     const json = (await response.json()) as { error?: string; nama?: string };
     if (!response.ok) {
-      setMessage(json.error ?? "Gagal menugaskan.");
+      toast(json.error ?? "Gagal menugaskan.");
       return;
     }
     setAssigned((current) => ({ ...current, [tagId]: userId }));
-    setMessage(`Hitung ke-3 ditugaskan${json.nama ? ` ke ${json.nama}` : ""}.`);
+    toast(`Pass 3 ditugaskan${json.nama ? ` ke ${json.nama}` : ""}.`);
   }
 
   if (rows.length === 0) {
@@ -77,7 +77,6 @@ export function SelisihHitungBoard({
   return (
     <>
       <p className="mt-2 text-sm text-[#6b6b6b]">{tags.length} tag</p>
-      {message ? <p className="mt-3 text-sm text-ksa-teal-deep">{message}</p> : null}
       {tags.map(([tagId, items]) => {
         const head = items[0];
         if (!head) {
@@ -95,9 +94,9 @@ export function SelisihHitungBoard({
                 </p>
               </div>
               <label className="text-sm">
-                Tugaskan hitung ke-3
-                <select
-                  className="ml-2 rounded-lg border px-2 py-1"
+                Tugaskan pass 3
+                <Select
+                  className="ml-2 min-w-44"
                   value={assigned[tagId] ?? ""}
                   onChange={(event) => void assign(tagId, event.target.value)}
                 >
@@ -107,13 +106,13 @@ export function SelisihHitungBoard({
                       {counter.nama}
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
             </div>
             <ReportTable headers={["Kode", "Nama", "Hitung 1", "Hitung 2"]}>
               {items.map((row) => (
                 <ReportRow key={row.snapshot_item_id}>
-                  <Td>{row.barcode_4}</Td>
+                  <Td>{row.kode_barang}</Td>
                   <Td>{row.nama_barang}</Td>
                   <Td>{qtyOrDash(row.qty_1)}</Td>
                   <Td>{qtyOrDash(row.qty_2)}</Td>

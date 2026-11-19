@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { samePersonOnBothPasses } from "@/lib/assignment-rules";
 import { fetchJson } from "@/app/siap/api";
 import { ReportRow, ReportTable, Td } from "@/app/siap/report-table";
-import { BackLink, ErrorText, MissingList, TealButton } from "@/app/siap/ui";
+import { BackLink, ErrorText, MissingList, Select, TealButton } from "@/app/siap/ui";
+import { toast } from "@/app/toast";
 import { ROLE_LABEL, type StaffRole } from "@/lib/roles";
 
 type Counter = { id: string; nama: string; role?: StaffRole };
@@ -38,14 +39,14 @@ function PassSelect({
   onChange: (userId: string) => void;
 }) {
   return (
-    <select className="w-full rounded-lg border px-2 py-1" value={value ?? ""} onChange={(e) => onChange(e.target.value)}>
+    <Select className="w-full" value={value ?? ""} onChange={(e) => onChange(e.target.value)}>
       <option value="">—</option>
       {counters.map((counter) => (
         <option key={counter.id} value={counter.id}>
           {counter.role ? `${counter.nama} · ${ROLE_LABEL[counter.role]}` : counter.nama}
         </option>
       ))}
-    </select>
+    </Select>
   );
 }
 
@@ -53,7 +54,6 @@ export function TugasBoard({ id }: { id: string }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [counters, setCounters] = useState<Counter[]>([]);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
   const [missing, setMissing] = useState<string[]>([]);
 
   useEffect(() => {
@@ -92,7 +92,7 @@ export function TugasBoard({ id }: { id: string }) {
           ...(next.pass_2 ? [{ tag_id: next.tag_id, pass: 2, user_id: next.pass_2 }] : []),
         ]);
         if (clash) {
-          setError(`Tag ${row.nomor}: orang yang sama tidak boleh mengisi kedua kolom.`);
+          toast(`Tag ${row.nomor}: orang yang sama tidak boleh di pass 1 dan pass 2.`, setError);
           return row;
         }
         return next;
@@ -102,7 +102,6 @@ export function TugasBoard({ id }: { id: string }) {
 
   async function save() {
     setError("");
-    setMessage("");
     const assignments = rows.flatMap((row) => {
       const out: { tag_id: string; pass: number; user_id: string }[] = [];
       if (row.pass_1) {
@@ -115,7 +114,7 @@ export function TugasBoard({ id }: { id: string }) {
     });
     const clash = samePersonOnBothPasses(assignments);
     if (clash) {
-      setError(clash);
+      toast(clash, setError);
       return;
     }
     const { ok, data } = await fetchJson<{ error?: string; missing_assignments?: string[] }>(`/api/sessions/${id}/assignments`, {
@@ -124,22 +123,22 @@ export function TugasBoard({ id }: { id: string }) {
       body: JSON.stringify({ assignments }),
     });
     if (!ok) {
-      setError(data.error ?? "Gagal menyimpan tugas.");
+      toast(data.error ?? "Gagal menyimpan tugas.", setError);
       return;
     }
     setMissing(data.missing_assignments ?? []);
-    setMessage("Tugas tersimpan.");
+    toast("Tugas tersimpan.");
   }
 
   return (
     <>
       <BackLink href={`/siap/${id}`} />
       <h1 className="mt-3 text-2xl font-semibold">Bagi tugas</h1>
-      <p className="mt-1 text-sm text-[#6b6b6b]">Dua kolom per tag. Orang yang sama ditolak di kedua pass. Nama baru ditambah di Pengguna.</p>
+      <p className="mt-1 text-sm text-[#6b6b6b]">Dua kolom per tag. Orang yang sama tidak boleh di pass 1 dan pass 2. Nama baru ditambah di Pengguna.</p>
       {grouped.map(([gudang, tags]) => (
         <section key={gudang} className="mt-8">
           <h2 className="mb-3 font-medium">{gudang}</h2>
-          <ReportTable headers={["Tag", "Lokasi", "Hitung ke-1", "Hitung ke-2"]}>
+          <ReportTable headers={["Tag", "Lokasi", "Pass 1", "Pass 2"]}>
             {tags.map((row) => (
               <ReportRow key={row.tag_id}>
                 <Td className="font-medium">{row.nomor}</Td>
@@ -156,7 +155,6 @@ export function TugasBoard({ id }: { id: string }) {
         </section>
       ))}
       <ErrorText>{error}</ErrorText>
-      {message ? <p className="mt-4 text-sm text-ksa-teal-deep">{message}</p> : null}
       <MissingList items={missing} />
       <TealButton className="mt-6 px-6 py-3" onClick={() => void save()}>
         Simpan tugas

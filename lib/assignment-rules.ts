@@ -14,7 +14,7 @@ export function samePersonOnBothPasses(rows: AssignmentInput[]): string | null {
     }
     byTag.set(row.tag_id, slot);
     if (slot.pass1 && slot.pass2 && slot.pass1 === slot.pass2) {
-      return "Orang yang sama tidak boleh mengisi hitung ke-1 dan ke-2 pada tag yang sama.";
+      return "Orang yang sama tidak boleh di pass 1 dan pass 2 pada tag yang sama.";
     }
   }
   return null;

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { IMPORT_ACCEPT, importFileList } from "@/lib/import-kinds";
 import { BackLink, Card, ErrorText, OutlineButton, TealButton } from "@/app/siap/ui";
+import { toast } from "@/app/toast";
 
 type Preview = {
   rowCount: number;
@@ -19,24 +20,34 @@ type Preview = {
 };
 
 export function ImporForm({ id }: { id: string }) {
+  const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
   const [progressLabel, setProgressLabel] = useState("");
 
+  function resetForm() {
+    setFile(null);
+    setPreview(null);
+    setError("");
+    setProgress(null);
+    setProgressLabel("");
+    if (fileRef.current) {
+      fileRef.current.value = "";
+    }
+  }
+
   async function post(confirm: boolean) {
     if (!file) {
-      setError(`Pilih berkas ${importFileList("atau")}.`);
+      toast(`Pilih file ${importFileList("atau")}.`, setError);
       return;
     }
     setBusy(true);
     setError("");
-    setSaved(false);
     setProgress(4);
-    setProgressLabel(confirm ? "Menyimpan snapshot…" : "Mengunggah berkas…");
+    setProgressLabel(confirm ? "Menyimpan snapshot…" : "Mengunggah file…");
     const creep = window.setInterval(() => {
       setProgress((current) => (current == null || current >= 92 ? current : current + 1));
     }, 350);
@@ -47,11 +58,11 @@ export function ImporForm({ id }: { id: string }) {
         const uploaded = Math.round(ratio * 70);
         setProgress((current) => Math.max(current ?? 0, uploaded));
         if (ratio >= 1) {
-          setProgressLabel(confirm ? "Menyimpan snapshot…" : "Mengolah berkas…");
+          setProgressLabel(confirm ? "Menyimpan snapshot…" : "Mengolah file…");
         }
       });
       if (!ok) {
-        setError(data.error ?? "Impor ditolak.");
+        toast(data.error ?? "Impor ditolak.", setError);
         setPreview(null);
         setProgress(null);
         return;
@@ -59,13 +70,14 @@ export function ImporForm({ id }: { id: string }) {
       setProgress(100);
       setProgressLabel("Selesai");
       if (confirm) {
-        setSaved(true);
-        setPreview(null);
+        resetForm();
+        toast("Snapshot tersimpan.");
       } else {
         setPreview(data);
+        toast("File selesai dibaca.");
       }
     } catch {
-      setError("Tidak ada koneksi. Impor harus dilakukan di area bersinyal.");
+      toast("Tidak ada koneksi. Impor harus dilakukan di area bersinyal.", setError);
       setPreview(null);
       setProgress(null);
     } finally {
@@ -78,49 +90,57 @@ export function ImporForm({ id }: { id: string }) {
     <>
       <BackLink href={`/siap/${id}`} />
       <h1 className="mt-3 text-2xl font-semibold">Impor snapshot</h1>
-      <p className="mt-1 text-sm text-[#6b6b6b]">Hasil pembacaan muncul dulu. Snapshot belum ditulis sebelum Simpan Snapshot.</p>
+      <p className="mt-1 text-sm text-[#6b6b6b]">Preview dulu. Snapshot baru tersimpan saat Simpan Snapshot.</p>
       <Card className="mt-6 max-w-xl">
         <input
+          ref={fileRef}
           type="file"
           accept={IMPORT_ACCEPT}
+          className="sr-only"
           onChange={(event) => {
             setFile(event.target.files?.[0] ?? null);
             setPreview(null);
-            setSaved(false);
             setProgress(null);
           }}
         />
+        <div className="flex items-center gap-3 rounded-2xl border border-[#e7dfd2] bg-[#faf7f1] px-4 py-3">
+          <TealButton className="px-4 py-2 text-sm" onClick={() => fileRef.current?.click()}>
+            Cari file
+          </TealButton>
+          <span className={`min-w-0 truncate text-sm ${file ? "text-[#1c1c1c]" : "text-[#8a8a8a]"}`}>
+            {file ? file.name : importFileList("atau")}
+          </span>
+        </div>
         <TealButton disabled={busy} className="mt-4 px-5 py-2.5 text-sm" onClick={() => void post(false)}>
-          Baca berkas
+          Baca file
         </TealButton>
         <ImportProgress progress={progress} label={progressLabel} />
       </Card>
       <ErrorText>{error}</ErrorText>
-      {saved ? <p className="mt-4 text-sm text-ksa-teal-deep">Snapshot tersimpan.</p> : null}
       {preview ? (
         <Card className="mt-6 max-w-xl">
-          <h2 className="font-medium">Hasil pembacaan file</h2>
+          <h2 className="font-medium">Preview file</h2>
           <ul className="mt-3 space-y-1 text-sm">
-            <li>Baris dibaca {preview.rowCount}</li>
-            <li>Disaring (di luar lingkup) {preview.filteredCount}</li>
-            <li>Barang unik {preview.items}</li>
+            <li>Baris terbaca {preview.rowCount}</li>
+            <li>Di luar scope {preview.filteredCount}</li>
+            <li>Item unik {preview.items}</li>
           </ul>
           <ul className="mt-3 space-y-1 text-sm">
             {Object.entries(preview.gudangBreakdown).map(([nama, count]) => (
               <li key={nama}>
-                {nama} {count} barang
+                {nama} {count} item
               </li>
             ))}
           </ul>
           {preview.emptyHargaCount > 0 ? (
-            <p className="mt-3 text-sm">⚠ Harga satuan kosong pada {preview.emptyHargaCount} barang</p>
+            <p className="mt-3 text-sm">⚠ Harga satuan kosong pada {preview.emptyHargaCount} item</p>
           ) : null}
           {preview.missingBarcodeCount > 0 ? (
             <p className="mt-1 text-sm">⚠ Kolom barcode belum ada di {preview.missingBarcodeCount} baris</p>
           ) : null}
           <AddedNames label="Gudang baru" names={preview.addedGudang} detail="Ditambahkan saat Simpan Snapshot." />
-          <AddedNames label="Merek baru" names={preview.addedBrands} detail="Masuk ke lingkup sesi saat Simpan Snapshot." />
-          <AddedNames label="Group baru" names={preview.addedGroups} detail="Masuk ke lingkup sesi saat Simpan Snapshot." />
+          <AddedNames label="Brand baru" names={preview.addedBrands} detail="Masuk ke scope sesi saat Simpan Snapshot." />
+          <AddedNames label="Group baru" names={preview.addedGroups} detail="Masuk ke scope sesi saat Simpan Snapshot." />
           <div className="mt-6 flex gap-3">
             <OutlineButton className="px-5 py-2.5" onClick={() => setPreview(null)}>
               Batal

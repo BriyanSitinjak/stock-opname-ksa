@@ -4,7 +4,7 @@ import { kondisiReport } from "@/lib/reports";
 
 export default function Page({ params }: { params: Promise<{ id: string }> }) {
   return (
-    <LaporanPage params={params} title="Kondisi" subtitle="Pendapat kondisi tidak menahan selisih hitung.">
+    <LaporanPage params={params} title="Kondisi" subtitle="Catatan kondisi tidak mengubah selisih hitung.">
       {(id) => <Body id={id} />}
     </LaporanPage>
   );

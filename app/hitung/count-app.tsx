@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrandIcon, BrandLockup } from "@/app/brand-lockup";
 import { NumericKeypad } from "@/app/hitung/keypad";
-import { ActionColumn, GhostButton, Overlay, Phone, PrimaryButton, TextLink, TopBar, WaitNote } from "@/app/hitung/ui";
+import { ActionColumn, BackButton, GhostButton, Overlay, Phone, PrimaryButton, TextLink, TopBar, WaitNote } from "@/app/hitung/ui";
+import { toast } from "@/app/toast";
 import { evaluateQtyNote } from "@/lib/calculator";
 import { SESSION_ID } from "@/lib/fixture";
 import { maybeActivate } from "@/lib/offline/register-sw";
@@ -172,6 +173,11 @@ export function CountApp() {
   const [pending, setPending] = useState(0);
   const [storageOk, setStorageOk] = useState<boolean | null>(null);
   const [message, setMessage] = useState("");
+  useEffect(() => {
+    if (message) {
+      toast(message);
+    }
+  }, [message]);
   const [busy, setBusy] = useState(false);
   const [tagNomor, setTagNomor] = useState("");
   const [activeTag, setActiveTag] = useState<{
@@ -758,9 +764,7 @@ export function CountApp() {
             </li>
           ))}
         </ul>
-        <TextLink className="mt-6" onClick={() => setScreen("home")}>
-          Kembali
-        </TextLink>
+        <BackButton className="mt-6" onClick={() => setScreen("home")} />
       </Phone>
     );
   }
@@ -786,7 +790,7 @@ export function CountApp() {
         <ActionColumn>
           <PrimaryButton onClick={() => void openTag(tagNomor)}>Buka</PrimaryButton>
           <GhostButton onClick={() => setScreen("denah")}>Pilih dari Denah</GhostButton>
-          <TextLink onClick={() => setScreen("home")}>Kembali</TextLink>
+          <BackButton onClick={() => setScreen("home")} />
         </ActionColumn>
         {message ? (
           <Overlay>
@@ -823,9 +827,7 @@ export function CountApp() {
             </div>
           </section>
         ))}
-        <TextLink className="mt-6" onClick={() => setScreen("open-tag")}>
-          Kembali
-        </TextLink>
+        <BackButton className="mt-6" onClick={() => setScreen("open-tag")} />
         {message ? <p className="mt-3 text-sm">{message}</p> : null}
       </Phone>
     );
@@ -872,9 +874,7 @@ export function CountApp() {
             </li>
           ))}
         </ul>
-        <button type="button" className="mt-6 text-sm text-white/70" onClick={() => setScreen("count")}>
-          Kembali
-        </button>
+        <BackButton light className="mt-6" onClick={() => setScreen("count")} />
       </Phone>
     );
   }
@@ -931,14 +931,12 @@ export function CountApp() {
         ))}
         <ActionColumn>
           <PrimaryButton onClick={() => void syncNow(false)}>Kirim Sekarang</PrimaryButton>
-          <GhostButton
+          <BackButton
             onClick={() => {
               setExitBlock(false);
               setScreen("home");
             }}
-          >
-            Kembali
-          </GhostButton>
+          />
         </ActionColumn>
         {message ? <p className="mt-3 text-sm">{message}</p> : null}
       </Phone>
@@ -957,9 +955,7 @@ export function CountApp() {
         <p className="mt-4 text-sm">Nama: {prepare?.counter.nama}</p>
         <p className="text-sm">Antrian: {pending}</p>
         <p className="text-sm">Penyimpanan permanen: {storageOk ? "ya" : "tidak / belum dicek"}</p>
-        <TextLink className="mt-8" onClick={() => setScreen("home")}>
-          Kembali
-        </TextLink>
+        <BackButton className="mt-8" onClick={() => setScreen("home")} />
       </Phone>
     );
   }

@@ -48,10 +48,10 @@ export async function missingAssignments(sessionId: string): Promise<string[]> {
   const missing: string[] = [];
   for (const tag of tags) {
     if (!have.has(`${tag.id}:1`)) {
-      missing.push(`Tag ${tag.nomor} (${tag.lokasi.gudang.nama} / ${tag.lokasi.nama}) belum ada hitung ke-1`);
+      missing.push(`Tag ${tag.nomor} (${tag.lokasi.gudang.nama} / ${tag.lokasi.nama}) belum ada pass 1`);
     }
     if (!have.has(`${tag.id}:2`)) {
-      missing.push(`Tag ${tag.nomor} (${tag.lokasi.gudang.nama} / ${tag.lokasi.nama}) belum ada hitung ke-2`);
+      missing.push(`Tag ${tag.nomor} (${tag.lokasi.gudang.nama} / ${tag.lokasi.nama}) belum ada pass 2`);
     }
   }
   return missing;

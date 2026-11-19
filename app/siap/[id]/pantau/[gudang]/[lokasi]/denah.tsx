@@ -33,8 +33,8 @@ export function LokasiDenah({ tags }: { tags: DenahTag[] }) {
             <p className="text-sm text-[#6b6b6b]">{open.lokasi_nama}</p>
             <h2 className="text-xl font-semibold">Tag {open.nomor}</h2>
             <p className="mt-2 text-sm">{statusCaption(open.status)}</p>
-            <p className="mt-4 text-sm">Hitung ke-1: {open.pass_1_nama ?? "—"}</p>
-            <p className="text-sm">Hitung ke-2: {open.pass_2_nama ?? "—"}</p>
+            <p className="mt-4 text-sm">Pass 1: {open.pass_1_nama ?? "—"}</p>
+            <p className="text-sm">Pass 2: {open.pass_2_nama ?? "—"}</p>
           </>
         ) : (
           <p className="text-sm">Pilih tag pada denah.</p>

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { fetchJson } from "@/app/siap/api";
 import { SAMPLE_DENAH_NOTE } from "@/lib/monitor";
 import { MissingList, TealButton } from "@/app/siap/ui";
+import { toast } from "@/app/toast";
 
 type Detail = {
   id: string;
@@ -30,11 +31,11 @@ type DenahPayload = {
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  draft: "Draf",
-  counting: "Sedang berjalan",
-  review: "Penelaahan",
-  approved: "Disetujui",
-  closed: "Ditutup",
+  draft: "Draft",
+  counting: "Counting",
+  review: "Review",
+  approved: "Approved",
+  closed: "Closed",
 };
 
 async function fetchSession(id: string) {
@@ -46,7 +47,6 @@ export function SesiDetail({ id }: { id: string }) {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [gudang, setGudang] = useState<GudangProgress[]>([]);
   const [pinned, setPinned] = useState(true);
-  const [message, setMessage] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -67,12 +67,11 @@ export function SesiDetail({ id }: { id: string }) {
   }, [id]);
 
   async function openSession() {
-    setMessage("");
     const { ok, data } = await fetchJson<{ error?: string; missing_assignments?: string[] }>(`/api/sessions/${id}/open`, {
       method: "POST",
     });
     if (!ok) {
-      setMessage(data.error ?? "Belum bisa dibuka.");
+      toast(data.error ?? "Belum bisa dibuka.");
       if (data.missing_assignments) {
         setDetail((current) => (current ? { ...current, missing_assignments: data.missing_assignments ?? [] } : current));
       }
@@ -82,7 +81,7 @@ export function SesiDetail({ id }: { id: string }) {
     if (next) {
       setDetail(next);
     }
-    setMessage("Sesi dibuka. session_tags sudah dipin.");
+    toast("Sesi dibuka. Tag sudah di-pin.");
   }
 
   if (!detail) {
@@ -106,15 +105,15 @@ export function SesiDetail({ id }: { id: string }) {
       </div>
 
       <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Barang di snapshot" value={String(detail.snapshot_items)} href={`/siap/${id}/laporan/daftar-barang`} />
-        <Stat label="Tag di pin" value={String(detail.session_tags || total)} href={`/siap/${id}/pantau`} />
+        <Stat label="Item di snapshot" value={String(detail.snapshot_items)} href={`/siap/${id}/laporan/daftar-barang`} />
+        <Stat label="Tag yang di-pin" value={String(detail.session_tags || total)} href={`/siap/${id}/pantau`} />
         <Stat label="Selesai" value={String(selesai)} href={`/siap/${id}/pantau`} />
         <Stat label="Selisih hitung" value={String(selisih)} href={`/siap/${id}/laporan/selisih-hitung`} />
       </div>
 
       <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm">
         <div className="flex items-baseline justify-between gap-3">
-          <h2 className="font-medium">Pantauan per gudang</h2>
+          <h2 className="font-medium">Progress per gudang</h2>
           <Link href={`/siap/${id}/pantau`} className="text-sm text-ksa-teal-deep">
             Buka denah
           </Link>
@@ -150,7 +149,7 @@ export function SesiDetail({ id }: { id: string }) {
       <div className="mt-6 grid gap-3 sm:grid-cols-3">
         <Link href={`/siap/${id}/impor`} className="rounded-2xl bg-white p-5 shadow-sm">
           <p className="font-medium">Impor</p>
-          <p className="mt-1 text-sm text-[#6b6b6b]">{detail.snapshot_items} barang</p>
+          <p className="mt-1 text-sm text-[#6b6b6b]">{detail.snapshot_items} item</p>
         </Link>
         <Link href={`/siap/${id}/tugas`} className="rounded-2xl bg-white p-5 shadow-sm">
           <p className="font-medium">Bagi tugas</p>
@@ -160,12 +159,11 @@ export function SesiDetail({ id }: { id: string }) {
         </Link>
         <Link href={`/siap/${id}/persetujuan`} className="rounded-2xl bg-white p-5 shadow-sm">
           <p className="font-medium">Persetujuan</p>
-          <p className="mt-1 text-sm text-[#6b6b6b]">Penelaahan dan ekspor</p>
+          <p className="mt-1 text-sm text-[#6b6b6b]">Review dan export</p>
         </Link>
       </div>
 
       <MissingList items={detail.missing_assignments} />
-      {message ? <p className="mt-4 text-sm">{message}</p> : null}
       <TealButton className="mt-6 px-6 py-3" disabled={detail.status !== "draft"} onClick={() => void openSession()}>
         Buka sesi
       </TealButton>

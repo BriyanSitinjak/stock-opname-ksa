@@ -183,7 +183,7 @@ app.post("/users", async (c) => {
   const body = await c.req.json<{ nama?: string; role?: string }>();
   const role = parseRole(body.role);
   if (!body.nama?.trim() || role == null) {
-    return c.json({ error: "Nama dan peran wajib." }, 400);
+    return c.json({ error: "Nama dan role wajib." }, 400);
   }
   const user = await prisma.user.create({
     data: { nama: body.nama.trim(), role },
@@ -203,7 +203,7 @@ app.patch("/users/:id", async (c) => {
   const body = await c.req.json<{ role?: string; retired?: boolean }>();
   const role = body.role == null ? undefined : parseRole(body.role);
   if (body.role != null && role == null) {
-    return c.json({ error: "Peran tidak dikenal." }, 400);
+    return c.json({ error: "Role tidak dikenal." }, 400);
   }
   if (role == null && body.retired !== true) {
     return c.json({ error: "Tidak ada perubahan." }, 400);
@@ -498,14 +498,14 @@ app.post("/sessions/:id/import", async (c) => {
   const body = await c.req.parseBody();
   const file = body.file;
   if (!(file instanceof File)) {
-    return c.json({ error: "Berkas wajib diunggah." }, 400);
+    return c.json({ error: "File wajib di-upload." }, 400);
   }
   const session = await prisma.opnameSession.findUnique({ where: { id } });
   if (!session) {
     return c.json(sessionMissing, 404);
   }
   if (session.status === "approved" || session.status === "closed") {
-    return c.json({ error: "Sesi disetujui tidak bisa diubah." }, 409);
+    return c.json({ error: "Sesi yang sudah approved tidak bisa diubah." }, 409);
   }
   const bytes = Buffer.from(await file.arrayBuffer());
   const parsed = await parseImportFile(file.name, bytes);
@@ -530,7 +530,7 @@ app.post("/sessions/:id/import", async (c) => {
     await commitImport(id, result.raw, result.items, widen);
   } catch (error) {
     console.error(error);
-    return c.json({ error: "Impor gagal. Tidak ada perubahan." }, 500);
+    return c.json({ error: "Import gagal. Tidak ada perubahan." }, 500);
   }
   return c.json({ ok: true, items: result.preview.items, source_row_count_check: result.items });
 });
@@ -547,7 +547,7 @@ app.post("/sessions/:id/open", async (c) => {
   }
   const snapshotCount = await prisma.snapshotItem.count({ where: { sessionId: id } });
   if (snapshotCount === 0) {
-    return c.json({ error: "Snapshot belum diimpor." }, 409);
+    return c.json({ error: "Snapshot belum di-import." }, 409);
   }
   const tags = await liveTags();
   if (tags.length === 0) {
@@ -793,7 +793,7 @@ app.post("/sessions/:id/approve", async (c) => {
   const body = await c.req.json<{ actor_id?: string; step?: number; catatan?: string }>();
   const actorId = parseId(c.req.header("x-actor-id") ?? body.actor_id, "usr");
   if (actorId == null || (body.step !== 1 && body.step !== 2)) {
-    return c.json({ error: "Petugas dan langkah wajib." }, 400);
+    return c.json({ error: "Petugas dan step wajib." }, 400);
   }
   const result = await approveSession(id, actorId, body.step, body.catatan?.trim() || null);
   if ("error" in result) {
@@ -844,7 +844,7 @@ app.get("/sessions/:id/export.xlsx", async (c) => {
     return c.json(sessionMissing, 404);
   }
   if (session.status !== "approved" && session.status !== "closed") {
-    return c.json({ error: "Ekspor akhir hanya setelah disetujui." }, 409);
+    return c.json({ error: "Export akhir hanya setelah approved." }, 409);
   }
   const file = await buildWorkbook(id);
   if (!file) {
@@ -864,7 +864,7 @@ app.get("/sessions/:id/export.pdf", async (c) => {
     return c.json(sessionMissing, 404);
   }
   if (session.status !== "approved" && session.status !== "closed") {
-    return c.json({ error: "Ekspor akhir hanya setelah disetujui." }, 409);
+    return c.json({ error: "Export akhir hanya setelah approved." }, 409);
   }
   const file = await buildPdf(id);
   if (!file) {

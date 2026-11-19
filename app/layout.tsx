@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ToastHost } from "@/app/toast";
 import { SwRegister } from "@/lib/offline/register-sw";
 import "./globals.css";
 
@@ -45,6 +46,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col bg-ksa-cream">
         <SwRegister />
         {children}
+        <ToastHost />
       </body>
     </html>
   );

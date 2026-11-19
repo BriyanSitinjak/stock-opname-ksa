@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { fetchJson } from "@/app/siap/api";
 import { ReportRow, ReportTable, Td } from "@/app/siap/report-table";
-import { ErrorText, OutlineButton, TealButton } from "@/app/siap/ui";
+import { ErrorText, OutlineButton, Select, TealButton } from "@/app/siap/ui";
+import { toast } from "@/app/toast";
 import { ROLE_LABEL, ROLES, type StaffRole } from "@/lib/roles";
 
 type Person = { id: string; nama: string; role: StaffRole };
@@ -18,13 +19,13 @@ function RoleSelect({
   className: string;
 }) {
   return (
-    <select className={className} value={value} onChange={(event) => onChange(event.target.value as StaffRole)}>
+    <Select className={className} value={value} onChange={(event) => onChange(event.target.value as StaffRole)}>
       {ROLES.map((item) => (
         <option key={item} value={item}>
           {ROLE_LABEL[item]}
         </option>
       ))}
-    </select>
+    </Select>
   );
 }
 
@@ -46,7 +47,6 @@ export function PenggunaBoard() {
   const [nama, setNama] = useState("");
   const [role, setRole] = useState<StaffRole>("counter");
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -62,9 +62,8 @@ export function PenggunaBoard() {
 
   async function addPerson() {
     setError("");
-    setMessage("");
     if (!nama.trim()) {
-      setError("Nama wajib.");
+      toast("Nama wajib.", setError);
       return;
     }
     const { ok, data } = await fetchJson<{ error?: string }>("/api/users", {
@@ -73,11 +72,11 @@ export function PenggunaBoard() {
       body: JSON.stringify({ nama: nama.trim(), role }),
     });
     if (!ok) {
-      setError(data.error ?? "Gagal menambah pengguna.");
+      toast(data.error ?? "Gagal menambah pengguna.", setError);
       return;
     }
     setNama("");
-    setMessage("Pengguna tersimpan.");
+    toast("Pengguna tersimpan.");
     const users = await readUsers();
     if (users) {
       setPeople(users);
@@ -86,32 +85,31 @@ export function PenggunaBoard() {
 
   async function changeRole(person: Person, next: StaffRole) {
     setError("");
-    setMessage("");
     const { ok, data } = await patchUser(person.id, { role: next });
     if (!ok) {
-      setError(data.error ?? "Gagal mengubah peran.");
+      toast(data.error ?? "Gagal mengubah role.", setError);
       return;
     }
     setPeople((current) => current.map((row) => (row.id === person.id ? { ...row, role: next } : row)));
+    toast("Role diubah.");
   }
 
   async function retire(person: Person) {
     setError("");
-    setMessage("");
     const { ok, data } = await patchUser(person.id, { retired: true });
     if (!ok) {
-      setError(data.error ?? "Gagal menonaktifkan.");
+      toast(data.error ?? "Gagal menonaktifkan.", setError);
       return;
     }
     setPeople((current) => current.filter((row) => row.id !== person.id));
-    setMessage(`${person.nama} dinonaktifkan.`);
+    toast(`${person.nama} dinonaktifkan.`);
   }
 
   return (
     <>
       <h1 className="text-2xl font-semibold">Pengguna</h1>
       <p className="mt-1 max-w-2xl text-sm text-[#6b6b6b]">
-        Admin menyetujui langkah 1 dan membuka ulang sesi. Reviewer menyetujui langkah 2. Petugas menghitung barang di HP. Satu orang satu peran, dan siapa pun bisa ditugaskan menghitung.
+        Admin approve step 1 dan bisa reopen sesi. Reviewer approve step 2. Petugas hitung di HP. Satu orang satu role, dan siapa pun bisa ditugaskan hitung.
       </p>
       <div className="mt-5 flex max-w-xl flex-col gap-2 sm:flex-row">
         <input
@@ -120,17 +118,17 @@ export function PenggunaBoard() {
           value={nama}
           onChange={(e) => setNama(e.target.value)}
         />
-        <RoleSelect className="rounded-xl border px-3 py-2 text-sm" value={role} onChange={setRole} />
+        <RoleSelect className="min-w-36" value={role} onChange={setRole} />
         <TealButton className="px-5 py-2 text-sm" onClick={() => void addPerson()}>
           Tambah
         </TealButton>
       </div>
-      <ReportTable headers={["Nama", "Peran", ""]}>
+      <ReportTable headers={["Nama", "Role", ""]}>
         {people.map((person) => (
           <ReportRow key={person.id}>
             <Td className="font-medium">{person.nama}</Td>
             <Td>
-              <RoleSelect className="rounded-lg border px-2 py-1" value={person.role} onChange={(next) => void changeRole(person, next)} />
+              <RoleSelect className="w-full" value={person.role} onChange={(next) => void changeRole(person, next)} />
             </Td>
             <Td>
               <OutlineButton className="px-3 py-1" onClick={() => void retire(person)}>
@@ -141,7 +139,6 @@ export function PenggunaBoard() {
         ))}
       </ReportTable>
       <ErrorText>{error}</ErrorText>
-      {message ? <p className="mt-4 text-sm text-ksa-teal-deep">{message}</p> : null}
     </>
   );
 }

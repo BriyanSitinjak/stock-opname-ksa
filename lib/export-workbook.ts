@@ -112,7 +112,7 @@ export async function buildWorkbook(sessionId: string) {
   for (const row of data.sistem) {
     const line = sistemSheet.addRow([]);
     text(line, 1, row.gudang_nama);
-    text(line, 2, row.barcode_4);
+    text(line, 2, row.kode_barang);
     text(line, 3, row.nama_barang);
     line.getCell(4).value = Number(row.qty_onhand);
     line.getCell(5).value = Number(row.qty_hitung);
@@ -128,7 +128,7 @@ export async function buildWorkbook(sessionId: string) {
     text(line, 1, row.nomor);
     text(line, 2, row.gudang_nama);
     text(line, 3, row.lokasi_nama);
-    text(line, 4, row.barcode_4);
+    text(line, 4, row.kode_barang);
     text(line, 5, row.nama_barang);
     text(line, 6, qtyOrDash(row.qty_1));
     text(line, 7, qtyOrDash(row.qty_2));
@@ -140,7 +140,7 @@ export async function buildWorkbook(sessionId: string) {
   for (const row of data.zero) {
     const line = zeroSheet.addRow([]);
     text(line, 1, row.gudang_nama);
-    text(line, 2, row.barcode_4);
+    text(line, 2, row.kode_barang);
     text(line, 3, row.nama_barang);
     line.getCell(4).value = Number(row.qty_onhand);
   }

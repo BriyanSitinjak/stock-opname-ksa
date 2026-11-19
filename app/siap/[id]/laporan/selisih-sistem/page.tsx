@@ -7,7 +7,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
     <LaporanPage
       params={params}
       title="Selisih sistem"
-      subtitle="Baris dengan selisih hitung belum masuk. Qty hitung 0 vs stok sistem ditandai."
+      subtitle="Baris yang masih selisih hitung belum masuk. Qty hitung 0 vs stok sistem ditandai."
     >
       {(id) => <Body id={id} />}
     </LaporanPage>
@@ -21,7 +21,7 @@ async function Body({ id }: { id: string }) {
       {rows.map((row) => (
         <ReportRow key={`${row.gudang_id}-${row.kode_barang}`} className={row.zero_found ? "bg-[#f3d4a0]" : ""}>
           <Td>{row.gudang_nama}</Td>
-          <Td>{row.barcode_4}</Td>
+          <Td>{row.kode_barang}</Td>
           <Td>
             {row.nama_barang}
             {row.zero_found ? " · tidak ditemukan" : ""}

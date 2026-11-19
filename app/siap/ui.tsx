@@ -1,12 +1,14 @@
 "use client";
 
-import type { InputHTMLAttributes, ReactNode } from "react";
+import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
+import { ChevronDown } from "lucide-react";
 import Link from "next/link";
+import { BackIcon, backControlClass } from "@/app/back-icon";
 
 export function BackLink({ href }: { href: string }) {
   return (
-    <Link href={href} className="text-sm text-ksa-teal-deep">
-      Kembali
+    <Link href={href} aria-label="Kembali" className={`${backControlClass} text-ksa-teal-deep`}>
+      <BackIcon />
     </Link>
   );
 }
@@ -48,6 +50,18 @@ export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={`mt-1 w-full rounded-xl border px-3 py-2 ${props.className ?? ""}`} />;
 }
 
+export function Select({ className = "", ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <span className={`relative inline-flex min-w-0 align-middle ${className}`}>
+      <select
+        {...props}
+        className="w-full cursor-pointer appearance-none rounded-xl border border-[#e7dfd2] bg-white py-2 pr-9 pl-3 text-sm text-[#1c1c1c] shadow-sm outline-none transition-[border-color,box-shadow] duration-150 hover:border-ksa-teal/50 focus:border-ksa-teal focus:ring-2 focus:ring-ksa-teal/20 disabled:cursor-not-allowed disabled:opacity-50"
+      />
+      <ChevronDown aria-hidden className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-ksa-teal-deep" size={16} strokeWidth={2} />
+    </span>
+  );
+}
+
 export function SearchForm({
   action,
   name,
@@ -63,7 +77,7 @@ export function SearchForm({
     <form className="mt-4 flex max-w-xl gap-2" action={action}>
       <input name={name} defaultValue={defaultValue} className="flex-1 rounded-xl border px-3 py-2 text-sm" placeholder={placeholder} />
       <TealButton type="submit" className="px-5 py-2.5 text-sm">
-        Cari
+        Search
       </TealButton>
     </form>
   );

@@ -28,7 +28,7 @@ export async function parseImportFile(
   bytes: Buffer,
 ): Promise<{ rows: RawRow[] } | { error: ImportError }> {
   if (bytes.length > MAX_BYTES) {
-    return { error: { code: "file_too_large", message: "Berkas terlalu besar (maksimum 10 MB)." } };
+    return { error: { code: "file_too_large", message: "File terlalu besar (maksimum 10 MB)." } };
   }
   const lower = filename.trim().toLowerCase();
   const magic = bytes.subarray(0, 4).toString("binary");
@@ -173,7 +173,7 @@ export function validateAndAggregate(
     return {
       error: {
         code: "zero_rows",
-        message: "Tidak ada baris yang lolos filter merek. Periksa nama merek pada berkas.",
+        message: "Tidak ada baris yang lolos filter brand. Periksa nama brand di file.",
       },
     };
   }
@@ -218,7 +218,7 @@ export function validateAndAggregate(
     return {
       error: {
         code: "zero_rows",
-        message: `Tidak ada baris yang lolos filter. Merek pada berkas: ${foundBrands}. Group pada berkas: ${foundGroups}. Lingkup sesi: ${brands.join(", ")} / ${groups.join(", ")}.`,
+        message: `Tidak ada baris yang lolos filter. Brand di file: ${foundBrands}. Group di file: ${foundGroups}. Scope sesi: ${brands.join(", ")} / ${groups.join(", ")}.`,
       },
     };
   }

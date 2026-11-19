@@ -22,8 +22,7 @@ export const TAG_STATUS_MARK: Record<TagStatus, string> = {
 
 const STALE_AFTER_MS = 3 * 60 * 60 * 1000;
 
-export const PENDING_CAPTION =
-  "Laporan HP saat sinkron terakhir, bukan antrian yang terlihat server.";
+export const PENDING_CAPTION = "Angka dari HP saat sync terakhir, bukan antrian di server.";
 
 export function statusCaption(status: TagStatus) {
   return `${TAG_STATUS_MARK[status]} ${TAG_STATUS_LABEL[status]}`;
@@ -206,7 +205,7 @@ async function masterPreview(sessionId: string): Promise<DenahTag[]> {
 // layout so the sample denah can be walked and replaced before open.
 // Reports keep sessionDenah, which reads session_tags only.
 export const SAMPLE_DENAH_NOTE =
-  "Denah contoh, belum dipin. Layout ini bisa diganti selama sesi masih draf. Pin terjadi saat sesi dibuka.";
+  "Denah contoh, belum di-pin. Layout ini bisa diganti selama sesi masih draft. Pin terjadi saat sesi dibuka.";
 
 export async function coordinatorDenah(sessionId: string) {
   const pinnedCount = await prisma.sessionTag.count({ where: { sessionId } });

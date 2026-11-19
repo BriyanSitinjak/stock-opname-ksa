@@ -24,7 +24,7 @@ async function Body({ id, kode }: { id: string; kode: string }) {
     <LaporanShell
       id={id}
       title="Peta barang"
-      subtitle="Isi setelah hitungan disepakati. Nama lokasi dari pin sesi, bukan master denah."
+      subtitle="Dipakai setelah count disepakati. Lokasi dari pin sesi, bukan master denah."
     >
       <SearchForm
         action={`/siap/${id}/laporan/peta-barang`}
@@ -32,9 +32,9 @@ async function Body({ id, kode }: { id: string; kode: string }) {
         defaultValue={kode}
         placeholder="Barcode 4 digit"
       />
-      {!kode ? <p className="mt-6 text-sm">Cari barcode untuk melihat lokasi setelah hitungan pertama selesai.</p> : null}
+      {!kode ? <p className="mt-6 text-sm">Cari barcode untuk lihat lokasi setelah pass 1 selesai.</p> : null}
       {kode && items.length === 0 ? (
-        <p className="mt-6 text-sm">Belum ada qty disepakati untuk kode {kode}.</p>
+        <p className="mt-6 text-sm">Belum ada qty yang disepakati untuk kode {kode}.</p>
       ) : null}
       {items.length > 0 ? (
         <ReportTable headers={["Gudang", "Lokasi", "Tag", "Qty"]}>

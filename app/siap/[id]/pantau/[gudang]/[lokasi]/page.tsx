@@ -20,7 +20,7 @@ async function PantauLokasi({ id, gudang, lokasi }: { id: string; gudang: string
   const lokasiNama = decodeURIComponent(lokasi);
   const match = (await coordinatorGudang(id, gudangNama))?.lokasi.find((row) => row.nama === lokasiNama);
   if (!match) {
-    return <MissingPin href={pantauHref(id, gudangNama)}>Lokasi tidak ada di pin sesi ini.</MissingPin>;
+    return <MissingPin href={pantauHref(id, gudangNama)}>Lokasi ini tidak ada di pin sesi.</MissingPin>;
   }
   return (
     <SiapSubpage backHref={pantauHref(id, gudangNama)} title={`${gudangNama} · ${match.nama}`} subtitle={selesaiCaption(match)} legend>

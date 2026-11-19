@@ -48,12 +48,12 @@ export async function sendToReview(sessionId: string) {
     return { error: "Sesi tidak ditemukan.", status: 404 as const };
   }
   if (session.status !== "counting") {
-    return { error: "Hanya sesi counting yang bisa dikirim ke penelaahan.", status: 409 as const };
+    return { error: "Hanya sesi counting yang bisa dikirim ke review.", status: 409 as const };
   }
   const blockers = await reviewBlockers(sessionId);
   if (blockers.open_tags.length > 0) {
     return {
-      error: "Masih ada tag yang belum selesai dihitung.",
+      error: "Masih ada tag yang count-nya belum selesai.",
       status: 409 as const,
       open_tags: blockers.open_tags,
     };
@@ -75,25 +75,25 @@ function stepRole(step: number): Role {
 
 export async function approveSession(sessionId: string, actorId: string, step: number, catatan: string | null) {
   if (step !== 1 && step !== 2) {
-    return { error: "Langkah persetujuan hanya 1 atau 2.", status: 400 as const };
+    return { error: "Step approval hanya 1 atau 2.", status: 400 as const };
   }
   const session = await prisma.opnameSession.findUnique({ where: { id: sessionId } });
   if (!session) {
     return { error: "Sesi tidak ditemukan.", status: 404 as const };
   }
   if (session.status !== "review") {
-    return { error: "Persetujuan hanya saat sesi penelaahan.", status: 409 as const };
+    return { error: "Approval hanya saat sesi sedang review.", status: 409 as const };
   }
   const actor = await prisma.user.findFirst({ where: { id: actorId, retiredAt: null } });
   if (!actor || actor.role !== stepRole(step)) {
-    return { error: "Petugas ini tidak berwenang pada langkah itu.", status: 403 as const };
+    return { error: "Orang ini tidak berwenang di step itu.", status: 403 as const };
   }
   if (step === 2) {
     const first = await prisma.approval.findUnique({
       where: { sessionId_step: { sessionId, step: 1 } },
     });
     if (!first) {
-      return { error: "Langkah 1 belum dicatat.", status: 409 as const };
+      return { error: "Step 1 belum dicatat.", status: 409 as const };
     }
   }
   try {
@@ -101,7 +101,7 @@ export async function approveSession(sessionId: string, actorId: string, step: n
       data: { sessionId, step, approvedById: actorId, catatan },
     });
   } catch {
-    return { error: "Langkah ini sudah disetujui.", status: 409 as const };
+    return { error: "Step ini sudah di-approve.", status: 409 as const };
   }
   if (step === 2) {
     await prisma.opnameSession.update({ where: { id: sessionId }, data: { status: "approved" } });
@@ -113,18 +113,18 @@ export async function approveSession(sessionId: string, actorId: string, step: n
 export async function reopenSession(sessionId: string, actorId: string, reason: string) {
   const trimmed = reason.trim();
   if (!trimmed) {
-    return { error: "Alasan buka ulang wajib.", status: 400 as const };
+    return { error: "Alasan reopen wajib.", status: 400 as const };
   }
   const session = await prisma.opnameSession.findUnique({ where: { id: sessionId } });
   if (!session) {
     return { error: "Sesi tidak ditemukan.", status: 404 as const };
   }
   if (session.status !== "approved" && session.status !== "closed") {
-    return { error: "Hanya sesi disetujui atau ditutup yang bisa dibuka ulang.", status: 409 as const };
+    return { error: "Hanya sesi approved atau closed yang bisa di-reopen.", status: 409 as const };
   }
   const actor = await prisma.user.findFirst({ where: { id: actorId, role: "admin", retiredAt: null } });
   if (!actor) {
-    return { error: "Hanya admin yang bisa membuka ulang.", status: 403 as const };
+    return { error: "Hanya admin yang bisa reopen.", status: 403 as const };
   }
   await prisma.$transaction([
     prisma.sessionReopen.create({
@@ -141,7 +141,7 @@ export async function closeSession(sessionId: string) {
     return { error: "Sesi tidak ditemukan.", status: 404 as const };
   }
   if (session.status !== "approved") {
-    return { error: "Hanya sesi disetujui yang bisa ditutup.", status: 409 as const };
+    return { error: "Hanya sesi approved yang bisa ditutup.", status: 409 as const };
   }
   await prisma.opnameSession.update({ where: { id: sessionId }, data: { status: "closed" } });
   return { ok: true as const, session_status: "closed" as const };

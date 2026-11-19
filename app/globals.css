@@ -34,3 +34,26 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), Helvetica, sans-serif;
 }
+
+button,
+a,
+summary,
+[role="button"] {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+button:not(:disabled),
+a,
+[role="button"] {
+  transition: transform 140ms ease;
+}
+
+button:not(:disabled):active,
+a:active,
+[role="button"]:active {
+  transform: scale(0.96);
+}
