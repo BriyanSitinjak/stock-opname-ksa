@@ -1,17 +1,16 @@
 "use client";
 
 import type { ReactNode, Ref } from "react";
-import { BackIcon, backControlClass } from "@/app/back-icon";
+import { BackMark, backControlClass } from "@/app/back-icon";
 
 export function BackButton({ onClick, light = false, className = "" }: { onClick: () => void; light?: boolean; className?: string }) {
   return (
     <button
       type="button"
-      aria-label="Kembali"
       onClick={onClick}
       className={`${backControlClass} ${light ? "text-white/80" : "text-ksa-teal-deep"} ${className}`}
     >
-      <BackIcon />
+      <BackMark />
     </button>
   );
 }

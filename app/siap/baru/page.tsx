@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fetchJson } from "@/app/siap/api";
-import { Card, ErrorText, Field, ScopeTicks, TealButton, TextInput, toggleValue } from "@/app/siap/ui";
+import { Card, ErrorText, Field, PageLead, ScopeTicks, TealButton, TextInput, toggleValue } from "@/app/siap/ui";
 import { toast } from "@/app/toast";
 
 export default function SesiBaruPage() {
@@ -55,6 +55,9 @@ export default function SesiBaruPage() {
   return (
     <>
       <h1 className="text-2xl font-semibold">Sesi baru</h1>
+      <PageLead>
+        Nama, periode, dan waktu cut off cukup untuk membuat sesi draft. Brand dan group terisi dari file impor, jadi daftar itu kosong sampai snapshot disimpan.
+      </PageLead>
       <Card className="mt-6 max-w-xl">
         <Field label="Nama sesi">
           <TextInput value={nama} onChange={(e) => setNama(e.target.value)} />

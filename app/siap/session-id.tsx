@@ -1,4 +1,5 @@
 import { Suspense, type ReactNode } from "react";
+import { LoadingMark } from "@/app/loading-mark";
 
 export function AwaitParams<T>({
   params,
@@ -8,7 +9,7 @@ export function AwaitParams<T>({
   children: (value: T) => ReactNode;
 }) {
   return (
-    <Suspense fallback={<p>Memuat…</p>}>
+    <Suspense fallback={<LoadingMark />}>
       <ResolveParams params={params}>{children}</ResolveParams>
     </Suspense>
   );

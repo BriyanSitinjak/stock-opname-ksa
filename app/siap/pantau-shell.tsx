@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { StatusLegend } from "@/app/siap/pantau-ui";
-import { BackLink } from "@/app/siap/ui";
+import { BackLink, PageLead } from "@/app/siap/ui";
 
 export function SiapSubpage({
   backHref,
@@ -19,7 +19,7 @@ export function SiapSubpage({
     <>
       <BackLink href={backHref} />
       <h1 className="mt-3 text-2xl font-semibold">{title}</h1>
-      {subtitle ? <p className="mt-1 text-sm text-[#6b6b6b]">{subtitle}</p> : null}
+      {subtitle ? <PageLead>{subtitle}</PageLead> : null}
       {legend ? <StatusLegend /> : null}
       {children}
     </>

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { IMPORT_ACCEPT, importFileList } from "@/lib/import-kinds";
-import { BackLink, Card, ErrorText, OutlineButton, TealButton } from "@/app/siap/ui";
+import { BackLink, Card, ErrorText, OutlineButton, PageLead, TealButton } from "@/app/siap/ui";
 import { toast } from "@/app/toast";
 
 type Preview = {
@@ -90,7 +90,9 @@ export function ImporForm({ id }: { id: string }) {
     <>
       <BackLink href={`/siap/${id}`} />
       <h1 className="mt-3 text-2xl font-semibold">Impor snapshot</h1>
-      <p className="mt-1 text-sm text-[#6b6b6b]">Preview dulu. Snapshot baru tersimpan saat Simpan Snapshot.</p>
+      <PageLead>
+        Baca file cut off dulu sebagai preview. Gudang yang belum ada akan ditambahkan saat Simpan Snapshot. Snapshot baru tertulis setelah tombol itu, bukan saat file dipilih.
+      </PageLead>
       <Card className="mt-6 max-w-xl">
         <input
           ref={fileRef}

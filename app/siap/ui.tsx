@@ -1,14 +1,15 @@
 "use client";
 
 import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
-import { ChevronDown } from "lucide-react";
+import { Ban, ChevronDown, Layers, Tags, type LucideIcon } from "lucide-react";
 import Link from "next/link";
-import { BackIcon, backControlClass } from "@/app/back-icon";
+import { BackMark, backControlClass } from "@/app/back-icon";
+import { countedTitle } from "@/app/siap/format";
 
 export function BackLink({ href }: { href: string }) {
   return (
-    <Link href={href} aria-label="Kembali" className={`${backControlClass} text-ksa-teal-deep`}>
-      <BackIcon />
+    <Link href={href} className={`${backControlClass} text-ksa-teal-deep`}>
+      <BackMark />
     </Link>
   );
 }
@@ -25,6 +26,85 @@ export function MissingList({ items }: { items: string[] }) {
     <ul className="mt-4 rounded-2xl bg-[#f3d4a0] p-4 text-sm">
       {items.map((row) => (
         <li key={row}>{row}</li>
+      ))}
+    </ul>
+  );
+}
+
+export function PageLead({ children }: { children: ReactNode }) {
+  return <p className="mt-1 max-w-3xl text-sm leading-6 text-[#6b6b6b]">{children}</p>;
+}
+
+export function IconLabel({
+  icon: Icon,
+  title,
+  as: Tag = "p",
+}: {
+  icon: LucideIcon;
+  title: string;
+  as?: "p" | "h2";
+}) {
+  return (
+    <Tag className="flex items-center gap-2 text-sm font-normal text-[#6b6b6b]">
+      <Icon aria-hidden size={16} strokeWidth={2} className="shrink-0 text-ksa-teal-deep" />
+      {title}
+    </Tag>
+  );
+}
+
+export function InfoCard({
+  icon,
+  title,
+  children,
+  className = "",
+}: {
+  icon: LucideIcon;
+  title: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`rounded-3xl bg-white p-5 shadow-sm ${className}`}>
+      <IconLabel icon={icon} title={title} />
+      <div className="mt-2 text-base font-semibold leading-6 text-[#1c1c1c]">{children}</div>
+    </div>
+  );
+}
+
+export function ScopeLists({
+  included,
+  excluded,
+  groups,
+  groupClassName = "",
+}: {
+  included: string[];
+  excluded: string[];
+  groups: string[];
+  groupClassName?: string;
+}) {
+  return (
+    <>
+      <InfoCard icon={Tags} title={countedTitle("Brand yang dihitung", included.length)}>
+        <BulletList items={included} />
+      </InfoCard>
+      <InfoCard icon={Ban} title={countedTitle("Brand di luar scope", excluded.length)}>
+        <BulletList items={excluded} />
+      </InfoCard>
+      <InfoCard icon={Layers} title={countedTitle("Group", groups.length)} className={groupClassName}>
+        <BulletList items={groups} />
+      </InfoCard>
+    </>
+  );
+}
+
+export function BulletList({ items }: { items: string[] }) {
+  if (items.length === 0) {
+    return <span>—</span>;
+  }
+  return (
+    <ul className="max-h-36 list-disc space-y-1 overflow-y-auto pr-1 pl-5">
+      {items.map((item) => (
+        <li key={item}>{item}</li>
       ))}
     </ul>
   );
@@ -67,14 +147,17 @@ export function SearchForm({
   name,
   defaultValue,
   placeholder,
+  hidden,
 }: {
   action: string;
   name: string;
   defaultValue: string;
   placeholder: string;
+  hidden?: Record<string, string>;
 }) {
   return (
     <form className="mt-4 flex max-w-xl gap-2" action={action}>
+      {Object.entries(hidden ?? {}).map(([key, value]) => (value ? <input key={key} type="hidden" name={key} value={value} /> : null))}
       <input name={name} defaultValue={defaultValue} className="flex-1 rounded-xl border px-3 py-2 text-sm" placeholder={placeholder} />
       <TealButton type="submit" className="px-5 py-2.5 text-sm">
         Search

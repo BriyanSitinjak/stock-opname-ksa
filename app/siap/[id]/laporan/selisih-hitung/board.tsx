@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { EmptyState } from "@/app/empty-state";
 import { ReportRow, ReportTable, Td } from "@/app/siap/report-table";
 import { Select } from "@/app/siap/ui";
 import { toast } from "@/app/toast";
@@ -71,7 +72,7 @@ export function SelisihHitungBoard({
   }
 
   if (rows.length === 0) {
-    return <p className="mt-6 text-sm">Tidak ada selisih hitung.</p>;
+    return <EmptyState menu="selisih hitung" kind="tidak" />;
   }
 
   return (
@@ -109,7 +110,7 @@ export function SelisihHitungBoard({
                 </Select>
               </label>
             </div>
-            <ReportTable headers={["Kode", "Nama", "Hitung 1", "Hitung 2"]}>
+            <ReportTable title={`Perbandingan tag ${head.nomor}`} headers={["Kode", "Nama", "Hitung 1", "Hitung 2"]}>
               {items.map((row) => (
                 <ReportRow key={row.snapshot_item_id}>
                   <Td>{row.kode_barang}</Td>

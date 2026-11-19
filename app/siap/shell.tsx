@@ -11,6 +11,7 @@ import {
   Files,
   House,
   List,
+  LogOut,
   Map,
   MapPin,
   Plus,
@@ -21,8 +22,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { BrandIcon } from "@/app/brand-lockup";
+import { confirm } from "@/app/confirm";
+import { LoadingMark } from "@/app/loading-mark";
 import { fetchJson } from "@/app/siap/api";
+import { CoordinatorGate } from "@/app/siap/gate";
 import { parseId } from "@/lib/ids";
+import type { StaffSession } from "@/lib/staff-auth";
 
 type NavItem = {
   label: string;
@@ -155,6 +160,22 @@ function HomeLink({ sessionId, iconSize, className = "" }: { sessionId: string |
   );
 }
 
+function StaffBar({ staff, onLeave }: { staff: StaffSession; onLeave: () => void }) {
+  return (
+    <div className="mt-4 px-3">
+      <p className="truncate text-sm text-white/80">{staff.nama}</p>
+      <button
+        type="button"
+        onClick={onLeave}
+        className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/50 px-3 py-2 text-sm text-white"
+      >
+        <LogOut aria-hidden size={16} strokeWidth={2} />
+        Keluar
+      </button>
+    </div>
+  );
+}
+
 function CountLink({ className, onNavigate }: { className: string; onNavigate?: () => void }) {
   return (
     <Link href="/hitung" onClick={onNavigate} className={`flex items-center gap-2.5 px-3 py-2 text-sm text-white/60 hover:text-white ${className}`}>
@@ -198,11 +219,30 @@ export function CoordinatorShell({ children }: { children: ReactNode }) {
   const pathSession = sessionFromPath(pathname);
   const [fallbackId, setFallbackId] = useState<string | null>(null);
   const [menuPath, setMenuPath] = useState<string | null>(null);
+  const [staff, setStaff] = useState<StaffSession | null | undefined>(undefined);
   const sessionId = pathSession ?? fallbackId;
   const menuOpen = menuPath === pathname;
 
   useEffect(() => {
-    if (pathSession) {
+    let cancelled = false;
+    void fetchJson<StaffSession>("/api/auth/me").then(({ ok, data }) => {
+      if (!cancelled) {
+        setStaff(ok ? data : null);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const onRequired = () => setStaff(null);
+    window.addEventListener("ksa-staff-required", onRequired);
+    return () => window.removeEventListener("ksa-staff-required", onRequired);
+  }, []);
+
+  useEffect(() => {
+    if (pathSession || !staff) {
       return;
     }
     let cancelled = false;
@@ -214,7 +254,28 @@ export function CoordinatorShell({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [pathSession]);
+  }, [pathSession, staff]);
+
+  async function leave() {
+    const ok = await confirm({
+      title: "Keluar dari Layar koordinator?",
+      message: "Untuk masuk lagi, pilih nama dan isi password.",
+      confirmLabel: "Keluar",
+      tone: "danger",
+    });
+    if (!ok) {
+      return;
+    }
+    await fetch("/api/auth/logout", { method: "POST" });
+    setStaff(null);
+  }
+
+  if (staff === undefined) {
+    return <LoadingMark />;
+  }
+  if (staff === null) {
+    return <CoordinatorGate onReady={setStaff} />;
+  }
 
   return (
     <div className="min-h-dvh bg-ksa-cream lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
@@ -223,7 +284,8 @@ export function CoordinatorShell({ children }: { children: ReactNode }) {
         <div className="flex-1 overflow-y-auto">
           <NavLinks sessionId={sessionId} pathname={pathname} />
         </div>
-        <CountLink className="mt-4" />
+        <StaffBar staff={staff} onLeave={() => void leave()} />
+        <CountLink className="mt-2" />
       </aside>
 
       <div className="lg:hidden">
@@ -236,7 +298,8 @@ export function CoordinatorShell({ children }: { children: ReactNode }) {
         {menuOpen ? (
           <div className="bg-[#1c1c1c] px-3 pb-4">
             <NavLinks sessionId={sessionId} pathname={pathname} onNavigate={() => setMenuPath(null)} />
-            <CountLink className="mt-3" onNavigate={() => setMenuPath(null)} />
+            <StaffBar staff={staff} onLeave={() => void leave()} />
+            <CountLink className="mt-2" onNavigate={() => setMenuPath(null)} />
           </div>
         ) : null}
       </div>

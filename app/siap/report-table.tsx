@@ -1,21 +1,26 @@
 import type { ReactNode } from "react";
 
-export function ReportTable({ headers, children }: { headers: string[]; children: ReactNode }) {
+export const scrollListClass = "max-h-[32rem] overflow-y-auto";
+
+export function ReportTable({ title, headers, children }: { title: string; headers: string[]; children: ReactNode }) {
   return (
-    <div className="mt-6 overflow-x-auto rounded-2xl bg-white shadow-sm">
-      <table className="w-full min-w-[640px] text-left text-sm">
-        <thead>
-          <tr className="border-b text-[#6b6b6b]">
-            {headers.map((header) => (
-              <th key={header} className="px-4 py-3 font-medium">
-                {header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>{children}</tbody>
-      </table>
-    </div>
+    <section className="mt-6">
+      <h2 className="mb-2 text-base font-semibold">{title}</h2>
+      <div className={`overflow-auto rounded-2xl border border-[#e7dfd2] bg-white ${scrollListClass}`}>
+        <table className="w-full min-w-[640px] text-left text-sm">
+          <thead className="sticky top-0 bg-white">
+            <tr className="border-b border-[#e7dfd2]">
+              {headers.map((header) => (
+                <th key={header} className="px-4 py-3 font-bold text-[#1c1c1c]">
+                  {header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="font-normal">{children}</tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 

@@ -10,7 +10,11 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
 async function PetugasBody({ id }: { id: string }) {
   const devices = await devicesForSession(id);
   return (
-    <SiapSubpage backHref={`/siap/${id}`} title="Status petugas" subtitle={PENDING_CAPTION}>
+    <SiapSubpage
+      backHref={`/siap/${id}`}
+      title="Status petugas"
+      subtitle={`${PENDING_CAPTION} Kotak menandai HP yang masih terikat. Warna amber berarti sync terakhir sudah lama. Lepas device supaya petugas yang sama bisa memilih nama di HP lain.`}
+    >
       <PetugasList
         id={id}
         devices={devices.map((row) => ({

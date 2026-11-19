@@ -1,3 +1,4 @@
+import { EmptyState } from "@/app/empty-state";
 import { LaporanPage } from "@/app/siap/laporan-shell";
 import { ReportRow, ReportTable, Td } from "@/app/siap/report-table";
 import { selisihSistem } from "@/lib/reports";
@@ -7,7 +8,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
     <LaporanPage
       params={params}
       title="Selisih sistem"
-      subtitle="Baris yang masih selisih hitung belum masuk. Qty hitung 0 vs stok sistem ditandai."
+      subtitle="Membandingkan qty hitung yang sudah disepakati dengan qty on hand di snapshot. Baris yang masih selisih hitung tidak masuk. Qty hitung 0 terhadap stok sistem ditandai sebagai tidak ditemukan."
     >
       {(id) => <Body id={id} />}
     </LaporanPage>
@@ -16,8 +17,11 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
 
 async function Body({ id }: { id: string }) {
   const rows = (await selisihSistem(id)).filter((row) => !row.ada_selisih_hitung);
+  if (rows.length === 0) {
+    return <EmptyState menu="selisih sistem" kind="tidak" />;
+  }
   return (
-    <ReportTable headers={["Gudang", "Kode", "Nama", "On hand", "Hitung", "Selisih qty", "Selisih nilai"]}>
+    <ReportTable title="Selisih terhadap sistem" headers={["Gudang", "Kode", "Nama", "On hand", "Hitung", "Selisih qty", "Selisih nilai"]}>
       {rows.map((row) => (
         <ReportRow key={`${row.gudang_id}-${row.kode_barang}`} className={row.zero_found ? "bg-[#f3d4a0]" : ""}>
           <Td>{row.gudang_nama}</Td>

@@ -17,6 +17,15 @@ describe("Phase 9 verification", () => {
     expect(response.status).toBe(404);
   });
 
+  it("a coordinator change without a staff cookie is refused", async () => {
+    const response = await app.request("/api/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-staff-test": "anon" },
+      body: JSON.stringify({}),
+    });
+    expect(response.status).toBe(401);
+  });
+
   it("AC-1.5 second live binding is refused by the unique index", async () => {
     await expect(
       prisma.$executeRaw`

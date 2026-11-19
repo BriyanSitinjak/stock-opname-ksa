@@ -13,19 +13,19 @@ TRUNCATE session_reopens, approvals, user_devices, unknown_items, tag_submission
 
 -- ---------------------------------------------------------------- pengguna
 INSERT INTO users (id, nama, username, password_hash, role) VALUES
- ('usr-1','Briyan',         'briyan',       '$argon2id$PLACEHOLDER','admin'),
- ('usr-16','Ardian',         'ardian',       '$argon2id$PLACEHOLDER','reviewer'),
- ('usr-17','Kepala Gudang',  'kepalagudang', '$argon2id$PLACEHOLDER','reviewer'),
- ('usr-2','Parmadi',        'parmadi',      '$argon2id$PLACEHOLDER','counter'),
- ('usr-7','Dufi',           'dufi',         '$argon2id$PLACEHOLDER','counter'),
- ('usr-8','Yulius',         'yulius',       '$argon2id$PLACEHOLDER','counter'),
- ('usr-9','Nelly',          'nelly',        '$argon2id$PLACEHOLDER','counter'),
- ('usr-10','Kenny',          'kenny',        '$argon2id$PLACEHOLDER','counter'),
- ('usr-11','Okky',           'okky',         '$argon2id$PLACEHOLDER','counter'),
- ('usr-12','Aisia',          'aisia',        '$argon2id$PLACEHOLDER','counter'),
- ('usr-13','Afang',          'afang',        '$argon2id$PLACEHOLDER','counter'),
- ('usr-14','Natalia',        'natalia',      '$argon2id$PLACEHOLDER','counter'),
- ('usr-15','Mukcin',         'mukcin',       '$argon2id$PLACEHOLDER','counter');
+ ('usr-1','Briyan',         'briyan',       '$2b$10$1hVK52UO7ytPxTDo8LtYW.B28WSFk32BuisHPNy/mLtpI27lWN89y','admin'),
+ ('usr-16','Ardian',         'ardian',       '$2b$10$1hVK52UO7ytPxTDo8LtYW.B28WSFk32BuisHPNy/mLtpI27lWN89y','reviewer'),
+ ('usr-17','Kepala Gudang',  'kepalagudang', '$2b$10$1hVK52UO7ytPxTDo8LtYW.B28WSFk32BuisHPNy/mLtpI27lWN89y','reviewer'),
+ ('usr-2','Parmadi',        'parmadi',      NULL,'counter'),
+ ('usr-7','Dufi',           'dufi',         NULL,'counter'),
+ ('usr-8','Yulius',         'yulius',       NULL,'counter'),
+ ('usr-9','Nelly',          'nelly',        NULL,'counter'),
+ ('usr-10','Kenny',          'kenny',        NULL,'counter'),
+ ('usr-11','Okky',           'okky',         NULL,'counter'),
+ ('usr-12','Aisia',          'aisia',        NULL,'counter'),
+ ('usr-13','Afang',          'afang',        NULL,'counter'),
+ ('usr-14','Natalia',        'natalia',      NULL,'counter'),
+ ('usr-15','Mukcin',         'mukcin',       NULL,'counter');
 
 -- ------------------------------------------------------------------ gudang
 INSERT INTO gudang (id, kode, nama, urutan) VALUES

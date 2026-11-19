@@ -1,10 +1,26 @@
 "use client";
 
+import {
+  ArrowLeft,
+  BadgeCheck,
+  CalendarDays,
+  CheckCircle2,
+  CircleDot,
+  ClipboardList,
+  Clock,
+  FileUp,
+  Map,
+  Package,
+  Scale,
+  type LucideIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { fetchJson } from "@/app/siap/api";
 import { SAMPLE_DENAH_NOTE } from "@/lib/monitor";
-import { MissingList, TealButton } from "@/app/siap/ui";
+import { LoadingMark } from "@/app/loading-mark";
+import { formatDateTime, type SessionScope } from "@/app/siap/format";
+import { IconLabel, InfoCard, MissingList, ScopeLists, TealButton } from "@/app/siap/ui";
 import { toast } from "@/app/toast";
 
 type Detail = {
@@ -15,7 +31,7 @@ type Detail = {
   snapshot_items: number;
   session_tags: number;
   missing_assignments: string[];
-  scope_filter: { brands?: string[]; groups?: string[] };
+  scope: SessionScope;
 };
 
 type GudangProgress = {
@@ -85,35 +101,40 @@ export function SesiDetail({ id }: { id: string }) {
   }
 
   if (!detail) {
-    return <p>Memuat…</p>;
+    return <LoadingMark />;
   }
 
-  const scope = detail.scope_filter;
+  const scope = detail.scope;
   const selesai = gudang.reduce((sum, row) => sum + row.selesai, 0);
   const total = gudang.reduce((sum, row) => sum + row.total, 0);
   const selisih = gudang.reduce((sum, row) => sum + row.selisih_hitung, 0);
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">{detail.nama}</h1>
-          <p className="mt-1 text-sm text-[#6b6b6b]">
-            {detail.periode} · {(scope.brands ?? []).join(", ")} · {(scope.groups ?? []).join(", ")}
-          </p>
-        </div>
-        <span className="rounded-full bg-[#f3e2b0] px-3 py-1 text-sm">{STATUS_LABEL[detail.status] ?? detail.status}</span>
+      <h1 className="text-2xl font-semibold">{detail.nama}</h1>
+
+      <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <InfoCard icon={CircleDot} title="Status">
+          {STATUS_LABEL[detail.status] ?? detail.status}
+        </InfoCard>
+        <InfoCard icon={CalendarDays} title="Periode">
+          {scope.periode}
+        </InfoCard>
+        <InfoCard icon={Clock} title="Cut off" className="sm:col-span-2">
+          {formatDateTime(scope.snapshot_at)}
+        </InfoCard>
+        <ScopeLists included={scope.included} excluded={scope.excluded} groups={scope.groups} groupClassName="sm:col-span-2" />
       </div>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Item di snapshot" value={String(detail.snapshot_items)} href={`/siap/${id}/laporan/daftar-barang`} />
-        <Stat label="Tag yang di-pin" value={String(detail.session_tags || total)} href={`/siap/${id}/pantau`} />
-        <Stat label="Selesai" value={String(selesai)} href={`/siap/${id}/pantau`} />
-        <Stat label="Selisih hitung" value={String(selisih)} href={`/siap/${id}/laporan/selisih-hitung`} />
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat icon={Package} label="Item di snapshot" value={String(detail.snapshot_items)} href={`/siap/${id}/laporan/daftar-barang`} />
+        <Stat icon={ClipboardList} label="Tag yang di-pin" value={String(detail.session_tags || total)} href={`/siap/${id}/pantau`} />
+        <Stat icon={CheckCircle2} label="Selesai" value={String(selesai)} href={`/siap/${id}/pantau`} />
+        <Stat icon={Scale} label="Selisih hitung" value={String(selisih)} href={`/siap/${id}/laporan/selisih-hitung`} />
       </div>
 
-      <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm">
+      <section className="mt-6 rounded-3xl bg-white p-5 shadow-sm">
         <div className="flex items-baseline justify-between gap-3">
-          <h2 className="font-medium">Progress per gudang</h2>
+          <IconLabel as="h2" icon={Map} title="Progress per gudang" />
           <Link href={`/siap/${id}/pantau`} className="text-sm text-ksa-teal-deep">
             Buka denah
           </Link>
@@ -129,8 +150,8 @@ export function SesiDetail({ id }: { id: string }) {
               return (
                 <li key={row.nama}>
                   <div className="flex justify-between text-sm">
-                    <span>{row.nama}</span>
-                    <span className="text-[#6b6b6b]">
+                    <span className="font-semibold">{row.nama}</span>
+                    <span className="font-semibold">
                       {row.selesai}/{row.total}
                       {row.selisih_hitung > 0 ? ` · ${row.selisih_hitung} selisih` : ""}
                     </span>
@@ -147,35 +168,46 @@ export function SesiDetail({ id }: { id: string }) {
       </section>
 
       <div className="mt-6 grid gap-3 sm:grid-cols-3">
-        <Link href={`/siap/${id}/impor`} className="rounded-2xl bg-white p-5 shadow-sm">
-          <p className="font-medium">Impor</p>
-          <p className="mt-1 text-sm text-[#6b6b6b]">{detail.snapshot_items} item</p>
+        <Link href={`/siap/${id}/impor`}>
+          <InfoCard icon={FileUp} title="Impor">
+            {detail.snapshot_items} item
+          </InfoCard>
         </Link>
-        <Link href={`/siap/${id}/tugas`} className="rounded-2xl bg-white p-5 shadow-sm">
-          <p className="font-medium">Bagi tugas</p>
-          <p className="mt-1 text-sm text-[#6b6b6b]">
+        <Link href={`/siap/${id}/tugas`}>
+          <InfoCard icon={ClipboardList} title="Bagi tugas">
             {detail.missing_assignments.length === 0 ? "Semua tag terisi" : `${detail.missing_assignments.length} belum lengkap`}
-          </p>
+          </InfoCard>
         </Link>
-        <Link href={`/siap/${id}/persetujuan`} className="rounded-2xl bg-white p-5 shadow-sm">
-          <p className="font-medium">Persetujuan</p>
-          <p className="mt-1 text-sm text-[#6b6b6b]">Review dan export</p>
+        <Link href={`/siap/${id}/persetujuan`}>
+          <InfoCard icon={BadgeCheck} title="Persetujuan">
+            Review dan export
+          </InfoCard>
         </Link>
       </div>
 
       <MissingList items={detail.missing_assignments} />
-      <TealButton className="mt-6 px-6 py-3" disabled={detail.status !== "draft"} onClick={() => void openSession()}>
-        Buka sesi
-      </TealButton>
+      <div className="sticky bottom-0 z-10 -mx-4 mt-8 flex flex-wrap items-center gap-3 border-t border-[#e7dfd2] bg-ksa-cream/95 px-4 py-4 backdrop-blur sm:-mx-8 sm:px-8">
+        <TealButton className="px-6 py-3" disabled={detail.status !== "draft"} onClick={() => void openSession()}>
+          Buka sesi
+        </TealButton>
+        <Link
+          href="/siap"
+          className="inline-flex items-center gap-2 rounded-full border border-[#1c1c1c] bg-white px-5 py-3 text-sm font-medium text-[#1c1c1c]"
+        >
+          <ArrowLeft aria-hidden size={16} strokeWidth={2} />
+          Kembali ke tampilan awal
+        </Link>
+      </div>
     </div>
   );
 }
 
-function Stat({ label, value, href }: { label: string; value: string; href: string }) {
+function Stat({ icon, label, value, href }: { icon: LucideIcon; label: string; value: string; href: string }) {
   return (
-    <Link href={href} className="rounded-2xl bg-white p-5 shadow-sm">
-      <p className="text-3xl font-semibold">{value}</p>
-      <p className="mt-1 text-sm text-[#6b6b6b]">{label}</p>
+    <Link href={href}>
+      <InfoCard icon={icon} title={label}>
+        <span className="text-3xl">{value}</span>
+      </InfoCard>
     </Link>
   );
 }

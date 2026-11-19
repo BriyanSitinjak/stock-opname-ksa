@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { EmptyState } from "@/app/empty-state";
 import { SiapSubpage } from "@/app/siap/pantau-shell";
+import { scrollListClass } from "@/app/siap/report-table";
 import { SessionIdPage } from "@/app/siap/session-id";
 import { SAMPLE_DENAH_NOTE, coordinatorDenah, pantauHref, selesaiCaption } from "@/lib/monitor";
 
@@ -13,12 +15,12 @@ async function PantauHome({ id }: { id: string }) {
     <SiapSubpage
       backHref={`/siap/${id}`}
       title="Pantau gudang"
-      subtitle="Status tag dihitung dari submission dan count. Tidak disimpan di denah."
+      subtitle="Status tiap tag dihitung dari submission dan count yang sudah masuk. Angka itu tidak disimpan sebagai kolom di denah, jadi denah tetap mengikuti pin sesi."
       legend
     >
-      {gudang.length === 0 ? <p className="mt-6 text-sm">Sesi ini belum punya denah yang di-pin.</p> : null}
+      {gudang.length === 0 ? <EmptyState menu="denah" /> : null}
       {gudang.length > 0 && !pinned ? <p className="mt-6 text-sm text-[#6b6b6b]">{SAMPLE_DENAH_NOTE}</p> : null}
-      <ul className="mt-6 grid gap-3 sm:grid-cols-2">
+      <ul className={`mt-6 grid gap-3 sm:grid-cols-2 ${scrollListClass}`}>
         {gudang.map((row) => (
           <li key={row.nama}>
             <Link href={pantauHref(id, row.nama)} className="block rounded-2xl bg-white p-5 shadow-sm">

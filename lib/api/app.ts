@@ -30,6 +30,19 @@ import {
 } from "@/lib/reports";
 import { readScope } from "@/lib/scope-display";
 import { catalogNames, liveTags, missingAssignments } from "@/lib/setup";
+import {
+  checkPassword,
+  clearLoginFailures,
+  clearStaffCookie,
+  hashPassword,
+  isOpenRoute,
+  loadStaff,
+  loginLimited,
+  recordLoginFailure,
+  staffForRequest,
+  writeStaffCookie,
+  type StaffSession,
+} from "@/lib/staff-auth";
 import { syncCounts } from "@/lib/sync";
 
 const KondisiSchema = z.enum(["baik", "rusak", "kadaluarsa"]);
@@ -40,6 +53,78 @@ app.onError((err, c) => {
   console.error(err);
   return c.json({ error: "Kesalahan server." }, 500);
 });
+
+const staffRequired = { error: "Masuk dulu sebagai Admin atau Reviewer." } as const;
+
+app.use("*", async (c, next) => {
+  if (isOpenRoute(c.req.method, c.req.path)) {
+    return next();
+  }
+  const staff = await staffForRequest(c);
+  if (!staff) {
+    return c.json(staffRequired, 401);
+  }
+  c.set("staff", staff);
+  return next();
+});
+
+app.get("/auth/staff", async (c) => {
+  const users = await prisma.user.findMany({
+    where: { retiredAt: null, role: { in: ["admin", "reviewer"] } },
+    orderBy: { nama: "asc" },
+    select: { id: true, nama: true, role: true },
+  });
+  return c.json({ users });
+});
+
+app.post("/auth/login", async (c) => {
+  let body: { user_id?: string; username?: string; password?: string };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Pengguna tidak ditemukan." }, 404);
+  }
+  const user = body.user_id
+    ? await prisma.user.findFirst({ where: { id: body.user_id, retiredAt: null } })
+    : body.username
+      ? await prisma.user.findFirst({ where: { username: body.username, retiredAt: null } })
+      : null;
+  if (!user || user.role === "counter" || !user.passwordHash) {
+    return c.json({ error: "Pengguna tidak ditemukan." }, 404);
+  }
+  if (loginLimited(user.id)) {
+    return c.json({ error: "Terlalu banyak percobaan. Coba lagi nanti." }, 429);
+  }
+  const matches = await checkPassword(body.password ?? "", user.passwordHash);
+  if (!matches) {
+    recordLoginFailure(user.id);
+    return c.json({ error: "Password salah." }, 401);
+  }
+  const staff = await loadStaff(user.id);
+  if (!staff) {
+    return c.json({ error: "Pengguna tidak ditemukan." }, 404);
+  }
+  clearLoginFailures(user.id);
+  writeStaffCookie(c, staff.id);
+  return c.json(staff);
+});
+
+app.post("/auth/logout", (c) => {
+  clearStaffCookie(c);
+  return c.json({ ok: true });
+});
+
+app.get("/auth/me", (c) => c.json(c.get("staff")));
+
+function actingId(c: { req: { header: (name: string) => string | undefined }; get: (key: "staff") => StaffSession }, bodyId?: string) {
+  if (process.env.VITEST === "true") {
+    const fromTest = parseId(c.req.header("x-actor-id") ?? bodyId, "usr");
+    if (fromTest) {
+      return fromTest;
+    }
+  }
+  return c.get("staff").id;
+}
 
 const healthRoute = createRoute({
   method: "get",
@@ -56,6 +141,23 @@ app.openapi(healthRoute, async (c) => {
   await prisma.$queryRaw`SELECT 1`;
   return c.json({ ok: true }, 200);
 });
+
+async function passwordForRole(role: string, password: string | undefined, existing: string | null) {
+  if (role === "counter") {
+    return null;
+  }
+  const trimmed = password?.trim() ?? "";
+  if (trimmed.length > 0) {
+    if (trimmed.length < 8) {
+      return "missing" as const;
+    }
+    return hashPassword(trimmed);
+  }
+  if (existing) {
+    return undefined;
+  }
+  return "missing" as const;
+}
 
 function activeStaff() {
   return prisma.user.findMany({
@@ -102,7 +204,7 @@ app.post("/sessions", async (c) => {
       snapshotAt: new Date(body.snapshot_at),
       scopeFilter: { brands: body.brands ?? [], groups: body.groups ?? [] },
       status: "draft",
-      createdById: ADMIN_ID,
+      createdById: c.get("staff").id,
     },
   });
   return c.json({
@@ -180,13 +282,17 @@ app.post("/users", async (c) => {
   if (refuseDevice(c)) {
     return c.json(deviceBlocked, 403);
   }
-  const body = await c.req.json<{ nama?: string; role?: string }>();
+  const body = await c.req.json<{ nama?: string; role?: string; password?: string }>();
   const role = parseRole(body.role);
   if (!body.nama?.trim() || role == null) {
     return c.json({ error: "Nama dan role wajib." }, 400);
   }
+  const passwordHash = await passwordForRole(role, body.password, null);
+  if (passwordHash === "missing") {
+    return c.json({ error: "Password minimal 8 karakter untuk Admin dan Reviewer." }, 400);
+  }
   const user = await prisma.user.create({
-    data: { nama: body.nama.trim(), role },
+    data: { nama: body.nama.trim(), role, passwordHash },
     select: { id: true, nama: true, role: true },
   });
   return c.json(user);
@@ -200,22 +306,34 @@ app.patch("/users/:id", async (c) => {
   if (id == null) {
     return c.json({ error: "Pengguna tidak ditemukan." }, 404);
   }
-  const body = await c.req.json<{ role?: string; retired?: boolean }>();
+  const body = await c.req.json<{ role?: string; retired?: boolean; password?: string }>();
   const role = body.role == null ? undefined : parseRole(body.role);
   if (body.role != null && role == null) {
     return c.json({ error: "Role tidak dikenal." }, 400);
   }
-  if (role == null && body.retired !== true) {
+  if (role == null && body.retired !== true && body.password == null) {
     return c.json({ error: "Tidak ada perubahan." }, 400);
   }
-  const existing = await prisma.user.findFirst({ where: { id, retiredAt: null }, select: { id: true } });
+  const existing = await prisma.user.findFirst({
+    where: { id, retiredAt: null },
+    select: { id: true, role: true, passwordHash: true },
+  });
   if (!existing) {
     return c.json({ error: "Pengguna tidak ditemukan." }, 404);
+  }
+  if (id === c.get("staff").id) {
+    return c.json({ error: "Akun yang sedang masuk tidak bisa diubah dari sini." }, 403);
+  }
+  const nextRole = role ?? existing.role;
+  const passwordHash = await passwordForRole(nextRole, body.password, existing.passwordHash);
+  if (passwordHash === "missing") {
+    return c.json({ error: "Password minimal 8 karakter untuk Admin dan Reviewer." }, 400);
   }
   const user = await prisma.user.update({
     where: { id },
     data: {
       ...(role ? { role } : {}),
+      ...(passwordHash !== undefined ? { passwordHash } : {}),
       ...(body.retired === true ? { retiredAt: new Date() } : {}),
     },
     select: { id: true, nama: true, role: true, retiredAt: true },
@@ -791,10 +909,10 @@ app.post("/sessions/:id/approve", async (c) => {
   const id = sessionId(c);
   if (id == null) return c.json(sessionMissing, 404);
   const body = await c.req.json<{ actor_id?: string; step?: number; catatan?: string }>();
-  const actorId = parseId(c.req.header("x-actor-id") ?? body.actor_id, "usr");
-  if (actorId == null || (body.step !== 1 && body.step !== 2)) {
-    return c.json({ error: "Petugas dan step wajib." }, 400);
+  if (body.step !== 1 && body.step !== 2) {
+    return c.json({ error: "Step approval hanya 1 atau 2." }, 400);
   }
+  const actorId = actingId(c, body.actor_id);
   const result = await approveSession(id, actorId, body.step, body.catatan?.trim() || null);
   if ("error" in result) {
     return c.json({ error: result.error }, result.status);
@@ -809,10 +927,7 @@ app.post("/sessions/:id/reopen", async (c) => {
   const id = sessionId(c);
   if (id == null) return c.json(sessionMissing, 404);
   const body = await c.req.json<{ actor_id?: string; reason?: string }>();
-  const actorId = parseId(c.req.header("x-actor-id") ?? body.actor_id, "usr");
-  if (actorId == null) {
-    return c.json({ error: "Petugas wajib." }, 400);
-  }
+  const actorId = actingId(c, body.actor_id);
   const result = await reopenSession(id, actorId, body.reason ?? "");
   if ("error" in result) {
     return c.json({ error: result.error }, result.status);

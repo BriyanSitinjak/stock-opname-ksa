@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ConfirmHost } from "@/app/confirm";
 import { ToastHost } from "@/app/toast";
 import { SwRegister } from "@/lib/offline/register-sw";
 import "./globals.css";
@@ -47,6 +48,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <SwRegister />
         {children}
         <ToastHost />
+        <ConfirmHost />
       </body>
     </html>
   );

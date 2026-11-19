@@ -14,6 +14,6 @@ export function BrandLockup({
   );
 }
 
-export function BrandIcon({ size = 96, className }: { size?: number; className?: string }) {
-  return <Image src="/brand/icon-512.png" alt="" width={size} height={size} className={className} />;
+export function BrandIcon({ size = 96, className, priority = false }: { size?: number; className?: string; priority?: boolean }) {
+  return <Image src="/brand/icon-512.png" alt="" width={size} height={size} className={className} priority={priority} />;
 }

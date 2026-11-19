@@ -226,6 +226,27 @@ export async function rekapTag(sessionId: string) {
   return { counts };
 }
 
+export async function daftarBarangChoices(sessionId: string) {
+  const [gudangRows, brandRows] = await Promise.all([
+    prisma.snapshotItem.findMany({
+      where: { sessionId },
+      distinct: ["gudangId"],
+      select: { gudangId: true, gudang: { select: { nama: true } } },
+    }),
+    prisma.snapshotItem.findMany({
+      where: { sessionId, namaBrand: { not: null } },
+      distinct: ["namaBrand"],
+      select: { namaBrand: true },
+    }),
+  ]);
+  return {
+    gudang: gudangRows
+      .map((row) => ({ id: row.gudangId, nama: row.gudang.nama }))
+      .sort((a, b) => a.nama.localeCompare(b.nama)),
+    brands: brandRows.flatMap((row) => (row.namaBrand ? [row.namaBrand] : [])).sort((a, b) => a.localeCompare(b)),
+  };
+}
+
 export async function daftarBarang(
   sessionId: string,
   query: { q?: string; gudang_id?: string; brand?: string; group?: string; page?: number },

@@ -1,3 +1,4 @@
+import { EmptyState } from "@/app/empty-state";
 import { LaporanShell } from "@/app/siap/laporan-shell";
 import { ReportRow, ReportTable, Td } from "@/app/siap/report-table";
 import { AwaitParams } from "@/app/siap/session-id";
@@ -24,7 +25,7 @@ async function Body({ id, kode }: { id: string; kode: string }) {
     <LaporanShell
       id={id}
       title="Peta barang"
-      subtitle="Dipakai setelah count disepakati. Lokasi dari pin sesi, bukan master denah."
+      subtitle="Mencari di pin sesi, bukan di master denah. Lokasi muncul setelah pass 1 selesai dan qty pada tag itu sudah disepakati."
     >
       <SearchForm
         action={`/siap/${id}/laporan/peta-barang`}
@@ -33,11 +34,9 @@ async function Body({ id, kode }: { id: string; kode: string }) {
         placeholder="Barcode 4 digit"
       />
       {!kode ? <p className="mt-6 text-sm">Cari barcode untuk lihat lokasi setelah pass 1 selesai.</p> : null}
-      {kode && items.length === 0 ? (
-        <p className="mt-6 text-sm">Belum ada qty yang disepakati untuk kode {kode}.</p>
-      ) : null}
+      {kode && items.length === 0 ? <EmptyState menu={`barang untuk kode ${kode}`} /> : null}
       {items.length > 0 ? (
-        <ReportTable headers={["Gudang", "Lokasi", "Tag", "Qty"]}>
+        <ReportTable title="Lokasi pin" headers={["Gudang", "Lokasi", "Tag", "Qty"]}>
           {items.map((row) => (
             <ReportRow key={`${row.gudang_nama}-${row.lokasi_nama}-${row.nomor}`}>
               <Td>{row.gudang_nama}</Td>

@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { samePersonOnBothPasses } from "@/lib/assignment-rules";
 import { fetchJson } from "@/app/siap/api";
+import { EmptyState } from "@/app/empty-state";
 import { ReportRow, ReportTable, Td } from "@/app/siap/report-table";
-import { BackLink, ErrorText, MissingList, Select, TealButton } from "@/app/siap/ui";
+import { BackLink, ErrorText, MissingList, PageLead, Select, TealButton } from "@/app/siap/ui";
 import { toast } from "@/app/toast";
 import { ROLE_LABEL, type StaffRole } from "@/lib/roles";
 
@@ -134,11 +135,13 @@ export function TugasBoard({ id }: { id: string }) {
     <>
       <BackLink href={`/siap/${id}`} />
       <h1 className="mt-3 text-2xl font-semibold">Bagi tugas</h1>
-      <p className="mt-1 text-sm text-[#6b6b6b]">Dua kolom per tag. Orang yang sama tidak boleh di pass 1 dan pass 2. Nama baru ditambah di Pengguna.</p>
+      <PageLead>
+        Setiap tag punya pass 1 dan pass 2. Dua kolom itu tidak boleh diisi orang yang sama, supaya hitung kedua benar-benar independen. Nama yang belum ada ditambah dulu di Pengguna. Tugas hanya bisa diubah selama sesi masih draft.
+      </PageLead>
+      {rows.length === 0 ? <EmptyState menu="tag" /> : null}
       {grouped.map(([gudang, tags]) => (
-        <section key={gudang} className="mt-8">
-          <h2 className="mb-3 font-medium">{gudang}</h2>
-          <ReportTable headers={["Tag", "Lokasi", "Pass 1", "Pass 2"]}>
+        <section key={gudang}>
+          <ReportTable title={gudang} headers={["Tag", "Lokasi", "Pass 1", "Pass 2"]}>
             {tags.map((row) => (
               <ReportRow key={row.tag_id}>
                 <Td className="font-medium">{row.nomor}</Td>
