@@ -185,31 +185,35 @@ export function validateAndAggregate(
     }
   }
 
-  const located = rows.map((row, index) => ({
-    row,
-    line: index + 2,
-    gudang: findGudang(row.Nama_Gudang ?? "", gudangByNama),
-  }));
+  const located = rows.flatMap((row, index) =>
+    isStockRow(row) ? [{ row, line: index + 2, gudang: findGudang(row.Nama_Gudang ?? "", gudangByNama) }] : [],
+  );
   const unknown = located.filter((item) => !item.gudang);
   if (unknown.length > 0) {
+    const sample = (unknown[0]?.row.Nama_Gudang ?? "").trim();
+    const where = unknown[0]?.line;
+    const detail = sample
+      ? `Nama_Gudang tidak dikenal pada baris ${where}: ${sample}.`
+      : `Nama_Gudang kosong pada baris ${where}.`;
     return {
       error: {
         code: "unknown_gudang",
-        message: `Nama_Gudang tidak dikenal pada baris ${unknown[0]?.line}: ${unknown[0]?.row.Nama_Gudang ?? ""}. Jumlah baris bermasalah: ${unknown.length}.`,
+        message: `${detail} Jumlah baris bermasalah: ${unknown.length}.`,
       },
     };
   }
 
-  const discovered = discoverScope(rows, scope, known);
+  const stockRows = located.map((item) => item.row);
+  const discovered = discoverScope(stockRows, scope, known);
   const brands = discovered.brands;
   const groups = discovered.groups;
   const kept = located.flatMap((item) =>
     item.gudang && inScope(item.row, brands, groups) ? [{ row: item.row, gudang: item.gudang }] : [],
   );
-  const filteredCount = rows.length - kept.length;
+  const filteredCount = stockRows.length - kept.length;
   if (kept.length === 0) {
-    const foundBrands = uniqueValues(rows.map((row) => row.Nama_Brand));
-    const foundGroups = uniqueValues(rows.map((row) => row.Nama_Group));
+    const foundBrands = uniqueValues(stockRows.map((row) => row.Nama_Brand));
+    const foundGroups = uniqueValues(stockRows.map((row) => row.Nama_Group));
     return {
       error: {
         code: "zero_rows",
@@ -287,7 +291,7 @@ export function validateAndAggregate(
 
   return {
     preview: {
-      rowCount: rows.length,
+      rowCount: stockRows.length,
       filteredCount,
       gudangBreakdown,
       items: aggregated.size,
@@ -297,7 +301,7 @@ export function validateAndAggregate(
       addedGroups: discovered.addedGroups,
     },
     items: [...aggregated.values()],
-    raw: rows,
+    raw: stockRows,
     scope: { brands, groups },
   };
 }
@@ -380,12 +384,26 @@ function findGudang(nama: string, gudangByNama: Map<string, GudangMatch>) {
   if (!folded) {
     return undefined;
   }
-  const matches = [...gudangByNama.values()].filter((row) => folded.includes(foldGudang(row.nama)));
-  return matches.length === 1 ? matches[0] : undefined;
+  const matches = [...gudangByNama.values()].filter((row) => {
+    const key = foldGudang(row.nama);
+    return key.length > 0 && folded.includes(key);
+  });
+  if (matches.length === 0) {
+    return undefined;
+  }
+  const best = matches.reduce((longest, row) =>
+    foldGudang(row.nama).length > foldGudang(longest.nama).length ? row : longest,
+  );
+  const bestKey = foldGudang(best.nama);
+  return matches.filter((row) => foldGudang(row.nama) === bestKey).length === 1 ? best : undefined;
 }
 
 function foldGudang(nama: string) {
-  return nama.trim().replace(/\s+/g, " ").toLowerCase();
+  return nama.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function isStockRow(row: RawRow) {
+  return Boolean((row.Kode_Barang ?? "").trim() || (row.Nama_Barang ?? "").trim());
 }
 
 function inScope(row: RawRow, brands: string[], groups: string[]): boolean {
