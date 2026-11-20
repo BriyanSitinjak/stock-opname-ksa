@@ -54,6 +54,7 @@ model User {
   devicesBound    UserDevice[]    @relation("DeviceBoundBy")
   approvals       Approval[]
   reopens         SessionReopen[]
+  staffActions    StaffAction[]
 
   @@map("users")
 }
@@ -127,6 +128,7 @@ model OpnameSession {
   devices       UserDevice[]
   approvals     Approval[]
   reopens       SessionReopen[]
+  staffActions  StaffAction[]
 
   @@map("opname_sessions")
 }
@@ -323,6 +325,23 @@ model SessionReopen {
   reopenedBy User          @relation(fields: [reopenedById], references: [id])
 
   @@map("session_reopens")
+}
+
+/// APPEND ONLY. One row per successful Layar koordinator action.
+/// Never update or delete a row. The screen reads the newest rows first.
+model StaffAction {
+  id        String   @id @default(dbgenerated("('log-' || nextval('staff_actions_id_seq'::regclass))"))
+  actorId   String   @map("actor_id")
+  action    String
+  summary   String
+  sessionId String?  @map("session_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  actor   User           @relation(fields: [actorId], references: [id])
+  session OpnameSession? @relation(fields: [sessionId], references: [id])
+
+  @@index([createdAt])
+  @@map("staff_actions")
 }
 
 // Prisma cannot express these, so they live in the init migration SQL:

@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { RefreshCw } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
 import { confirm } from "@/app/confirm";
 import { EmptyState } from "@/app/empty-state";
 import { fetchJson } from "@/app/siap/api";
 import { scrollListClass } from "@/app/siap/report-table";
-import { TealButton } from "@/app/siap/ui";
+import { OutlineButton, TealButton } from "@/app/siap/ui";
 import { toast } from "@/app/toast";
 
 type Device = {
@@ -17,8 +19,24 @@ type Device = {
   age: string;
 };
 
+export function RefreshStatusButton() {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  return (
+    <OutlineButton
+      className="inline-flex shrink-0 items-center gap-2 px-4 py-2"
+      disabled={pending}
+      onClick={() => startTransition(() => router.refresh())}
+    >
+      <RefreshCw aria-hidden size={16} strokeWidth={2} className={pending ? "animate-spin" : ""} />
+      Muat ulang
+    </OutlineButton>
+  );
+}
+
 export function PetugasList({ id, devices }: { id: string; devices: Device[] }) {
-  const [rows, setRows] = useState(devices);
+  const [released, setReleased] = useState<string[]>([]);
+  const rows = devices.filter((row) => !released.includes(row.device_id));
 
   async function release(row: Device) {
     const ok = await confirm({
@@ -39,7 +57,7 @@ export function PetugasList({ id, devices }: { id: string; devices: Device[] }) 
       toast(data.error ?? "Gagal melepas device.");
       return;
     }
-    setRows((current) => current.filter((item) => item.device_id !== row.device_id));
+    setReleased((current) => [...current, row.device_id]);
     toast("Device dilepas. Petugas bisa di-bind ke HP lain.");
   }
 
@@ -59,7 +77,7 @@ export function PetugasList({ id, devices }: { id: string; devices: Device[] }) 
             <p className="text-sm leading-snug break-all text-[#1c1c1c]">Device {row.device_id}</p>
           </div>
           <div className="space-y-2">
-            <p className={`text-sm leading-snug font-semibold ${row.stale ? "" : "text-[#1c1c1c]"}`}>Sync {row.age}</p>
+            <p className="text-sm leading-snug font-semibold">Sync {row.age}</p>
             <p className="text-sm leading-snug font-semibold">Belum terkirim: {row.pending_reported}</p>
             <TealButton className="w-full px-3 py-2.5 text-sm" onClick={() => void release(row)}>
               Lepas device

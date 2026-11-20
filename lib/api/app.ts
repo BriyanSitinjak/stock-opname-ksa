@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { releaseDevice } from "@/lib/devices";
 import { ADMIN_ID } from "@/lib/fixture";
 import { idPattern, parseId } from "@/lib/ids";
-import { parseRole } from "@/lib/roles";
+import { ROLE_LABEL, parseRole } from "@/lib/roles";
 import { commitImport, parseImportFile, validateAndAggregate } from "@/lib/import";
 import { coordinatorDenah, devicesForSession } from "@/lib/monitor";
 import { buildPdf, buildWorkbook } from "@/lib/export-workbook";
@@ -30,6 +30,7 @@ import {
 } from "@/lib/reports";
 import { readScope } from "@/lib/scope-display";
 import { catalogNames, liveTags, missingAssignments } from "@/lib/setup";
+import { listStaffActions, recordSessionAction, recordStaffAction } from "@/lib/staff-log";
 import {
   checkPassword,
   clearLoginFailures,
@@ -106,10 +107,15 @@ app.post("/auth/login", async (c) => {
   }
   clearLoginFailures(user.id);
   writeStaffCookie(c, staff.id);
+  await recordStaffAction({ actorId: staff.id, action: "login", summary: "Masuk ke Layar koordinator" });
   return c.json(staff);
 });
 
-app.post("/auth/logout", (c) => {
+app.post("/auth/logout", async (c) => {
+  const staff = await staffForRequest(c);
+  if (staff) {
+    await recordStaffAction({ actorId: staff.id, action: "logout", summary: "Keluar dari Layar koordinator" });
+  }
   clearStaffCookie(c);
   return c.json({ ok: true });
 });
@@ -159,6 +165,23 @@ async function passwordForRole(role: string, password: string | undefined, exist
   return "missing" as const;
 }
 
+function userChangeSummary(
+  nama: string,
+  changes: { role?: "admin" | "reviewer" | "counter"; password: boolean; retired: boolean },
+): string | null {
+  if (changes.retired) {
+    return `Nonaktifkan ${nama}`;
+  }
+  const parts: string[] = [];
+  if (changes.role) {
+    parts.push(`role menjadi ${ROLE_LABEL[changes.role]}`);
+  }
+  if (changes.password) {
+    parts.push("password diganti");
+  }
+  return parts.length > 0 ? `${nama}: ${parts.join(", ")}` : null;
+}
+
 function activeStaff() {
   return prisma.user.findMany({
     where: { retiredAt: null },
@@ -206,6 +229,12 @@ app.post("/sessions", async (c) => {
       status: "draft",
       createdById: c.get("staff").id,
     },
+  });
+  await recordStaffAction({
+    actorId: c.get("staff").id,
+    action: "session-create",
+    sessionId: session.id,
+    summary: `Buat sesi ${session.nama}`,
   });
   return c.json({
     id: session.id,
@@ -278,6 +307,10 @@ app.get("/users", async (c) => {
   return c.json({ users: await activeStaff() });
 });
 
+app.get("/staff-actions", async (c) => {
+  return c.json({ actions: await listStaffActions() });
+});
+
 app.post("/users", async (c) => {
   if (refuseDevice(c)) {
     return c.json(deviceBlocked, 403);
@@ -294,6 +327,11 @@ app.post("/users", async (c) => {
   const user = await prisma.user.create({
     data: { nama: body.nama.trim(), role, passwordHash },
     select: { id: true, nama: true, role: true },
+  });
+  await recordStaffAction({
+    actorId: c.get("staff").id,
+    action: "user-create",
+    summary: `Tambah ${user.nama} sebagai ${ROLE_LABEL[user.role]}`,
   });
   return c.json(user);
 });
@@ -338,6 +376,14 @@ app.patch("/users/:id", async (c) => {
     },
     select: { id: true, nama: true, role: true, retiredAt: true },
   });
+  const summary = userChangeSummary(user.nama, {
+    role: role ? user.role : undefined,
+    password: passwordHash !== undefined,
+    retired: body.retired === true,
+  });
+  if (summary) {
+    await recordStaffAction({ actorId: c.get("staff").id, action: "user-update", summary });
+  }
   return c.json({ id: user.id, nama: user.nama, role: user.role, retired: user.retiredAt != null });
 });
 
@@ -405,6 +451,12 @@ app.put("/sessions/:id/assignments", async (c) => {
     }
   });
   const missing = await missingAssignments(id);
+  await recordStaffAction({
+    actorId: c.get("staff").id,
+    action: "assignments",
+    sessionId: id,
+    summary: `Simpan tugas pada ${session.nama}`,
+  });
   return c.json({ ok: true, missing_assignments: missing });
 });
 
@@ -526,10 +578,20 @@ app.post("/sessions/:id/devices/release", async (c) => {
   if (!body.device_id) {
     return c.json({ error: "device_id wajib." }, 400);
   }
+  const bound = await prisma.userDevice.findUnique({
+    where: { sessionId_deviceId: { sessionId: id, deviceId: body.device_id } },
+    include: { user: { select: { nama: true } } },
+  });
   const result = await releaseDevice(id, body.device_id);
   if ("error" in result) {
     return c.json({ error: result.error }, result.status);
   }
+  await recordStaffAction({
+    actorId: c.get("staff").id,
+    action: "device-release",
+    sessionId: id,
+    summary: `Lepas device ${bound?.user.nama ?? body.device_id}`,
+  });
   return c.json(result);
 });
 
@@ -650,6 +712,12 @@ app.post("/sessions/:id/import", async (c) => {
     console.error(error);
     return c.json({ error: "Import gagal. Tidak ada perubahan." }, 500);
   }
+  await recordStaffAction({
+    actorId: c.get("staff").id,
+    action: "import",
+    sessionId: id,
+    summary: `Impor snapshot ${result.preview.items} item pada ${session.nama}`,
+  });
   return c.json({ ok: true, items: result.preview.items, source_row_count_check: result.items });
 });
 
@@ -697,6 +765,12 @@ app.post("/sessions/:id/open", async (c) => {
     });
   });
   const written = await prisma.sessionTag.count({ where: { sessionId: id } });
+  await recordStaffAction({
+    actorId: c.get("staff").id,
+    action: "session-open",
+    sessionId: id,
+    summary: `Buka sesi ${session.nama}`,
+  });
   return c.json({ ok: true, session_tags: written });
 });
 
@@ -838,6 +912,16 @@ app.post("/sessions/:id/pass-3", async (c) => {
   if ("error" in result) {
     return c.json({ error: result.error }, result.status);
   }
+  const pin = await prisma.sessionTag.findUnique({
+    where: { sessionId_tagId: { sessionId: id, tagId } },
+    select: { nomor: true },
+  });
+  await recordStaffAction({
+    actorId: c.get("staff").id,
+    action: "pass-3",
+    sessionId: id,
+    summary: `Tetapkan pass 3 tag ${pin?.nomor ?? tagId} ke ${result.nama}`,
+  });
   return c.json(result);
 });
 
@@ -899,6 +983,7 @@ app.post("/sessions/:id/review", async (c) => {
   if ("error" in result) {
     return c.json(result, result.status);
   }
+  await recordSessionAction(c.get("staff").id, "review", id, (nama) => `Kirim ${nama} ke review`);
   return c.json(result);
 });
 
@@ -917,6 +1002,7 @@ app.post("/sessions/:id/approve", async (c) => {
   if ("error" in result) {
     return c.json({ error: result.error }, result.status);
   }
+  await recordSessionAction(actorId, "approve", id, (nama) => `Approve step ${body.step} pada ${nama}`);
   return c.json(result);
 });
 
@@ -932,6 +1018,7 @@ app.post("/sessions/:id/reopen", async (c) => {
   if ("error" in result) {
     return c.json({ error: result.error }, result.status);
   }
+  await recordSessionAction(actorId, "reopen", id, (nama) => `Reopen ${nama}`);
   return c.json(result);
 });
 
@@ -945,6 +1032,7 @@ app.post("/sessions/:id/close", async (c) => {
   if ("error" in result) {
     return c.json({ error: result.error }, result.status);
   }
+  await recordSessionAction(c.get("staff").id, "close", id, (nama) => `Tutup ${nama}`);
   return c.json(result);
 });
 
@@ -965,6 +1053,12 @@ app.get("/sessions/:id/export.xlsx", async (c) => {
   if (!file) {
     return c.json(sessionMissing, 404);
   }
+  await recordStaffAction({
+    actorId: c.get("staff").id,
+    action: "export-xlsx",
+    sessionId: id,
+    summary: `Unduh Excel ${session.nama}`,
+  });
   return fileBody(file.buffer, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", file.filename);
 });
 
@@ -985,6 +1079,12 @@ app.get("/sessions/:id/export.pdf", async (c) => {
   if (!file) {
     return c.json(sessionMissing, 404);
   }
+  await recordStaffAction({
+    actorId: c.get("staff").id,
+    action: "export-pdf",
+    sessionId: id,
+    summary: `Unduh PDF ${session.nama}`,
+  });
   return fileBody(file.buffer, "application/pdf", file.filename);
 });
 

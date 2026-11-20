@@ -7,18 +7,23 @@ export function SiapSubpage({
   title,
   subtitle,
   legend = false,
+  action,
   children,
 }: {
   backHref: string;
   title: string;
   subtitle?: string;
   legend?: boolean;
+  action?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <>
       <BackLink href={backHref} />
-      <h1 className="mt-3 text-2xl font-semibold">{title}</h1>
+      <div className="mt-3 flex items-start justify-between gap-3">
+        <h1 className="text-2xl font-semibold">{title}</h1>
+        {action}
+      </div>
       {subtitle ? <PageLead>{subtitle}</PageLead> : null}
       {legend ? <StatusLegend /> : null}
       {children}
