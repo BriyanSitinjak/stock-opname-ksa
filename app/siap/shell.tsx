@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   FileUp,
@@ -173,6 +173,7 @@ function NavLinks({ sessionId, pathname, onNavigate }: { sessionId: string | nul
 
 export function CoordinatorShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const pathSession = sessionFromPath(pathname);
   const [menuPath, setMenuPath] = useState<string | null>(null);
   const [signedOut, setSignedOut] = useState(false);
@@ -184,10 +185,15 @@ export function CoordinatorShell({ children }: { children: ReactNode }) {
   const menuOpen = menuPath === pathname;
 
   useEffect(() => {
-    const onRequired = () => setSignedOut(true);
+    const onRequired = () => {
+      setSignedOut(true);
+      if (pathname !== "/siap") {
+        router.replace("/siap");
+      }
+    };
     window.addEventListener("ksa-staff-required", onRequired);
     return () => window.removeEventListener("ksa-staff-required", onRequired);
-  }, []);
+  }, [pathname, router]);
 
   async function leave() {
     const ok = await confirm({
@@ -200,21 +206,32 @@ export function CoordinatorShell({ children }: { children: ReactNode }) {
       return;
     }
     await fetch("/api/auth/logout", { method: "POST" });
-    setSignedOut(true);
     queryClient.clear();
+    setSignedOut(true);
+    router.replace("/siap");
   }
 
+  // Keep `children` mounted so Next.js does not drop the page segment when the
+  // gate or loading mark covers the shell.
   if (staff === undefined) {
-    return <LoadingMark />;
+    return (
+      <>
+        <LoadingMark />
+        <div hidden>{children}</div>
+      </>
+    );
   }
   if (staff === null) {
     return (
-      <CoordinatorGate
-        onReady={(next) => {
-          setSignedOut(false);
-          queryClient.setQueryData(siapKey("/api/auth/me"), next);
-        }}
-      />
+      <>
+        <CoordinatorGate
+          onReady={(next) => {
+            setSignedOut(false);
+            queryClient.setQueryData(siapKey("/api/auth/me"), next);
+          }}
+        />
+        <div hidden>{children}</div>
+      </>
     );
   }
 

@@ -118,11 +118,14 @@ app.post("/auth/login", async (c) => {
 });
 
 app.post("/auth/logout", async (c) => {
-  const staff = await staffForRequest(c);
-  if (staff) {
-    await recordStaffAction({ actorId: staff.id, action: "logout", summary: "Keluar dari Layar koordinator" });
+  try {
+    const staff = await staffForRequest(c);
+    if (staff) {
+      await recordStaffAction({ actorId: staff.id, action: "logout", summary: "Keluar dari Layar koordinator" });
+    }
+  } finally {
+    clearStaffCookie(c);
   }
-  clearStaffCookie(c);
   return c.json({ ok: true });
 });
 

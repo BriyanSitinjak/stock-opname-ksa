@@ -134,7 +134,11 @@ export function writeStaffCookie(c: Context, id: string) {
 }
 
 export function clearStaffCookie(c: Context) {
-  deleteCookie(c, STAFF_COOKIE, { path: "/" });
+  deleteCookie(c, STAFF_COOKIE, {
+    path: "/",
+    sameSite: "Lax",
+    secure: process.env.NODE_ENV === "production",
+  });
 }
 
 export function isOpenRoute(method: string, path: string) {
