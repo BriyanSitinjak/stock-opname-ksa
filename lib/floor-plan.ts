@@ -117,10 +117,10 @@ function gudang21(): Floor {
 
 function gudang22(): Floor {
   const aisles: FloorAisle[] = [
-    { id: "kiri", label: "Kiri", role: "outer" },
-    { id: "tengah-kiri", label: "Tengah kiri", role: "center" },
-    { id: "tengah-kanan", label: "Tengah kanan", role: "center" },
-    { id: "kanan", label: "Kanan", role: "outer" },
+    { id: "W", label: "W", role: "outer" },
+    { id: "X", label: "X", role: "center" },
+    { id: "Y", label: "Y", role: "center" },
+    { id: "Z", label: "Z", role: "outer" },
   ];
   const places: FloorPlace[] = [];
   for (const aisle of aisles) {
@@ -135,7 +135,7 @@ function gudang22(): Floor {
   return {
     gudang: 22,
     nama: "Gudang 22",
-    note: "Huruf lorong pada lembar ini tidak terbaca, jadi rak disebut dari letaknya. Baris 16 hanya sisi A. Lima petak Z memakai nama yang tertulis.",
+    note: "Lorong W, X, Y, dan Z. Baris 16 hanya sisi A. Lima petak gypsum memakai nama yang tertulis.",
     aisles,
     rows: rackRows("outer", { to: 16 }),
     places,

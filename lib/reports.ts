@@ -226,35 +226,11 @@ export async function rekapTag(sessionId: string) {
   return { counts };
 }
 
-export async function daftarBarangChoices(sessionId: string) {
-  const [gudangRows, brandRows] = await Promise.all([
-    prisma.snapshotItem.findMany({
-      where: { sessionId },
-      distinct: ["gudangId"],
-      select: { gudangId: true, gudang: { select: { nama: true } } },
-    }),
-    prisma.snapshotItem.findMany({
-      where: { sessionId, namaBrand: { not: null } },
-      distinct: ["namaBrand"],
-      select: { namaBrand: true },
-    }),
-  ]);
-  return {
-    gudang: gudangRows
-      .map((row) => ({ id: row.gudangId, nama: row.gudang.nama }))
-      .sort((a, b) => a.nama.localeCompare(b.nama)),
-    brands: brandRows.flatMap((row) => (row.namaBrand ? [row.namaBrand] : [])).sort((a, b) => a.localeCompare(b)),
-  };
-}
+type StockQuery = { q?: string; gudang_id?: string; brand?: string; group?: string; page?: number };
 
-export async function daftarBarang(
-  sessionId: string,
-  query: { q?: string; gudang_id?: string; brand?: string; group?: string; page?: number },
-) {
-  const page = Math.max(1, query.page ?? 1);
-  const take = 50;
-  const where = {
-    sessionId,
+function stockWhere(query: StockQuery, sessionId?: string) {
+  return {
+    ...(sessionId ? { sessionId } : {}),
     ...(parseId(query.gudang_id, "gdg") ? { gudangId: query.gudang_id } : {}),
     ...(query.brand ? { namaBrand: query.brand } : {}),
     ...(query.group ? { namaGroup: query.group } : {}),
@@ -268,16 +244,21 @@ export async function daftarBarang(
         }
       : {}),
   };
-  const [total, rows] = await Promise.all([
-    prisma.snapshotItem.count({ where }),
-    prisma.snapshotItem.findMany({
-      where,
-      include: { gudang: { select: { nama: true } } },
-      orderBy: [{ namaBarang: "asc" }],
-      skip: (page - 1) * take,
-      take,
-    }),
-  ]);
+}
+
+type StockRow = {
+  id: string;
+  barcode4: string | null;
+  kodeBarang: string;
+  namaBarang: string;
+  namaBrand: string | null;
+  namaGroup: string | null;
+  qtyOnhand: { toString(): string };
+  hargaSatuan: { toString(): string } | null;
+  gudang: { nama: string };
+};
+
+function presentStock(page: number, take: number, total: number, rows: StockRow[]) {
   return {
     page,
     take,
@@ -294,6 +275,87 @@ export async function daftarBarang(
       harga_satuan: row.hargaSatuan == null ? null : String(row.hargaSatuan),
     })),
   };
+}
+
+function presentChoices(
+  gudangRows: { gudangId: string; gudang: { nama: string } }[],
+  brandRows: { namaBrand: string | null }[],
+) {
+  return {
+    gudang: gudangRows
+      .map((row) => ({ id: row.gudangId, nama: row.gudang.nama }))
+      .sort((a, b) => a.nama.localeCompare(b.nama)),
+    brands: brandRows.flatMap((row) => (row.namaBrand ? [row.namaBrand] : [])).sort((a, b) => a.localeCompare(b)),
+  };
+}
+
+type StockReader = {
+  count(args: { where: object }): Promise<number>;
+  findMany(args: object): Promise<never>;
+};
+
+function stockReader(model: object) {
+  return model as StockReader;
+}
+
+async function stockChoices(model: StockReader, where: ReturnType<typeof stockWhere>) {
+  const [gudangRows, brandRows] = await Promise.all([
+    model.findMany({
+      where,
+      distinct: ["gudangId"],
+      select: { gudangId: true, gudang: { select: { nama: true } } },
+    }),
+    model.findMany({
+      where: { ...where, namaBrand: { not: null } },
+      distinct: ["namaBrand"],
+      select: { namaBrand: true },
+    }),
+  ]);
+  return presentChoices(gudangRows, brandRows);
+}
+
+export function daftarBarangChoices(sessionId: string) {
+  return stockChoices(stockReader(prisma.snapshotItem), { sessionId });
+}
+
+export function masterBarangChoices() {
+  return stockChoices(stockReader(prisma.masterItem), {});
+}
+
+async function readStock(
+  count: (where: ReturnType<typeof stockWhere>) => Promise<number>,
+  find: (where: ReturnType<typeof stockWhere>, skip: number, take: number) => Promise<StockRow[]>,
+  where: ReturnType<typeof stockWhere>,
+  query: StockQuery,
+) {
+  const page = Math.max(1, query.page ?? 1);
+  const take = 50;
+  const [total, rows] = await Promise.all([count(where), find(where, (page - 1) * take, take)]);
+  return presentStock(page, take, total, rows);
+}
+
+function pageStock(model: StockReader, where: ReturnType<typeof stockWhere>, query: StockQuery) {
+  return readStock(
+    (filter) => model.count({ where: filter }),
+    (filter, skip, take) =>
+      model.findMany({
+        where: filter,
+        include: { gudang: { select: { nama: true } } },
+        orderBy: [{ namaBarang: "asc" }],
+        skip,
+        take,
+      }),
+    where,
+    query,
+  );
+}
+
+export function daftarBarang(sessionId: string, query: StockQuery) {
+  return pageStock(stockReader(prisma.snapshotItem), stockWhere(query, sessionId), query);
+}
+
+export function masterBarang(query: StockQuery) {
+  return pageStock(stockReader(prisma.masterItem), stockWhere(query), query);
 }
 
 export async function petaBarang(sessionId: string, kode: string) {

@@ -24,6 +24,9 @@ describe("floor plan", () => {
     const row16 = floor?.places.filter((place) => place.row === 16) ?? [];
     expect(row16.every((place) => place.side === "A")).toBe(true);
     expect(row16.some((place) => place.side === "B")).toBe(false);
+    expect(floor?.aisles.map((aisle) => aisle.label)).toEqual(["W", "X", "Y", "Z"]);
+    expect(floor?.places.some((place) => place.label === "W-1-A")).toBe(true);
+    expect(floor?.places.some((place) => place.label === "Z-16-A")).toBe(true);
     expect(floor?.extras.places.map((place) => place.label)).toEqual(["20-A", "19-B", "19-A", "18-B", "18-A"]);
   });
 });

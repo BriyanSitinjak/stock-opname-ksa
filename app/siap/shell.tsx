@@ -4,21 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import {
-  ArrowLeftRight,
-  BadgeCheck,
-  ClipboardList,
   FileUp,
-  Files,
   History,
   House,
   LayoutGrid,
   List,
   LogOut,
-  Map,
-  MapPin,
   Plus,
-  Scale,
-  Smartphone,
   TabletSmartphone,
   Users,
   type LucideIcon,
@@ -28,6 +20,7 @@ import { confirm } from "@/app/confirm";
 import { LoadingMark } from "@/app/loading-mark";
 import { siapKey, useSiapQuery, useSiapQueryClient } from "@/app/siap/query";
 import { CoordinatorGate } from "@/app/siap/gate";
+import { sessionMenuGroups, type SessionMenu } from "@/app/siap/session-menus";
 import { parseId } from "@/lib/ids";
 import type { StaffSession } from "@/lib/staff-auth";
 
@@ -52,7 +45,7 @@ const GROUPS: { label: string; items: (sessionId: string | null) => NavItem[] }[
   },
   {
     label: "Persiapan",
-    items: (sessionId) => [
+    items: () => [
       {
         label: "Sesi baru",
         icon: Plus,
@@ -62,14 +55,14 @@ const GROUPS: { label: string; items: (sessionId: string | null) => NavItem[] }[
       {
         label: "Impor",
         icon: FileUp,
-        href: sessionId ? `/siap/${sessionId}/impor` : "/siap/baru",
-        match: (pathname) => pathname.endsWith("/impor"),
+        href: "/siap/impor",
+        match: (pathname) => pathname === "/siap/impor",
       },
       {
         label: "Daftar barang",
         icon: List,
-        href: sessionId ? `/siap/${sessionId}/laporan/daftar-barang` : "/siap",
-        match: (pathname) => pathname.endsWith("/daftar-barang"),
+        href: "/siap/daftar-barang",
+        match: (pathname) => pathname === "/siap/daftar-barang",
       },
       {
         label: "Pengguna",
@@ -91,70 +84,20 @@ const GROUPS: { label: string; items: (sessionId: string | null) => NavItem[] }[
       },
     ],
   },
-  {
-    label: "Pelaksanaan",
-    items: (sessionId) => [
-      {
-        label: "Bagi tugas",
-        icon: ClipboardList,
-        href: sessionId ? `/siap/${sessionId}/tugas` : "/siap",
-        match: (pathname) => pathname.endsWith("/tugas"),
-      },
-      {
-        label: "Pantau gudang",
-        icon: Map,
-        href: sessionId ? `/siap/${sessionId}/pantau` : "/siap",
-        match: (pathname) => pathname.includes("/pantau"),
-      },
-      {
-        label: "Status petugas",
-        icon: Smartphone,
-        href: sessionId ? `/siap/${sessionId}/petugas` : "/siap",
-        match: (pathname) => pathname.endsWith("/petugas"),
-      },
-    ],
-  },
-  {
-    label: "Laporan",
-    items: (sessionId) => [
-      {
-        label: "Selisih hitung",
-        icon: Scale,
-        href: sessionId ? `/siap/${sessionId}/laporan/selisih-hitung` : "/siap",
-        match: (pathname) => pathname.endsWith("/selisih-hitung"),
-      },
-      {
-        label: "Selisih sistem",
-        icon: ArrowLeftRight,
-        href: sessionId ? `/siap/${sessionId}/laporan/selisih-sistem` : "/siap",
-        match: (pathname) => pathname.endsWith("/selisih-sistem"),
-      },
-      {
-        label: "Laporan pendukung",
-        icon: Files,
-        href: sessionId ? `/siap/${sessionId}/laporan` : "/siap",
-        match: (pathname) => /\/laporan$/.test(pathname) || pathname.endsWith("/kondisi") || pathname.endsWith("/tidak-dikenal") || pathname.endsWith("/rekap-tag"),
-      },
-      {
-        label: "Peta barang",
-        icon: MapPin,
-        href: sessionId ? `/siap/${sessionId}/laporan/peta-barang` : "/siap",
-        match: (pathname) => pathname.endsWith("/peta-barang"),
-      },
-    ],
-  },
-  {
-    label: "Penutupan",
-    items: (sessionId) => [
-      {
-        label: "Persetujuan",
-        icon: BadgeCheck,
-        href: sessionId ? `/siap/${sessionId}/persetujuan` : "/siap",
-        match: (pathname) => pathname.endsWith("/persetujuan"),
-      },
-    ],
-  },
+  ...sessionMenuGroups.map((group) => ({
+    label: group.label,
+    items: () => group.items.map(menuLink),
+  })),
 ];
+
+function menuLink(menu: SessionMenu): NavItem {
+  return {
+    label: menu.title,
+    icon: menu.icon,
+    href: `/siap/pilih/${menu.key}`,
+    match: menu.match,
+  };
+}
 
 function sessionFromPath(pathname: string) {
   const segment = pathname.split("/")[2] ?? "";
@@ -277,7 +220,7 @@ export function CoordinatorShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-dvh bg-ksa-cream lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
-      <aside className="hidden min-h-dvh flex-col bg-[#1c1c1c] px-3 py-5 text-white lg:flex">
+      <aside className="hidden h-dvh flex-col self-start bg-[#1c1c1c] px-3 py-5 text-white lg:sticky lg:top-0 lg:flex">
         <HomeLink sessionId={sessionId} iconSize={28} className="mb-6 px-2" />
         <div className="flex-1 overflow-y-auto">
           <NavLinks sessionId={sessionId} pathname={pathname} />

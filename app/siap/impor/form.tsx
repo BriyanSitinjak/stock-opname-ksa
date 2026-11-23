@@ -20,7 +20,7 @@ type Preview = {
   ok?: boolean;
 };
 
-export function ImporForm({ id }: { id: string }) {
+export function ImporForm() {
   const invalidate = useSiapInvalidate();
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -49,18 +49,18 @@ export function ImporForm({ id }: { id: string }) {
     setBusy(true);
     setError("");
     setProgress(4);
-    setProgressLabel(confirm ? "Menyimpan snapshot…" : "Mengunggah file…");
+    setProgressLabel(confirm ? "Menyimpan stok…" : "Mengunggah file…");
     const creep = window.setInterval(() => {
       setProgress((current) => (current == null || current >= 92 ? current : current + 1));
     }, 350);
     const body = new FormData();
     body.append("file", file);
     try {
-      const { ok, data } = await uploadImport(`/api/sessions/${id}/import${confirm ? "?confirm=1" : ""}`, body, (ratio) => {
+      const { ok, data } = await uploadImport(`/api/master/import${confirm ? "?confirm=1" : ""}`, body, (ratio) => {
         const uploaded = Math.round(ratio * 70);
         setProgress((current) => Math.max(current ?? 0, uploaded));
         if (ratio >= 1) {
-          setProgressLabel(confirm ? "Menyimpan snapshot…" : "Mengolah file…");
+          setProgressLabel(confirm ? "Menyimpan stok…" : "Mengolah file…");
         }
       });
       if (!ok) {
@@ -73,14 +73,8 @@ export function ImporForm({ id }: { id: string }) {
       setProgressLabel("Selesai");
       if (confirm) {
         resetForm();
-        invalidate([
-          `/api/sessions/${id}`,
-          `/api/sessions/${id}/items`,
-          `/api/sessions/${id}/item-choices`,
-          "/api/setup/catalog",
-          "/api/sessions",
-        ]);
-        toast("Snapshot tersimpan.");
+        invalidate(["/api/master/items", "/api/master/item-choices", "/api/setup/catalog"]);
+        toast("Stok tersimpan.");
       } else {
         setPreview(data);
         toast("File selesai dibaca.");
@@ -97,10 +91,10 @@ export function ImporForm({ id }: { id: string }) {
 
   return (
     <>
-      <BackLink href={`/siap/${id}`} />
-      <h1 className="mt-3 text-2xl font-semibold">Impor snapshot</h1>
+      <BackLink href="/siap" />
+      <h1 className="mt-3 text-2xl font-semibold">Impor stok</h1>
       <PageLead>
-        Baca file cut off dulu sebagai preview. Gudang yang belum ada akan ditambahkan saat Simpan Snapshot. Snapshot baru tertulis setelah tombol itu, bukan saat file dipilih.
+        File ini untuk seluruh gudang, bukan untuk satu sesi. Baca dulu sebagai preview. Stok tersimpan setelah Simpan stok, dan sesi menyalinnya saat dibuka.
       </PageLead>
       <Card className="mt-6 max-w-xl">
         <input
@@ -149,15 +143,15 @@ export function ImporForm({ id }: { id: string }) {
           {preview.missingBarcodeCount > 0 ? (
             <p className="mt-1 text-sm">⚠ Kolom barcode belum ada di {preview.missingBarcodeCount} baris</p>
           ) : null}
-          <AddedNames label="Gudang baru" names={preview.addedGudang} detail="Ditambahkan saat Simpan Snapshot." />
-          <AddedNames label="Brand baru" names={preview.addedBrands} detail="Masuk ke scope sesi saat Simpan Snapshot." />
-          <AddedNames label="Group baru" names={preview.addedGroups} detail="Masuk ke scope sesi saat Simpan Snapshot." />
+          <AddedNames label="Gudang baru" names={preview.addedGudang} detail="Ditambahkan saat Simpan stok." />
+          <AddedNames label="Brand baru" names={preview.addedBrands} detail="Ikut tersimpan bersama stok." />
+          <AddedNames label="Group baru" names={preview.addedGroups} detail="Ikut tersimpan bersama stok." />
           <div className="mt-6 flex gap-3">
             <OutlineButton className="px-5 py-2.5" onClick={() => setPreview(null)}>
               Batal
             </OutlineButton>
             <TealButton disabled={busy} className="px-5 py-2.5 text-sm" onClick={() => void post(true)}>
-              Simpan Snapshot
+              Simpan stok
             </TealButton>
           </div>
         </Card>

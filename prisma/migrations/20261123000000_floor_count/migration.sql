@@ -6177,1115 +6177,1115 @@ WHERE g.kode = 'G21' AND l.nama = 'U'
   );
 
 INSERT INTO lokasi (gudang_id, nama, urutan)
-SELECT g.id, 'Kiri', 23
+SELECT g.id, 'W', 23
 FROM gudang g
 WHERE g.kode = 'G22'
   AND NOT EXISTS (
-    SELECT 1 FROM lokasi l WHERE l.gudang_id = g.id AND l.nama = 'Kiri'
+    SELECT 1 FROM lokasi l WHERE l.gudang_id = g.id AND l.nama = 'W'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-1-A', 1, 661
+SELECT l.id, 'W-1-A', 1, 661
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-1-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-1-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-1-B', 1, 662
+SELECT l.id, 'W-1-B', 1, 662
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-1-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-1-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-2-A', 1, 663
+SELECT l.id, 'W-2-A', 1, 663
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-2-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-2-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-2-B', 1, 664
+SELECT l.id, 'W-2-B', 1, 664
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-2-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-2-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-3-A', 1, 665
+SELECT l.id, 'W-3-A', 1, 665
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-3-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-3-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-3-B', 1, 666
+SELECT l.id, 'W-3-B', 1, 666
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-3-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-3-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-4-A', 1, 667
+SELECT l.id, 'W-4-A', 1, 667
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-4-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-4-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-4-B', 1, 668
+SELECT l.id, 'W-4-B', 1, 668
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-4-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-4-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-5-A', 1, 669
+SELECT l.id, 'W-5-A', 1, 669
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-5-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-5-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-5-B', 1, 670
+SELECT l.id, 'W-5-B', 1, 670
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-5-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-5-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-6-A', 1, 671
+SELECT l.id, 'W-6-A', 1, 671
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-6-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-6-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-6-B', 1, 672
+SELECT l.id, 'W-6-B', 1, 672
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-6-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-6-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-7-A', 1, 673
+SELECT l.id, 'W-7-A', 1, 673
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-7-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-7-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-7-B', 1, 674
+SELECT l.id, 'W-7-B', 1, 674
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-7-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-7-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-8-A', 1, 675
+SELECT l.id, 'W-8-A', 1, 675
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-8-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-8-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-8-B', 1, 676
+SELECT l.id, 'W-8-B', 1, 676
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-8-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-8-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-9-A', 1, 677
+SELECT l.id, 'W-9-A', 1, 677
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-9-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-9-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-9-B', 1, 678
+SELECT l.id, 'W-9-B', 1, 678
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-9-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-9-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-10-A', 1, 679
+SELECT l.id, 'W-10-A', 1, 679
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-10-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-10-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-10-B', 1, 680
+SELECT l.id, 'W-10-B', 1, 680
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-10-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-10-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-11-A', 1, 681
+SELECT l.id, 'W-11-A', 1, 681
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-11-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-11-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-11-B', 1, 682
+SELECT l.id, 'W-11-B', 1, 682
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-11-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-11-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-12-A', 1, 683
+SELECT l.id, 'W-12-A', 1, 683
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-12-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-12-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-12-B', 1, 684
+SELECT l.id, 'W-12-B', 1, 684
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-12-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-12-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-13-A', 1, 685
+SELECT l.id, 'W-13-A', 1, 685
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-13-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-13-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-13-B', 1, 686
+SELECT l.id, 'W-13-B', 1, 686
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-13-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-13-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-14-A', 1, 687
+SELECT l.id, 'W-14-A', 1, 687
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-14-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-14-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-14-B', 1, 688
+SELECT l.id, 'W-14-B', 1, 688
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-14-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-14-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-15-A', 1, 689
+SELECT l.id, 'W-15-A', 1, 689
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-15-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-15-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-15-B', 1, 690
+SELECT l.id, 'W-15-B', 1, 690
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-15-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-15-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kiri-16-A', 1, 691
+SELECT l.id, 'W-16-A', 1, 691
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kiri'
+WHERE g.kode = 'G22' AND l.nama = 'W'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kiri-16-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'W-16-A'
   );
 
 INSERT INTO lokasi (gudang_id, nama, urutan)
-SELECT g.id, 'Tengah kiri', 24
+SELECT g.id, 'X', 24
 FROM gudang g
 WHERE g.kode = 'G22'
   AND NOT EXISTS (
-    SELECT 1 FROM lokasi l WHERE l.gudang_id = g.id AND l.nama = 'Tengah kiri'
+    SELECT 1 FROM lokasi l WHERE l.gudang_id = g.id AND l.nama = 'X'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-1-A', 1, 692
+SELECT l.id, 'X-1-A', 1, 692
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-1-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-1-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-1-B', 1, 693
+SELECT l.id, 'X-1-B', 1, 693
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-1-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-1-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-2-A', 1, 694
+SELECT l.id, 'X-2-A', 1, 694
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-2-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-2-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-2-B', 1, 695
+SELECT l.id, 'X-2-B', 1, 695
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-2-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-2-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-3-A', 1, 696
+SELECT l.id, 'X-3-A', 1, 696
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-3-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-3-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-3-B', 1, 697
+SELECT l.id, 'X-3-B', 1, 697
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-3-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-3-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-4-A', 1, 698
+SELECT l.id, 'X-4-A', 1, 698
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-4-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-4-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-4-B', 1, 699
+SELECT l.id, 'X-4-B', 1, 699
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-4-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-4-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-5-A', 1, 700
+SELECT l.id, 'X-5-A', 1, 700
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-5-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-5-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-5-B', 1, 701
+SELECT l.id, 'X-5-B', 1, 701
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-5-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-5-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-6-A', 1, 702
+SELECT l.id, 'X-6-A', 1, 702
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-6-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-6-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-6-B', 1, 703
+SELECT l.id, 'X-6-B', 1, 703
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-6-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-6-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-7-A', 1, 704
+SELECT l.id, 'X-7-A', 1, 704
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-7-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-7-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-7-B', 1, 705
+SELECT l.id, 'X-7-B', 1, 705
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-7-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-7-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-8-A', 1, 706
+SELECT l.id, 'X-8-A', 1, 706
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-8-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-8-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-8-B', 1, 707
+SELECT l.id, 'X-8-B', 1, 707
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-8-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-8-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-10-A', 1, 708
+SELECT l.id, 'X-10-A', 1, 708
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-10-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-10-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-10-B', 1, 709
+SELECT l.id, 'X-10-B', 1, 709
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-10-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-10-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-11-A', 1, 710
+SELECT l.id, 'X-11-A', 1, 710
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-11-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-11-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-11-B', 1, 711
+SELECT l.id, 'X-11-B', 1, 711
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-11-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-11-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-12-A', 1, 712
+SELECT l.id, 'X-12-A', 1, 712
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-12-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-12-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-12-B', 1, 713
+SELECT l.id, 'X-12-B', 1, 713
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-12-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-12-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-13-A', 1, 714
+SELECT l.id, 'X-13-A', 1, 714
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-13-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-13-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-13-B', 1, 715
+SELECT l.id, 'X-13-B', 1, 715
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-13-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-13-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-14-A', 1, 716
+SELECT l.id, 'X-14-A', 1, 716
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-14-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-14-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-14-B', 1, 717
+SELECT l.id, 'X-14-B', 1, 717
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-14-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-14-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-15-A', 1, 718
+SELECT l.id, 'X-15-A', 1, 718
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-15-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-15-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-15-B', 1, 719
+SELECT l.id, 'X-15-B', 1, 719
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-15-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-15-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kiri-16-A', 1, 720
+SELECT l.id, 'X-16-A', 1, 720
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kiri'
+WHERE g.kode = 'G22' AND l.nama = 'X'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kiri-16-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'X-16-A'
   );
 
 INSERT INTO lokasi (gudang_id, nama, urutan)
-SELECT g.id, 'Tengah kanan', 25
+SELECT g.id, 'Y', 25
 FROM gudang g
 WHERE g.kode = 'G22'
   AND NOT EXISTS (
-    SELECT 1 FROM lokasi l WHERE l.gudang_id = g.id AND l.nama = 'Tengah kanan'
+    SELECT 1 FROM lokasi l WHERE l.gudang_id = g.id AND l.nama = 'Y'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-1-A', 1, 721
+SELECT l.id, 'Y-1-A', 1, 721
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-1-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-1-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-1-B', 1, 722
+SELECT l.id, 'Y-1-B', 1, 722
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-1-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-1-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-2-A', 1, 723
+SELECT l.id, 'Y-2-A', 1, 723
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-2-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-2-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-2-B', 1, 724
+SELECT l.id, 'Y-2-B', 1, 724
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-2-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-2-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-3-A', 1, 725
+SELECT l.id, 'Y-3-A', 1, 725
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-3-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-3-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-3-B', 1, 726
+SELECT l.id, 'Y-3-B', 1, 726
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-3-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-3-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-4-A', 1, 727
+SELECT l.id, 'Y-4-A', 1, 727
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-4-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-4-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-4-B', 1, 728
+SELECT l.id, 'Y-4-B', 1, 728
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-4-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-4-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-5-A', 1, 729
+SELECT l.id, 'Y-5-A', 1, 729
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-5-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-5-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-5-B', 1, 730
+SELECT l.id, 'Y-5-B', 1, 730
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-5-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-5-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-6-A', 1, 731
+SELECT l.id, 'Y-6-A', 1, 731
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-6-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-6-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-6-B', 1, 732
+SELECT l.id, 'Y-6-B', 1, 732
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-6-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-6-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-7-A', 1, 733
+SELECT l.id, 'Y-7-A', 1, 733
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-7-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-7-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-7-B', 1, 734
+SELECT l.id, 'Y-7-B', 1, 734
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-7-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-7-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-8-A', 1, 735
+SELECT l.id, 'Y-8-A', 1, 735
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-8-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-8-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-8-B', 1, 736
+SELECT l.id, 'Y-8-B', 1, 736
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-8-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-8-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-10-A', 1, 737
+SELECT l.id, 'Y-10-A', 1, 737
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-10-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-10-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-10-B', 1, 738
+SELECT l.id, 'Y-10-B', 1, 738
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-10-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-10-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-11-A', 1, 739
+SELECT l.id, 'Y-11-A', 1, 739
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-11-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-11-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-11-B', 1, 740
+SELECT l.id, 'Y-11-B', 1, 740
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-11-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-11-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-12-A', 1, 741
+SELECT l.id, 'Y-12-A', 1, 741
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-12-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-12-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-12-B', 1, 742
+SELECT l.id, 'Y-12-B', 1, 742
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-12-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-12-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-13-A', 1, 743
+SELECT l.id, 'Y-13-A', 1, 743
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-13-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-13-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-13-B', 1, 744
+SELECT l.id, 'Y-13-B', 1, 744
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-13-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-13-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-14-A', 1, 745
+SELECT l.id, 'Y-14-A', 1, 745
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-14-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-14-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-14-B', 1, 746
+SELECT l.id, 'Y-14-B', 1, 746
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-14-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-14-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-15-A', 1, 747
+SELECT l.id, 'Y-15-A', 1, 747
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-15-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-15-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-15-B', 1, 748
+SELECT l.id, 'Y-15-B', 1, 748
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-15-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-15-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'tengah-kanan-16-A', 1, 749
+SELECT l.id, 'Y-16-A', 1, 749
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Tengah kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Y'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'tengah-kanan-16-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Y-16-A'
   );
 
 INSERT INTO lokasi (gudang_id, nama, urutan)
-SELECT g.id, 'Kanan', 26
+SELECT g.id, 'Z', 26
 FROM gudang g
 WHERE g.kode = 'G22'
   AND NOT EXISTS (
-    SELECT 1 FROM lokasi l WHERE l.gudang_id = g.id AND l.nama = 'Kanan'
+    SELECT 1 FROM lokasi l WHERE l.gudang_id = g.id AND l.nama = 'Z'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-1-A', 1, 750
+SELECT l.id, 'Z-1-A', 1, 750
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-1-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-1-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-1-B', 1, 751
+SELECT l.id, 'Z-1-B', 1, 751
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-1-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-1-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-2-A', 1, 752
+SELECT l.id, 'Z-2-A', 1, 752
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-2-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-2-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-2-B', 1, 753
+SELECT l.id, 'Z-2-B', 1, 753
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-2-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-2-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-3-A', 1, 754
+SELECT l.id, 'Z-3-A', 1, 754
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-3-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-3-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-3-B', 1, 755
+SELECT l.id, 'Z-3-B', 1, 755
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-3-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-3-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-4-A', 1, 756
+SELECT l.id, 'Z-4-A', 1, 756
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-4-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-4-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-4-B', 1, 757
+SELECT l.id, 'Z-4-B', 1, 757
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-4-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-4-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-5-A', 1, 758
+SELECT l.id, 'Z-5-A', 1, 758
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-5-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-5-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-5-B', 1, 759
+SELECT l.id, 'Z-5-B', 1, 759
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-5-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-5-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-6-A', 1, 760
+SELECT l.id, 'Z-6-A', 1, 760
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-6-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-6-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-6-B', 1, 761
+SELECT l.id, 'Z-6-B', 1, 761
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-6-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-6-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-7-A', 1, 762
+SELECT l.id, 'Z-7-A', 1, 762
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-7-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-7-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-7-B', 1, 763
+SELECT l.id, 'Z-7-B', 1, 763
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-7-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-7-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-8-A', 1, 764
+SELECT l.id, 'Z-8-A', 1, 764
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-8-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-8-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-8-B', 1, 765
+SELECT l.id, 'Z-8-B', 1, 765
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-8-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-8-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-9-A', 1, 766
+SELECT l.id, 'Z-9-A', 1, 766
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-9-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-9-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-9-B', 1, 767
+SELECT l.id, 'Z-9-B', 1, 767
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-9-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-9-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-10-A', 1, 768
+SELECT l.id, 'Z-10-A', 1, 768
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-10-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-10-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-10-B', 1, 769
+SELECT l.id, 'Z-10-B', 1, 769
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-10-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-10-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-11-A', 1, 770
+SELECT l.id, 'Z-11-A', 1, 770
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-11-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-11-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-11-B', 1, 771
+SELECT l.id, 'Z-11-B', 1, 771
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-11-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-11-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-12-A', 1, 772
+SELECT l.id, 'Z-12-A', 1, 772
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-12-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-12-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-12-B', 1, 773
+SELECT l.id, 'Z-12-B', 1, 773
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-12-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-12-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-13-A', 1, 774
+SELECT l.id, 'Z-13-A', 1, 774
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-13-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-13-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-13-B', 1, 775
+SELECT l.id, 'Z-13-B', 1, 775
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-13-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-13-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-14-A', 1, 776
+SELECT l.id, 'Z-14-A', 1, 776
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-14-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-14-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-14-B', 1, 777
+SELECT l.id, 'Z-14-B', 1, 777
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-14-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-14-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-15-A', 1, 778
+SELECT l.id, 'Z-15-A', 1, 778
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-15-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-15-A'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-15-B', 1, 779
+SELECT l.id, 'Z-15-B', 1, 779
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-15-B'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-15-B'
   );
 
 INSERT INTO tags (lokasi_id, nomor, weight, urutan)
-SELECT l.id, 'kanan-16-A', 1, 780
+SELECT l.id, 'Z-16-A', 1, 780
 FROM lokasi l
 JOIN gudang g ON g.id = l.gudang_id
-WHERE g.kode = 'G22' AND l.nama = 'Kanan'
+WHERE g.kode = 'G22' AND l.nama = 'Z'
   AND NOT EXISTS (
-    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'kanan-16-A'
+    SELECT 1 FROM tags t WHERE t.lokasi_id = l.id AND t.nomor = 'Z-16-A'
   );
 
 INSERT INTO lokasi (gudang_id, nama, urutan)

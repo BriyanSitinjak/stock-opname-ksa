@@ -1,4 +1,4 @@
-import { ArrowLeftRight, ClipboardList, List, MapPin, PackageSearch, Scale, TriangleAlert } from "lucide-react";
+import { ArrowLeftRight, ClipboardList, MapPin, PackageSearch, Scale, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { SiapSubpage } from "@/app/siap/pantau-shell";
@@ -10,7 +10,6 @@ const LINKS: { href: string; title: string; blurb: string; icon: LucideIcon }[] 
   { href: "kondisi", title: "Kondisi", blurb: "Baik, rusak, dan kadaluarsa. Catatan ini tidak mengubah angka selisih.", icon: TriangleAlert },
   { href: "tidak-dikenal", title: "Barang tidak dikenal", blurb: "Barang yang dicatat di HP tetapi tidak ada di snapshot sesi.", icon: PackageSearch },
   { href: "rekap-tag", title: "Rekap tag", blurb: "Jumlah tag per status, dihitung dari submission yang sudah masuk.", icon: ClipboardList },
-  { href: "daftar-barang", title: "Daftar barang", blurb: "Seluruh item di snapshot sesi, bisa disaring per gudang dan brand.", icon: List },
   { href: "peta-barang", title: "Peta barang", blurb: "Lokasi pin dan qty yang sudah disepakati setelah pass 1.", icon: MapPin },
 ];
 

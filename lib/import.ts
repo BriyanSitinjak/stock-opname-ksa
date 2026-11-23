@@ -309,6 +309,40 @@ export function validateAndAggregate(
   };
 }
 
+function stockFields(item: AggregatedItem, gudangId: string) {
+  return {
+    gudangId,
+    kodeBarang: item.kodeBarang,
+    barcode4: item.barcode4,
+    namaBarang: item.namaBarang,
+    kodeBrand: item.kodeBrand,
+    namaBrand: item.namaBrand,
+    kodeGroup: item.kodeGroup,
+    namaGroup: item.namaGroup,
+    qtyOnhand: item.qtyOnhand,
+    hargaSatuan: item.hargaSatuan,
+    sourceRowCount: item.sourceRowCount,
+  };
+}
+
+async function placedStock(tx: Prisma.TransactionClient, items: AggregatedItem[]) {
+  const createdGudang = await ensureGudang(
+    tx,
+    items.filter((item) => !item.gudangId).map((item) => item.gudangNama),
+  );
+  return items.map((item) =>
+    stockFields(item, item.gudangId || createdGudang.get(item.gudangNama) || missingGudang(item.gudangNama)),
+  );
+}
+
+export async function commitMaster(items: AggregatedItem[]) {
+  await prisma.$transaction(async (tx) => {
+    const data = await placedStock(tx, items);
+    await tx.masterItem.deleteMany();
+    await tx.masterItem.createMany({ data });
+  });
+}
+
 export async function commitImport(
   sessionId: string,
   raw: RawRow[],
@@ -322,10 +356,7 @@ export async function commitImport(
         data: { scopeFilter: scope },
       });
     }
-    const createdGudang = await ensureGudang(
-      tx,
-      items.filter((item) => !item.gudangId).map((item) => item.gudangNama),
-    );
+    const placed = await placedStock(tx, items);
     await tx.importRow.createMany({
       data: raw.map((row, index) => ({
         sessionId,
@@ -334,20 +365,7 @@ export async function commitImport(
       })),
     });
     await tx.snapshotItem.createMany({
-      data: items.map((item) => ({
-        sessionId,
-        gudangId: item.gudangId || createdGudang.get(item.gudangNama) || missingGudang(item.gudangNama),
-        kodeBarang: item.kodeBarang,
-        barcode4: item.barcode4,
-        namaBarang: item.namaBarang,
-        kodeBrand: item.kodeBrand,
-        namaBrand: item.namaBrand,
-        kodeGroup: item.kodeGroup,
-        namaGroup: item.namaGroup,
-        qtyOnhand: item.qtyOnhand,
-        hargaSatuan: item.hargaSatuan,
-        sourceRowCount: item.sourceRowCount,
-      })),
+      data: placed.map((item) => ({ sessionId, ...item })),
     });
   });
 }

@@ -9,7 +9,7 @@ import { fetchJson } from "@/app/siap/api";
 import { useDraftRows, useSiapInvalidate, useSiapQuery } from "@/app/siap/query";
 import { AisleTasks } from "./aisles";
 import { EmptyState } from "@/app/empty-state";
-import { PassSelect, type CounterOption } from "@/app/siap/pass-select";
+import { PassSelect, petugasOnly, type CounterOption } from "@/app/siap/pass-select";
 import { ReportRow, ReportTable, Td } from "@/app/siap/report-table";
 import { BackLink, ErrorText, MissingList, PageLead, TealButton } from "@/app/siap/ui";
 import { toast } from "@/app/toast";
@@ -30,7 +30,7 @@ export function TugasBoard({ id }: { id: string }) {
   const [rows, setRows] = useDraftRows(id, assignments.data);
   const [error, setError] = useState("");
   const [missing, setMissing] = useState<string[]>([]);
-  const counters = catalog.data?.counters ?? [];
+  const counters = petugasOnly(catalog.data?.counters ?? []);
   const list = rows ?? [];
 
   const grouped = useMemo(() => {
@@ -97,6 +97,9 @@ export function TugasBoard({ id }: { id: string }) {
       <PageLead>
         Setiap lorong punya hitung ke-1 dan hitung ke-2, orangnya boleh berganti di lorong berikutnya. Lorong yang ditandai kosong tidak dibagikan. Tag contoh yang masih ada tetap di daftar bawah. Tugas hanya bisa diubah selama sesi masih draft.
       </PageLead>
+      <p className="mt-3 text-sm">
+        Petugas: {counters.length === 0 ? "belum ada." : counters.map((person) => person.nama).join(", ")}
+      </p>
       {assignments.isPending ? null : list.length === 0 ? <EmptyState menu="tag" /> : null}
       <AisleTasks id={id} counters={counters} />
       <p className="mt-6 text-sm">

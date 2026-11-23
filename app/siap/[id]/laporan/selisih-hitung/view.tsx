@@ -1,5 +1,6 @@
 "use client";
 
+import { petugasOnly } from "@/app/siap/pass-select";
 import { QueryView } from "@/app/siap/query";
 import { SelisihHitungBoard, type SelisihHitungRow } from "./board";
 
@@ -14,7 +15,7 @@ export function SelisihHitungView({ id }: { id: string }) {
             <SelisihHitungBoard
               id={id}
               rows={rows}
-              counters={catalog.counters.filter((person) => person.role === "counter")}
+              counters={petugasOnly(catalog.counters)}
             />
           )}
         </QueryView>

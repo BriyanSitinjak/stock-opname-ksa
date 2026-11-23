@@ -17,7 +17,6 @@ export type DaftarItem = {
 export type GudangChoice = { id: string; nama: string };
 
 export function DaftarBrowse({
-  id,
   items,
   total,
   page,
@@ -28,7 +27,6 @@ export function DaftarBrowse({
   gudangChoices,
   brandChoices,
 }: {
-  id: string;
   items: DaftarItem[];
   total: number;
   page: number;
@@ -60,7 +58,7 @@ export function DaftarBrowse({
       params.set("page", String(nextPage));
     }
     const suffix = params.toString();
-    return `/siap/${id}/laporan/daftar-barang${suffix ? `?${suffix}` : ""}`;
+    return `/siap/daftar-barang${suffix ? `?${suffix}` : ""}`;
   }
 
   const filtered = Boolean(q || gudang || brand);
@@ -68,7 +66,7 @@ export function DaftarBrowse({
   return (
     <>
       <SearchForm
-        action={`/siap/${id}/laporan/daftar-barang`}
+        action="/siap/daftar-barang"
         name="q"
         defaultValue={q}
         placeholder="Nama, kode, atau barcode"
@@ -101,7 +99,7 @@ export function DaftarBrowse({
       <p className="mt-3 text-sm text-[#6b6b6b]">{total} barang</p>
       {items.length === 0 ? <EmptyState menu="barang" kind={filtered ? "tidak" : "belum"} /> : null}
       {items.length > 0 ? (
-        <ReportTable title="Item snapshot" headers={["Gudang", "Kode", "Nama", "Brand", "Qty on hand"]}>
+        <ReportTable title="Stok master" headers={["Gudang", "Kode", "Nama", "Brand", "Qty on hand"]}>
           {items.map((row) => (
             <ReportRow key={row.id}>
               <Td>{row.gudang_nama}</Td>

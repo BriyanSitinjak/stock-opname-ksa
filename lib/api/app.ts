@@ -5,7 +5,7 @@ import { releaseDevice } from "@/lib/devices";
 import { ADMIN_ID } from "@/lib/fixture";
 import { idPattern, parseId } from "@/lib/ids";
 import { ROLE_LABEL, parseRole } from "@/lib/roles";
-import { commitImport, parseImportFile, validateAndAggregate } from "@/lib/import";
+import { commitImport, commitMaster, parseImportFile, validateAndAggregate } from "@/lib/import";
 import { coordinatorDenah, devicesForSession } from "@/lib/monitor";
 import { buildPdf, buildWorkbook } from "@/lib/export-workbook";
 import {
@@ -20,6 +20,8 @@ import {
   assignPass3,
   daftarBarang,
   daftarBarangChoices,
+  masterBarang,
+  masterBarangChoices,
   kondisiReport,
   pass3Compare,
   petaBarang,
@@ -744,6 +746,62 @@ app.get("/sessions/:id/prepare", async (c) => {
   return c.json(payload);
 });
 
+function stockListQuery(c: { req: { query: (name: string) => string | undefined } }) {
+  return {
+    q: c.req.query("q") || undefined,
+    gudang_id: c.req.query("gudang_id") || undefined,
+    brand: c.req.query("brand") || undefined,
+    group: c.req.query("group") || undefined,
+    page: Number(c.req.query("page") ?? "1") || 1,
+  };
+}
+
+async function readStockFile(file: File, scope: { brands: string[]; groups: string[] }) {
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const parsed = await parseImportFile(file.name, bytes);
+  if ("error" in parsed) {
+    return parsed;
+  }
+  const gudang = await prisma.gudang.findMany();
+  const gudangByNama = new Map(gudang.map((row) => [row.nama, { id: row.id, nama: row.nama }]));
+  return validateAndAggregate(parsed.rows, gudangByNama, scope, await catalogNames());
+}
+
+app.post("/master/import", async (c) => {
+  const confirm = c.req.query("confirm") === "1";
+  const body = await c.req.parseBody();
+  const file = body.file;
+  if (!(file instanceof File)) {
+    return c.json({ error: "File wajib di-upload." }, 400);
+  }
+  const result = await readStockFile(file, { brands: [], groups: [] });
+  if ("error" in result) {
+    return c.json({ error: result.error.message, code: result.error.code }, 400);
+  }
+  if (!confirm) {
+    const existing = await prisma.masterItem.count();
+    return c.json({ ...result.preview, master_items: existing, confirm_required: true });
+  }
+  try {
+    await commitMaster(result.items);
+  } catch (error) {
+    console.error(error);
+    return c.json({ error: "Import gagal. Tidak ada perubahan." }, 500);
+  }
+  await recordStaffAction({
+    actorId: c.get("staff").id,
+    action: "import",
+    summary: `Impor stok master ${result.preview.items} item`,
+  });
+  return c.json({ ok: true, items: result.preview.items });
+});
+
+app.get("/master/item-choices", async (c) => c.json(await masterBarangChoices()));
+
+app.get("/master/items", async (c) => {
+  return c.json(await masterBarang(stockListQuery(c)));
+});
+
 app.post("/sessions/:id/import", async (c) => {
   const id = sessionId(c);
   if (id == null) return c.json(sessionMissing, 404);
@@ -760,16 +818,7 @@ app.post("/sessions/:id/import", async (c) => {
   if (session.status === "approved" || session.status === "closed") {
     return c.json({ error: "Sesi yang sudah approved tidak bisa diubah." }, 409);
   }
-  const bytes = Buffer.from(await file.arrayBuffer());
-  const parsed = await parseImportFile(file.name, bytes);
-  if ("error" in parsed) {
-    return c.json({ error: parsed.error.message, code: parsed.error.code }, 400);
-  }
-  const gudang = await prisma.gudang.findMany();
-  const gudangByNama = new Map(gudang.map((row) => [row.nama, { id: row.id, nama: row.nama }]));
-  const scope = readScope(session.scopeFilter);
-  const names = await catalogNames();
-  const result = validateAndAggregate(parsed.rows, gudangByNama, scope, names);
+  const result = await readStockFile(file, readScope(session.scopeFilter));
   if ("error" in result) {
     return c.json({ error: result.error.message, code: result.error.code }, 400);
   }
@@ -1042,15 +1091,7 @@ app.get("/sessions/:id/items", async (c) => {
   if (!(await requireSession(id))) {
     return c.json(sessionMissing, 404);
   }
-  return c.json(
-    await daftarBarang(id, {
-      q: c.req.query("q") || undefined,
-      gudang_id: c.req.query("gudang_id") || undefined,
-      brand: c.req.query("brand") || undefined,
-      group: c.req.query("group") || undefined,
-      page: Number(c.req.query("page") ?? "1") || 1,
-    }),
-  );
+  return c.json(await daftarBarang(id, stockListQuery(c)));
 });
 
 app.get("/sessions/:id/peta-barang", async (c) => {

@@ -18,26 +18,24 @@ type Choices = {
 };
 
 export function DaftarLoad({
-  id,
   q,
   page,
   gudang,
   brand,
 }: {
-  id: string;
   q: string;
   page?: string;
   gudang: string;
   brand: string;
 }) {
   const parsed = Number.parseInt(page ?? "1", 10);
-  const items = useSiapQuery<Payload>(`/api/sessions/${id}/items`, {
+  const items = useSiapQuery<Payload>("/api/master/items", {
     q,
     gudang_id: gudang,
     brand,
     page: Number.isFinite(parsed) ? parsed : 1,
   });
-  const choices = useSiapQuery<Choices>(`/api/sessions/${id}/item-choices`);
+  const choices = useSiapQuery<Choices>("/api/master/item-choices");
   if (items.isPending || choices.isPending) {
     return <LoadingMark />;
   }
@@ -46,7 +44,6 @@ export function DaftarLoad({
   }
   return (
     <DaftarBrowse
-      id={id}
       items={items.data.items}
       total={items.data.total}
       page={items.data.page}

@@ -109,7 +109,7 @@ export function SesiDetail({ id }: { id: string }) {
       </div>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat icon={Package} label="Item di snapshot" value={String(detail.snapshot_items)} href={`/siap/${id}/laporan/daftar-barang`} />
+        <Stat icon={Package} label="Item di snapshot" value={String(detail.snapshot_items)} href="/siap/daftar-barang" />
         <Stat icon={ClipboardList} label="Tag yang di-pin" value={String(detail.session_tags || total)} href={`/siap/${id}/pantau`} />
         <Stat icon={CheckCircle2} label="Selesai" value={String(selesai)} href={`/siap/${id}/pantau`} />
         <Stat icon={Scale} label="Selisih hitung" value={String(selisih)} href={`/siap/${id}/laporan/selisih-hitung`} />
@@ -151,7 +151,7 @@ export function SesiDetail({ id }: { id: string }) {
       </section>
 
       <div className="mt-6 grid gap-3 sm:grid-cols-3">
-        <Link href={`/siap/${id}/impor`}>
+        <Link href="/siap/impor">
           <InfoCard icon={FileUp} title="Impor">
             {detail.snapshot_items} item
           </InfoCard>
