@@ -499,7 +499,7 @@ app.put("/sessions/:id/aisles", async (c) => {
   }
   const saved = await saveAisles(
     id,
-    (body.aisles ?? []).map((row) => ({
+    rows.map((row) => ({
       gudang: row.gudang,
       aisle: row.aisle,
       pass1: row.pass_1,

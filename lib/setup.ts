@@ -44,35 +44,37 @@ export async function liveTags() {
   });
 }
 
+function missingTagPasses(
+  tags: Array<{ id: string; nomor: string; lokasi: { nama: string; gudang: { nama: string } } }>,
+  have: Set<string>,
+): string[] {
+  const missing: string[] = [];
+  for (const tag of tags) {
+    const where = `${tag.lokasi.gudang.nama} / ${tag.lokasi.nama}`;
+    if (!have.has(`${tag.id}:1`)) {
+      missing.push(`Tag ${tag.nomor} (${where}) belum ada pass 1`);
+    }
+    if (!have.has(`${tag.id}:2`)) {
+      missing.push(`Tag ${tag.nomor} (${where}) belum ada pass 2`);
+    }
+  }
+  return missing;
+}
+
 export async function missingAssignments(sessionId: string): Promise<string[]> {
   const tags = await liveTags();
   const floorTags = tags.filter((tag) => isFloorPlace(tag.nomor));
   const otherTags = tags.filter((tag) => !isFloorPlace(tag.nomor));
   const rows = await prisma.tagAssignment.findMany({ where: { sessionId } });
   const have = new Set(rows.map((row) => `${row.tagId}:${row.pass}`));
-  const missing: string[] = [];
   const tagList = floorTags.length > 0 ? otherTags : tags;
-  for (const tag of tagList) {
-    if (!have.has(`${tag.id}:1`)) {
-      missing.push(`Tag ${tag.nomor} (${tag.lokasi.gudang.nama} / ${tag.lokasi.nama}) belum ada pass 1`);
-    }
-    if (!have.has(`${tag.id}:2`)) {
-      missing.push(`Tag ${tag.nomor} (${tag.lokasi.gudang.nama} / ${tag.lokasi.nama}) belum ada pass 2`);
-    }
-  }
+  const missing = missingTagPasses(tagList, have);
   if (floorTags.length === 0) {
     return missing;
   }
   const board = await aisleBoard(sessionId);
   if (!board.ready) {
-    for (const tag of floorTags) {
-      if (!have.has(`${tag.id}:1`)) {
-        missing.push(`Tag ${tag.nomor} (${tag.lokasi.gudang.nama} / ${tag.lokasi.nama}) belum ada pass 1`);
-      }
-      if (!have.has(`${tag.id}:2`)) {
-        missing.push(`Tag ${tag.nomor} (${tag.lokasi.gudang.nama} / ${tag.lokasi.nama}) belum ada pass 2`);
-      }
-    }
+    missing.push(...missingTagPasses(floorTags, have));
     return missing;
   }
   const slots = floorAisles().map((aisle) => ({ gudang: aisle.gudang, aisle: aisle.aisle, label: aisle.label }));

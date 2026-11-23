@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { fetchJson } from "@/app/siap/api";
+import { PassSelect, type CounterOption } from "@/app/siap/pass-select";
 import { ReportRow, ReportTable, Td } from "@/app/siap/report-table";
-import { ErrorText, MissingList, Select, TealButton } from "@/app/siap/ui";
+import { ErrorText, MissingList, TealButton } from "@/app/siap/ui";
 import { toast } from "@/app/toast";
-import { ROLE_LABEL, type StaffRole } from "@/lib/roles";
+import { aisleKey } from "@/lib/aisle-rules";
 
-type Counter = { id: string; nama: string; role?: StaffRole };
 type AisleRow = {
   gudang: number;
   gudangNama: string;
@@ -19,30 +19,7 @@ type AisleRow = {
   note: string;
 };
 
-function PassSelect({
-  counters,
-  value,
-  disabled,
-  onChange,
-}: {
-  counters: Counter[];
-  value: string | null;
-  disabled?: boolean;
-  onChange: (userId: string) => void;
-}) {
-  return (
-    <Select className="w-full" value={value ?? ""} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
-      <option value="">—</option>
-      {counters.map((counter) => (
-        <option key={counter.id} value={counter.id}>
-          {counter.role ? `${counter.nama} · ${ROLE_LABEL[counter.role]}` : counter.nama}
-        </option>
-      ))}
-    </Select>
-  );
-}
-
-export function AisleTasks({ id, counters }: { id: string; counters: Counter[] }) {
+export function AisleTasks({ id, counters }: { id: string; counters: CounterOption[] }) {
   const [rows, setRows] = useState<AisleRow[]>([]);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
@@ -67,7 +44,7 @@ export function AisleTasks({ id, counters }: { id: string; counters: Counter[] }
   }
 
   function update(key: string, patch: Partial<AisleRow>) {
-    setRows((current) => current.map((row) => (`${row.gudang}:${row.aisle}` === key ? { ...row, ...patch } : row)));
+    setRows((current) => current.map((row) => (aisleKey(row.gudang, row.aisle) === key ? { ...row, ...patch } : row)));
   }
 
   async function save() {
@@ -112,7 +89,7 @@ export function AisleTasks({ id, counters }: { id: string; counters: Counter[] }
         <section key={gudang}>
           <ReportTable title={`Gudang ${gudang}`} headers={["Lorong", "Hitung ke-1", "Hitung ke-2", "Kosong", "Catatan"]}>
             {aisles.map((row) => {
-              const key = `${row.gudang}:${row.aisle}`;
+              const key = aisleKey(row.gudang, row.aisle);
               return (
                 <ReportRow key={key}>
                   <Td className="font-medium">{row.label}</Td>

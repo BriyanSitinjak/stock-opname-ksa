@@ -1,6 +1,6 @@
 import { Prisma, type Kondisi, type SessionStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { isMissingColumn } from "@/lib/db-errors";
+import { whenColumnMissing } from "@/lib/db-errors";
 import { cardAlreadyUsed } from "@/lib/aisle-rules";
 
 export type SyncCountIn = {
@@ -256,8 +256,8 @@ async function pass2DeviceConflict(
 
 async function insertCount(sessionId: string, userId: string, deviceId: string, row: SyncCountIn) {
   const nomor = row.nomor_kartu?.trim() || null;
-  try {
-    await prisma.$executeRaw`
+  await whenColumnMissing(
+    () => prisma.$executeRaw`
       INSERT INTO counts (
         client_row_id, session_id, tag_id, pass, snapshot_item_id,
         counted_by, qty, qty_note, kondisi, nomor_kartu, device_id, client_created_at
@@ -276,12 +276,8 @@ async function insertCount(sessionId: string, userId: string, deviceId: string, 
         ${row.client_created_at}::timestamptz
       )
       ON CONFLICT (client_row_id) DO NOTHING
-    `;
-  } catch (error) {
-    if (!isMissingColumn(error)) {
-      throw error;
-    }
-    await prisma.$executeRaw`
+    `,
+    () => prisma.$executeRaw`
       INSERT INTO counts (
         client_row_id, session_id, tag_id, pass, snapshot_item_id,
         counted_by, qty, qty_note, kondisi, device_id, client_created_at
@@ -299,14 +295,14 @@ async function insertCount(sessionId: string, userId: string, deviceId: string, 
         ${row.client_created_at}::timestamptz
       )
       ON CONFLICT (client_row_id) DO NOTHING
-    `;
-  }
+    `,
+  );
 }
 
 async function insertSubmission(sessionId: string, userId: string, deviceId: string, row: SyncSubmissionIn) {
   const nomor = row.nomor_kartu?.trim() || null;
-  try {
-    await prisma.$executeRaw`
+  await whenColumnMissing(
+    () => prisma.$executeRaw`
       INSERT INTO tag_submissions (
         client_row_id, session_id, tag_id, pass, submitted_by,
         is_empty, nomor_kartu, device_id, client_created_at
@@ -322,12 +318,8 @@ async function insertSubmission(sessionId: string, userId: string, deviceId: str
         ${row.client_created_at}::timestamptz
       )
       ON CONFLICT (client_row_id) DO NOTHING
-    `;
-  } catch (error) {
-    if (!isMissingColumn(error)) {
-      throw error;
-    }
-    await prisma.$executeRaw`
+    `,
+    () => prisma.$executeRaw`
       INSERT INTO tag_submissions (
         client_row_id, session_id, tag_id, pass, submitted_by,
         is_empty, device_id, client_created_at
@@ -342,8 +334,8 @@ async function insertSubmission(sessionId: string, userId: string, deviceId: str
         ${row.client_created_at}::timestamptz
       )
       ON CONFLICT (client_row_id) DO NOTHING
-    `;
-  }
+    `,
+  );
 }
 
 async function ownCardRepeat(
@@ -356,7 +348,7 @@ async function ownCardRepeat(
   if (!nomor) {
     return null;
   }
-  try {
+  return whenColumnMissing(async () => {
     const prior = await prisma.$queryRaw<Array<{ nomor_kartu: string }>>`
       SELECT nomor_kartu FROM counts
       WHERE session_id = ${sessionId}
@@ -364,20 +356,15 @@ async function ownCardRepeat(
         AND tag_id <> ${tagId}
         AND nomor_kartu IS NOT NULL
     `;
-    if (cardAlreadyUsed(prior.map((row) => row.nomor_kartu), nomor)) {
-      return "Nomor kartu ini sudah Anda pakai di HP ini.";
-    }
-  } catch (error) {
-    if (!isMissingColumn(error)) {
-      throw error;
-    }
-  }
-  return null;
+    return cardAlreadyUsed(prior.map((row) => row.nomor_kartu), nomor)
+      ? "Nomor kartu ini sudah Anda pakai di HP ini."
+      : null;
+  }, async () => null);
 }
 
 export async function cardClashes(sessionId: string): Promise<Array<{ nomor_kartu: string; pemakaian: number }>> {
-  try {
-    return await prisma.$queryRaw<Array<{ nomor_kartu: string; pemakaian: number }>>`
+  return whenColumnMissing(
+    () => prisma.$queryRaw<Array<{ nomor_kartu: string; pemakaian: number }>>`
       SELECT min(nomor_kartu) AS nomor_kartu, COUNT(DISTINCT device_id)::int AS pemakaian
       FROM counts
       WHERE session_id = ${sessionId}
@@ -386,11 +373,7 @@ export async function cardClashes(sessionId: string): Promise<Array<{ nomor_kart
       GROUP BY lower(nomor_kartu)
       HAVING COUNT(DISTINCT device_id) > 1 OR COUNT(DISTINCT pass) > 1
       ORDER BY min(nomor_kartu)
-    `;
-  } catch (error) {
-    if (isMissingColumn(error)) {
-      return [];
-    }
-    throw error;
-  }
+    `,
+    async () => [],
+  );
 }

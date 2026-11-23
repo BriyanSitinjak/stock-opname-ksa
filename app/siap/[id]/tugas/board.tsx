@@ -7,12 +7,11 @@ import { isFloorPlace } from "@/lib/floor-plan";
 import { fetchJson } from "@/app/siap/api";
 import { AisleTasks } from "./aisles";
 import { EmptyState } from "@/app/empty-state";
+import { PassSelect, type CounterOption } from "@/app/siap/pass-select";
 import { ReportRow, ReportTable, Td } from "@/app/siap/report-table";
-import { BackLink, ErrorText, MissingList, PageLead, Select, TealButton } from "@/app/siap/ui";
+import { BackLink, ErrorText, MissingList, PageLead, TealButton } from "@/app/siap/ui";
 import { toast } from "@/app/toast";
-import { ROLE_LABEL, type StaffRole } from "@/lib/roles";
 
-type Counter = { id: string; nama: string; role?: StaffRole };
 type Row = {
   tag_id: string;
   nomor: string;
@@ -25,7 +24,7 @@ type Row = {
 async function fetchBoard(id: string) {
   const [assign, catalog] = await Promise.all([
     fetchJson<Row[]>(`/api/sessions/${id}/assignments`),
-    fetchJson<{ counters: Counter[] }>("/api/setup/catalog"),
+    fetchJson<{ counters: CounterOption[] }>("/api/setup/catalog"),
   ]);
   return {
     rows: assign.ok ? assign.data : [],
@@ -33,30 +32,9 @@ async function fetchBoard(id: string) {
   };
 }
 
-function PassSelect({
-  counters,
-  value,
-  onChange,
-}: {
-  counters: Counter[];
-  value: string | null;
-  onChange: (userId: string) => void;
-}) {
-  return (
-    <Select className="w-full" value={value ?? ""} onChange={(e) => onChange(e.target.value)}>
-      <option value="">—</option>
-      {counters.map((counter) => (
-        <option key={counter.id} value={counter.id}>
-          {counter.role ? `${counter.nama} · ${ROLE_LABEL[counter.role]}` : counter.nama}
-        </option>
-      ))}
-    </Select>
-  );
-}
-
 export function TugasBoard({ id }: { id: string }) {
   const [rows, setRows] = useState<Row[]>([]);
-  const [counters, setCounters] = useState<Counter[]>([]);
+  const [counters, setCounters] = useState<CounterOption[]>([]);
   const [error, setError] = useState("");
   const [missing, setMissing] = useState<string[]>([]);
 

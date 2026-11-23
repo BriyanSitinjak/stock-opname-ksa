@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
-import { isMissingRelation } from "@/lib/db-errors";
+import { whenRelationMissing } from "@/lib/db-errors";
 import { floorAisles, type FloorAisleRef } from "@/lib/floor-plan";
-import { missingAisleTasks, samePersonOnAisle, type AisleCross, type AisleTask } from "@/lib/aisle-rules";
+import { aisleKey, aislePassKey, missingAisleTasks, samePersonOnAisle, type AisleCross, type AisleTask } from "@/lib/aisle-rules";
 
 export type SavedAisle = FloorAisleRef & {
   pass1: string | null;
@@ -10,51 +10,41 @@ export type SavedAisle = FloorAisleRef & {
   note: string;
 };
 
+function blankAisles(catalog: FloorAisleRef[]): SavedAisle[] {
+  return catalog.map((aisle) => ({ ...aisle, pass1: null, pass2: null, crossed: false, note: "" }));
+}
+
 export async function aisleBoard(sessionId: string): Promise<{ ready: boolean; aisles: SavedAisle[] }> {
   const catalog = floorAisles();
-  try {
+  return whenRelationMissing<{ ready: boolean; aisles: SavedAisle[] }>(async () => {
     const [tasks, marks] = await Promise.all([
       prisma.aisleAssignment.findMany({ where: { sessionId } }),
       prisma.aisleMark.findMany({ where: { sessionId } }),
     ]);
-    const taskKey = new Map(tasks.map((row) => [`${row.gudang}:${row.aisle}:${row.pass}`, row.userId]));
-    const markKey = new Map(marks.map((row) => [`${row.gudang}:${row.aisle}`, row.note]));
+    const taskKey = new Map(tasks.map((row) => [aislePassKey(row.gudang, row.aisle, row.pass), row.userId]));
+    const markKey = new Map(marks.map((row) => [aisleKey(row.gudang, row.aisle), row.note]));
     return {
       ready: true,
       aisles: catalog.map((aisle) => ({
         ...aisle,
-        pass1: taskKey.get(`${aisle.gudang}:${aisle.aisle}:1`) ?? null,
-        pass2: taskKey.get(`${aisle.gudang}:${aisle.aisle}:2`) ?? null,
-        crossed: markKey.has(`${aisle.gudang}:${aisle.aisle}`),
-        note: markKey.get(`${aisle.gudang}:${aisle.aisle}`) ?? "",
+        pass1: taskKey.get(aislePassKey(aisle.gudang, aisle.aisle, 1)) ?? null,
+        pass2: taskKey.get(aislePassKey(aisle.gudang, aisle.aisle, 2)) ?? null,
+        crossed: markKey.has(aisleKey(aisle.gudang, aisle.aisle)),
+        note: markKey.get(aisleKey(aisle.gudang, aisle.aisle)) ?? "",
       })),
     };
-  } catch (error) {
-    if (isMissingRelation(error)) {
-      return {
-        ready: false,
-        aisles: catalog.map((aisle) => ({
-          ...aisle,
-          pass1: null,
-          pass2: null,
-          crossed: false,
-          note: "",
-        })),
-      };
-    }
-    throw error;
-  }
+  }, { ready: false, aisles: blankAisles(catalog) });
 }
 
 export async function saveAisles(
   sessionId: string,
   rows: Array<{ gudang: number; aisle: string; pass1: string | null; pass2: string | null; crossed: boolean; note: string }>,
 ): Promise<{ error: string } | { missing: string[] }> {
-  const catalog = new Map(floorAisles().map((aisle) => [`${aisle.gudang}:${aisle.aisle}`, aisle]));
+  const catalog = new Map(floorAisles().map((aisle) => [aisleKey(aisle.gudang, aisle.aisle), aisle]));
   const tasks: AisleTask[] = [];
   const crosses: AisleCross[] = [];
   for (const row of rows) {
-    const known = catalog.get(`${row.gudang}:${row.aisle}`);
+    const known = catalog.get(aisleKey(row.gudang, row.aisle));
     if (!known) {
       return { error: "Ada lorong yang tidak ada di denah." };
     }
@@ -76,10 +66,10 @@ export async function saveAisles(
   const labels = new Map<string, string>();
   for (const aisle of catalog.values()) {
     for (const label of aisle.placeLabels) {
-      labels.set(label, `${aisle.gudang}:${aisle.aisle}`);
+      labels.set(label, aisleKey(aisle.gudang, aisle.aisle));
     }
   }
-  try {
+  const saved = await whenRelationMissing(async () => {
     await prisma.$transaction(async (tx) => {
       await tx.aisleAssignment.deleteMany({ where: { sessionId } });
       await tx.aisleMark.deleteMany({ where: { sessionId } });
@@ -114,7 +104,7 @@ export async function saveAisles(
         const byNomor = new Map(live.map((tag) => [tag.nomor, tag.id]));
         const expanded: { sessionId: string; tagId: string; pass: number; userId: string }[] = [];
         for (const task of tasks) {
-          const aisle = catalog.get(`${task.gudang}:${task.aisle}`);
+          const aisle = catalog.get(aisleKey(task.gudang, task.aisle));
           if (!aisle) {
             continue;
           }
@@ -130,11 +120,10 @@ export async function saveAisles(
         }
       }
     });
-  } catch (error) {
-    if (isMissingRelation(error)) {
-      return { error: "Tabel lorong belum ada di database." };
-    }
-    throw error;
+    return true;
+  }, false);
+  if (!saved) {
+    return { error: "Tabel lorong belum ada di database." };
   }
   const slots = [...catalog.values()].map((aisle) => ({
     gudang: aisle.gudang,
@@ -145,17 +134,12 @@ export async function saveAisles(
 }
 
 export async function aisleCrosses(sessionId: string): Promise<{ aisle: string; note: string }[]> {
-  try {
+  return whenRelationMissing(async () => {
     const marks = await prisma.aisleMark.findMany({ where: { sessionId } });
-    const byAisle = new Map(floorAisles().map((aisle) => [`${aisle.gudang}:${aisle.aisle}`, aisle.label]));
+    const byAisle = new Map(floorAisles().map((aisle) => [aisleKey(aisle.gudang, aisle.aisle), aisle.label]));
     return marks.map((mark) => ({
-      aisle: byAisle.get(`${mark.gudang}:${mark.aisle}`) ?? mark.aisle,
+      aisle: byAisle.get(aisleKey(mark.gudang, mark.aisle)) ?? mark.aisle,
       note: mark.note,
     }));
-  } catch (error) {
-    if (isMissingRelation(error)) {
-      return [];
-    }
-    throw error;
-  }
+  }, []);
 }

@@ -49,6 +49,10 @@ export function FloorBoard() {
   );
 }
 
+function placeRing(selected: boolean) {
+  return selected ? "ring-2 ring-[#1c1c1c]" : "";
+}
+
 function FloorDrawing({
   floor,
   selectedId,
@@ -110,9 +114,7 @@ function Row({
                 key={place.id}
                 type="button"
                 onClick={() => onSelect(place)}
-                className={`flex-1 rounded-lg bg-ksa-sage text-xs font-medium text-ksa-teal-deep ${
-                  selectedId === place.id ? "ring-2 ring-[#1c1c1c]" : ""
-                }`}
+                className={`flex-1 rounded-lg bg-ksa-sage text-xs font-medium text-ksa-teal-deep ${placeRing(selectedId === place.id)}`}
               >
                 {place.side}
               </button>
@@ -142,9 +144,7 @@ function ExtraBand({
             key={place.id}
             type="button"
             onClick={() => onSelect(place)}
-            className={`rounded-xl bg-ksa-sage px-4 py-3 text-sm font-semibold text-ksa-teal-deep ${
-              selectedId === place.id ? "ring-2 ring-[#1c1c1c]" : ""
-            }`}
+            className={`rounded-xl bg-ksa-sage px-4 py-3 text-sm font-semibold text-ksa-teal-deep ${placeRing(selectedId === place.id)}`}
           >
             {place.label}
           </button>

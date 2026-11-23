@@ -17,18 +17,26 @@ export type AisleCross = {
   note: string;
 };
 
+export function aisleKey(gudang: number, aisle: string): string {
+  return `${gudang}:${aisle}`;
+}
+
+export function aislePassKey(gudang: number, aisle: string, pass: number): string {
+  return `${aisleKey(gudang, aisle)}:${pass}`;
+}
+
 export function missingAisleTasks(aisles: AisleSlot[], tasks: AisleTask[], crosses: AisleCross[]): string[] {
-  const crossed = new Set(crosses.map((row) => `${row.gudang}:${row.aisle}`));
-  const have = new Set(tasks.map((row) => `${row.gudang}:${row.aisle}:${row.pass}`));
+  const crossed = new Set(crosses.map((row) => aisleKey(row.gudang, row.aisle)));
+  const have = new Set(tasks.map((row) => aislePassKey(row.gudang, row.aisle, row.pass)));
   const missing: string[] = [];
   for (const aisle of aisles) {
-    if (crossed.has(`${aisle.gudang}:${aisle.aisle}`)) {
+    if (crossed.has(aisleKey(aisle.gudang, aisle.aisle))) {
       continue;
     }
-    if (!have.has(`${aisle.gudang}:${aisle.aisle}:1`)) {
+    if (!have.has(aislePassKey(aisle.gudang, aisle.aisle, 1))) {
       missing.push(`${aisle.label} di Gudang ${aisle.gudang} belum ada hitung ke-1`);
     }
-    if (!have.has(`${aisle.gudang}:${aisle.aisle}:2`)) {
+    if (!have.has(aislePassKey(aisle.gudang, aisle.aisle, 2))) {
       missing.push(`${aisle.label} di Gudang ${aisle.gudang} belum ada hitung ke-2`);
     }
   }
@@ -36,9 +44,9 @@ export function missingAisleTasks(aisles: AisleSlot[], tasks: AisleTask[], cross
 }
 
 export function samePersonOnAisle(tasks: AisleTask[]): string | null {
-  const byAisle = new Map<string, { pass1?: string; pass2?: string; label?: string }>();
+  const byAisle = new Map<string, { pass1?: string; pass2?: string }>();
   for (const task of tasks) {
-    const key = `${task.gudang}:${task.aisle}`;
+    const key = aisleKey(task.gudang, task.aisle);
     const slot = byAisle.get(key) ?? {};
     if (task.pass === 1) {
       slot.pass1 = task.userId;

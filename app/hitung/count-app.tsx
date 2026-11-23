@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuDoorOpen } from "react-icons/lu";
+
+const edgeIcon =
+  "pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-ksa-teal text-ksa-teal-deep";
 import { BrandLockup } from "@/app/brand-lockup";
 import { NumericKeypad } from "@/app/hitung/keypad";
 import { ActionColumn, BackButton, GhostButton, Overlay, Phone, PrimaryButton, TextLink, TopBar, WaitNote } from "@/app/hitung/ui";
@@ -483,20 +486,31 @@ export function CountApp() {
     setScreen("count");
   }
 
-  async function saveLine(nextQty: string, replaceExisting = false) {
-    if (!prepare || !activeTag || !matched) {
-      return;
+  function readCard(): { nomor: string | null } | null {
+    if (!activeTag) {
+      return null;
     }
     const nomor = cardNo.trim();
     if (isFloorPlace(activeTag.nomor) && !nomor) {
       setMessage("Isi nomor pada kartu.");
+      return null;
+    }
+    return { nomor: nomor || null };
+  }
+
+  async function saveLine(nextQty: string, replaceExisting = false) {
+    if (!prepare || !activeTag || !matched) {
       return;
     }
-    if (nomor && cardAlreadyUsed(
+    const card = readCard();
+    if (!card) {
+      return;
+    }
+    if (card.nomor && cardAlreadyUsed(
       (await allLines())
         .filter((line) => line.tag_id !== activeTag.id || line.pass !== activeTag.pass)
         .map((line) => line.nomor_kartu ?? ""),
-      nomor,
+      card.nomor,
     )) {
       setMessage("Nomor kartu ini sudah Anda pakai di HP ini.");
       return;
@@ -515,7 +529,7 @@ export function CountApp() {
       qty: nextQty,
       qty_note: qtyNote,
       kondisi,
-      nomor_kartu: cardNo.trim() || null,
+      nomor_kartu: card.nomor,
       client_created_at: new Date().toISOString(),
     };
     await enqueueCount(row);
@@ -529,7 +543,7 @@ export function CountApp() {
       qty: nextQty,
       kondisi,
       qty_note: qtyNote,
-      nomor_kartu: cardNo.trim() || null,
+      nomor_kartu: card.nomor,
     });
     setLines(await linesForTag(activeTag.id, activeTag.pass));
     await refreshPending();
@@ -545,8 +559,8 @@ export function CountApp() {
     if (!activeTag) {
       return;
     }
-    if (isFloorPlace(activeTag.nomor) && !cardNo.trim()) {
-      setMessage("Isi nomor pada kartu.");
+    const card = readCard();
+    if (!card) {
       return;
     }
     await enqueueSubmission({
@@ -554,7 +568,7 @@ export function CountApp() {
       tag_id: activeTag.id,
       pass: activeTag.pass,
       is_empty: isEmpty,
-      nomor_kartu: cardNo.trim() || null,
+      nomor_kartu: card.nomor,
       client_created_at: new Date().toISOString(),
     });
     await refreshPending();
@@ -750,7 +764,7 @@ export function CountApp() {
             <button
               type="button"
               aria-label="Tentang"
-              className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-ksa-teal text-lg font-semibold text-ksa-teal-deep"
+              className={`${edgeIcon} text-lg font-semibold`}
               onClick={() => setScreen("about")}
             >
               i
@@ -758,7 +772,7 @@ export function CountApp() {
             <button
               type="button"
               aria-label="Keluar"
-              className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-ksa-teal text-ksa-teal-deep"
+              className={edgeIcon}
               onClick={() => {
                 setMessage("");
                 setLeaveOpen(true);
