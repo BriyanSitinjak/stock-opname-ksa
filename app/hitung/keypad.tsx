@@ -18,7 +18,7 @@ export function NumericKeypad({ onDigit, onBack, extra, variant = "light" }: Pro
       {keys.map((key) => {
         if (key === "extra" && extra) {
           return (
-            <button key="extra" type="button" className={cell} onClick={extra.onClick}>
+            <button key="extra" type="button" className={`${cell} text-sm`} onClick={extra.onClick}>
               {extra.label}
             </button>
           );

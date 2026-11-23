@@ -9,6 +9,7 @@ export type CountRow = {
   snapshot_item_id: string;
   qty: string;
   qty_note: string | null;
+  nomor_kartu?: string | null;
   kondisi: Kondisi;
   client_created_at: string;
 };
@@ -18,6 +19,7 @@ export type SubmissionRow = {
   tag_id: string;
   pass: number;
   is_empty: boolean;
+  nomor_kartu?: string | null;
   client_created_at: string;
 };
 
@@ -46,6 +48,7 @@ export type PreparePayload = {
     uom: string | null;
   }[];
   denah: { lokasi: string; tags: { id: string; nomor: string; weight: number }[] }[];
+  crosses?: { aisle: string; note: string }[];
   assignments: {
     tag_id: string;
     pass: number;
@@ -69,6 +72,7 @@ export type LocalLine = {
   qty: string;
   kondisi: Kondisi;
   qty_note: string | null;
+  nomor_kartu?: string | null;
 };
 
 interface QueueSchema extends DBSchema {
@@ -178,6 +182,10 @@ export function lineKey(tagId: string, pass: number, itemId: string, kondisi: Ko
 
 export async function upsertLine(line: LocalLine): Promise<void> {
   await (await db()).put("lines", line);
+}
+
+export async function allLines(): Promise<LocalLine[]> {
+  return (await db()).getAll("lines");
 }
 
 export async function linesForTag(tagId: string, pass: number): Promise<LocalLine[]> {

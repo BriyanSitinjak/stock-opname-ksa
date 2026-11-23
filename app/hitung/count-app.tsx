@@ -1,15 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BrandIcon, BrandLockup } from "@/app/brand-lockup";
+import { LuDoorOpen } from "react-icons/lu";
+import { BrandLockup } from "@/app/brand-lockup";
 import { NumericKeypad } from "@/app/hitung/keypad";
 import { ActionColumn, BackButton, GhostButton, Overlay, Phone, PrimaryButton, TextLink, TopBar, WaitNote } from "@/app/hitung/ui";
 import { toast } from "@/app/toast";
+import { cardAlreadyUsed } from "@/lib/aisle-rules";
 import { evaluateQtyNote } from "@/lib/calculator";
+import { isFloorPlace } from "@/lib/floor-plan";
 import { SESSION_ID } from "@/lib/fixture";
 import { maybeActivate } from "@/lib/offline/register-sw";
 import { qtyOrDash } from "@/lib/qty-display";
 import {
+  allLines,
   clearPrepare,
   enqueueCount,
   enqueueSubmission,
@@ -188,6 +192,9 @@ export function CountApp() {
     compare?: PreparePayload["assignments"][number]["compare"];
   } | null>(null);
   const [code, setCode] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [cardNo, setCardNo] = useState("");
+  const [doneLines, setDoneLines] = useState<LocalLine[]>([]);
   const [qty, setQty] = useState("");
   const [qtyNote, setQtyNote] = useState<string | null>(null);
   const [kondisi, setKondisi] = useState<Kondisi>("baik");
@@ -210,11 +217,11 @@ export function CountApp() {
   const [rejected, setRejected] = useState<{ client_row_id: string; reason: string }[]>([]);
 
   const matched = useMemo(() => {
-    if (!prepare || !code) {
+    if (!prepare || !selectedId) {
       return null;
     }
-    return prepare.items.find((item) => item.barcode_4 === code) ?? null;
-  }, [prepare, code]);
+    return prepare.items.find((item) => item.id === selectedId) ?? null;
+  }, [prepare, selectedId]);
 
   const refreshPending = useCallback(async () => {
     setPending(await pendingCount());
@@ -313,6 +320,13 @@ export function CountApp() {
       void loadCounters().finally(() => setRefreshing(false));
     });
   }, [loadCounters, screen, refreshing, booting]);
+
+  useEffect(() => {
+    if (screen !== "sync") {
+      return;
+    }
+    void allLines().then(setDoneLines);
+  }, [screen, pending]);
 
   useEffect(() => {
     const onOnline = () => {
@@ -458,10 +472,12 @@ export function CountApp() {
     });
     setLines(await linesForTag(tag.id, assignment.pass));
     setCode("");
+    setSelectedId(null);
+    setCardNo("");
     setQty("");
     setQtyNote(null);
     setKondisi("baik");
-    setFocusField("code");
+    setFocusField("qty");
     setEmptyConfirm(false);
     setMessage("");
     setScreen("count");
@@ -469,6 +485,20 @@ export function CountApp() {
 
   async function saveLine(nextQty: string, replaceExisting = false) {
     if (!prepare || !activeTag || !matched) {
+      return;
+    }
+    const nomor = cardNo.trim();
+    if (isFloorPlace(activeTag.nomor) && !nomor) {
+      setMessage("Isi nomor pada kartu.");
+      return;
+    }
+    if (nomor && cardAlreadyUsed(
+      (await allLines())
+        .filter((line) => line.tag_id !== activeTag.id || line.pass !== activeTag.pass)
+        .map((line) => line.nomor_kartu ?? ""),
+      nomor,
+    )) {
+      setMessage("Nomor kartu ini sudah Anda pakai di HP ini.");
       return;
     }
     const key = lineKey(activeTag.id, activeTag.pass, matched.id, kondisi);
@@ -485,6 +515,7 @@ export function CountApp() {
       qty: nextQty,
       qty_note: qtyNote,
       kondisi,
+      nomor_kartu: cardNo.trim() || null,
       client_created_at: new Date().toISOString(),
     };
     await enqueueCount(row);
@@ -498,6 +529,7 @@ export function CountApp() {
       qty: nextQty,
       kondisi,
       qty_note: qtyNote,
+      nomor_kartu: cardNo.trim() || null,
     });
     setLines(await linesForTag(activeTag.id, activeTag.pass));
     await refreshPending();
@@ -513,11 +545,16 @@ export function CountApp() {
     if (!activeTag) {
       return;
     }
+    if (isFloorPlace(activeTag.nomor) && !cardNo.trim()) {
+      setMessage("Isi nomor pada kartu.");
+      return;
+    }
     await enqueueSubmission({
       client_row_id: newClientRowId(),
       tag_id: activeTag.id,
       pass: activeTag.pass,
       is_empty: isEmpty,
+      nomor_kartu: cardNo.trim() || null,
       client_created_at: new Date().toISOString(),
     });
     await refreshPending();
@@ -566,7 +603,9 @@ export function CountApp() {
     if (focusField === "code") {
       const next = (code + digit).slice(0, 4);
       setCode(next);
-      if (prepare?.items.some((item) => item.barcode_4 === next)) {
+      const hit = prepare?.items.find((item) => item.barcode_4 === next);
+      if (hit) {
+        setSelectedId(hit.id);
         setFocusField("qty");
       }
     } else if (matched) {
@@ -689,32 +728,45 @@ export function CountApp() {
       <Phone>
         {bar}
         <h1 className="sr-only">Beranda</h1>
-        <div className="flex flex-col gap-3">
+        <p className="text-sm leading-6 text-[#5c5c5c]">
+          Buka tag di rak yang Anda hitung. Cari barang, isi jumlah, lalu simpan. Kirim hasil lewat tombol di kanan
+          atas saat ada sinyal.
+        </p>
+        <div className="mt-5 flex flex-col gap-3">
           <button
             type="button"
             className="rounded-[28px] bg-ksa-teal px-5 py-8 text-left text-white"
             onClick={() => setScreen("open-tag")}
           >
             <p className="text-xl font-semibold">Buka Tag</p>
-            <p className="mt-1 text-sm text-white/80">Ketik nomor pada kartu tag</p>
+            <p className="mt-1 text-sm text-white/80">Nomor pada kartu di rak</p>
           </button>
           <GhostButton onClick={() => setScreen("tugas")}>Tugas Saya</GhostButton>
-          <GhostButton onClick={() => setScreen("sync")}>Sinkronisasi</GhostButton>
         </div>
         {message ? <p className="mt-4 text-sm">{message}</p> : null}
-        <div className="mt-auto flex justify-between pt-8 text-sm text-ksa-teal-deep">
-          <button type="button" onClick={() => setScreen("about")}>
-            Tentang
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMessage("");
-              setLeaveOpen(true);
-            }}
-          >
-            Keluar
-          </button>
+        <div className="h-16 shrink-0" />
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-20">
+          <div className="mx-auto flex w-full max-w-[390px] items-center justify-between px-5 pb-5">
+            <button
+              type="button"
+              aria-label="Tentang"
+              className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-ksa-teal text-lg font-semibold text-ksa-teal-deep"
+              onClick={() => setScreen("about")}
+            >
+              i
+            </button>
+            <button
+              type="button"
+              aria-label="Keluar"
+              className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-ksa-teal text-ksa-teal-deep"
+              onClick={() => {
+                setMessage("");
+                setLeaveOpen(true);
+              }}
+            >
+              <LuDoorOpen size={22} />
+            </button>
+          </div>
         </div>
         {leaveOpen ? (
           <Overlay>
@@ -773,7 +825,7 @@ export function CountApp() {
     return (
       <Phone>
         {bar}
-        <p className="text-sm text-[#6b6b6b]">Nomor tag</p>
+        <p className="text-sm text-[#6b6b6b]">Ketik nomor pada kartu di rak, atau pilih lokasinya dari denah.</p>
         <p className="mt-2 min-h-16 text-5xl font-semibold tracking-widest">{tagNomor || " "}</p>
         <div className="mt-6">
           <NumericKeypad
@@ -813,17 +865,22 @@ export function CountApp() {
           <section key={lokasi.lokasi} className="mt-5">
             <h2 className="mb-2 text-sm text-[#6b6b6b]">{lokasi.lokasi}</h2>
             <div className="flex flex-col gap-2">
-              {lokasi.tags.map((tag) => (
+              {lokasi.tags.map((tag) => {
+              const cross = prepare?.crosses?.find((row) => row.aisle === lokasi.lokasi);
+              return (
                 <button
                   key={tag.id}
                   type="button"
-                  className="rounded-2xl bg-ksa-sage px-4 py-4 text-left font-semibold text-ksa-teal-deep"
+                  disabled={Boolean(cross)}
+                  className="rounded-2xl bg-ksa-sage px-4 py-4 text-left font-semibold text-ksa-teal-deep disabled:bg-[#f3d4d0]"
                   style={{ minHeight: `${40 + tag.weight * 18}px` }}
                   onClick={() => void openTag(tag.nomor)}
                 >
-                  Tag {tag.nomor}
+                  <span className="block">Tag {tag.nomor}</span>
+                  {cross ? <span className="mt-1 block text-sm font-normal">Kosong. {cross.note}</span> : null}
                 </button>
-              ))}
+              );
+            })}
             </div>
           </section>
         ))}
@@ -860,15 +917,18 @@ export function CountApp() {
                 type="button"
                 className="w-full rounded-2xl bg-ksa-panel px-4 py-3 text-left"
                 onClick={() => {
-                  setCode(item.barcode_4 ?? "");
+                  setSelectedId(item.id);
+                  setCode(item.barcode_4 ?? item.kode_barang);
                   setSearch("");
+                  setQty("");
                   setScreen("count");
                   setFocusField("qty");
                 }}
               >
                 <span className="block font-medium">{item.nama_barang}</span>
                 <span className="text-sm text-white/50">
-                  {item.barcode_4} · {item.nama_brand}
+                  {item.kode_barang}
+                  {item.nama_brand ? ` · ${item.nama_brand}` : ""}
                 </span>
               </button>
             </li>
@@ -914,7 +974,11 @@ export function CountApp() {
     return (
       <Phone tone="sync">
         {bar}
-        <div className="rounded-[28px] bg-[#f3e2b0] px-5 py-8 text-center">
+        <h1 className="text-2xl font-semibold">Data hitung</h1>
+        <p className="mt-1 text-sm text-[#6b6b6b]">
+          Barang yang sudah Anda simpan tetap di HP ini. Angka di kanan atas adalah yang belum terkirim.
+        </p>
+        <div className="mt-5 rounded-[28px] bg-[#f3e2b0] px-5 py-8 text-center">
           <p className="text-5xl font-semibold">{pending}</p>
           <p className="mt-2 text-sm">data belum terkirim</p>
         </div>
@@ -929,15 +993,25 @@ export function CountApp() {
             {row.reason}
           </p>
         ))}
-        <ActionColumn>
+        <div className="mt-4">
           <PrimaryButton onClick={() => void syncNow(false)}>Kirim Sekarang</PrimaryButton>
-          <BackButton
-            onClick={() => {
-              setExitBlock(false);
-              setScreen("home");
-            }}
-          />
-        </ActionColumn>
+        </div>
+        <h2 className="mt-6 text-sm font-medium text-[#6b6b6b]">Sudah dicatat ({doneLines.length})</h2>
+        <ul className="mt-2 flex flex-col gap-2">
+          {doneLines.map((line) => (
+            <li key={line.key} className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3">
+              <span className="text-sm leading-5">{line.nama_barang}</span>
+              <span className="text-xl font-semibold">{line.qty}</span>
+            </li>
+          ))}
+        </ul>
+        <BackButton
+          className="mt-6"
+          onClick={() => {
+            setExitBlock(false);
+            setScreen("home");
+          }}
+        />
         {message ? <p className="mt-3 text-sm">{message}</p> : null}
       </Phone>
     );
@@ -947,15 +1021,28 @@ export function CountApp() {
     return (
       <Phone>
         {bar}
-        <BrandIcon className="mx-auto" />
-        <BrandLockup width={240} height={52} className="mx-auto mt-4" />
-        <p className="mt-6 text-sm leading-relaxed text-[#5c5c5c]">
-          Aplikasi hitung stock opname. Satu HP, satu petugas, satu sesi.
-        </p>
-        <p className="mt-4 text-sm">Nama: {prepare?.counter.nama}</p>
-        <p className="text-sm">Antrian: {pending}</p>
-        <p className="text-sm">Penyimpanan permanen: {storageOk ? "ya" : "tidak / belum dicek"}</p>
+        <h1 className="text-2xl font-semibold">Stock Opname</h1>
+        <p className="mt-2 text-sm text-[#5c5c5c]">Aplikasi hitung untuk petugas gudang.</p>
+        <dl className="mt-8 space-y-4">
+          <div>
+            <dt className="text-xs tracking-wide text-[#8a8a8a] uppercase">Petugas</dt>
+            <dd className="mt-1 text-xl font-semibold">{prepare?.counter.nama ?? "Belum terikat"}</dd>
+          </div>
+          <div>
+            <dt className="text-xs tracking-wide text-[#8a8a8a] uppercase">Sesi</dt>
+            <dd className="mt-1 text-base font-medium">{prepare?.session.nama ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-xs tracking-wide text-[#8a8a8a] uppercase">Periode</dt>
+            <dd className="mt-1 text-base">{prepare?.session.periode ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-xs tracking-wide text-[#8a8a8a] uppercase">Belum terkirim</dt>
+            <dd className="mt-1 text-base">{pending}</dd>
+          </div>
+        </dl>
         <BackButton className="mt-8" onClick={() => setScreen("home")} />
+        <p className="mt-auto pt-10 text-center text-xs text-[#8a8a8a]">developed by BS</p>
       </Phone>
     );
   }
@@ -969,6 +1056,17 @@ export function CountApp() {
         </span>
         <span>Hitung ke-{activeTag?.pass}</span>
       </div>
+      <p className="mt-2 text-sm text-white/60">Cari barang, isi jumlah, lalu simpan.</p>
+      {activeTag && isFloorPlace(activeTag.nomor) ? (
+        <label className="mt-4 block text-sm">
+          <span className="text-white/70">Nomor pada kartu</span>
+          <input
+            className="mt-1 w-full rounded-2xl bg-ksa-panel px-4 py-3 text-white outline-none"
+            value={cardNo}
+            onChange={(event) => setCardNo(event.target.value)}
+          />
+        </label>
+      ) : null}
       {activeTag?.pass === 3 && (activeTag.compare?.length ?? 0) > 0 ? (
         <div className="mt-4 rounded-2xl bg-white p-4 text-[#1c1c1c]">
           <p className="text-sm font-medium">Hitung ke-1 dan ke-2</p>
@@ -981,22 +1079,19 @@ export function CountApp() {
           </ul>
         </div>
       ) : null}
-      <p className="mt-6 text-xs uppercase tracking-wide text-white/40">Kode barang</p>
       <button
         type="button"
-        className={`mt-1 w-full text-left text-5xl font-semibold tracking-[0.2em] ${focusField === "code" ? "text-white" : "text-white/50"}`}
-        onClick={() => setFocusField("code")}
+        className="mt-4 w-full rounded-full border border-white/40 py-3 text-sm font-medium"
+        onClick={() => setScreen("search")}
       >
-        {code || "····"}
+        Cari Barang
       </button>
-      <p className="mt-4 min-h-16 text-3xl font-semibold leading-tight">
-        {matched ? matched.nama_barang : " "}
-      </p>
-      <p className="mt-4 text-xs uppercase tracking-wide text-white/40">Jumlah</p>
+      <p className="mt-4 text-lg font-medium leading-snug">{matched ? matched.nama_barang : "Belum ada barang"}</p>
+      <p className="mt-5 text-xs uppercase tracking-wide text-white/40">Jumlah</p>
       <button
         type="button"
         disabled={!matched}
-        className={`mt-1 w-full text-left text-4xl font-semibold disabled:opacity-30 ${focusField === "qty" ? "text-white" : "text-white/50"}`}
+        className={`mt-1 w-full text-left text-5xl font-semibold disabled:opacity-30 ${focusField === "qty" ? "text-white" : "text-white/50"}`}
         onClick={() => setFocusField("qty")}
       >
         {qty || "0"}
@@ -1022,7 +1117,7 @@ export function CountApp() {
           onDigit={onDigit}
           onBack={onBack}
           extra={{
-            label: "🖩",
+            label: "Hitung",
             onClick: () => {
               setCalcOpen(true);
               setCalcExpr("");
@@ -1035,11 +1130,8 @@ export function CountApp() {
           Simpan Barang
         </PrimaryButton>
       </div>
-      <div className="mt-3 flex gap-3 text-sm">
-        <button type="button" className="flex-1 text-white/70" onClick={() => setScreen("search")}>
-          Cari Barang
-        </button>
-        <button type="button" className="flex-1 text-right text-white/70" onClick={() => setScreen("unknown")}>
+      <div className="mt-3 text-sm">
+        <button type="button" className="text-white/70" onClick={() => setScreen("unknown")}>
           Tidak dikenal
         </button>
       </div>
@@ -1055,22 +1147,24 @@ export function CountApp() {
         <h2 className="mb-2 text-sm text-white/50">Sudah dicatat di tag ini ({lines.length} barang)</h2>
         <ul className="flex flex-col gap-2 text-sm">
           {lines.map((line) => (
-            <li key={line.key} className="flex items-center justify-between gap-2 rounded-xl bg-ksa-panel px-3 py-2">
-              <span>
-                {line.barcode_4} {line.nama_barang} {line.qty} {line.kondisi}
+            <li key={line.key} className="flex items-center justify-between gap-3 rounded-xl bg-ksa-panel px-3 py-2">
+              <span className="text-sm leading-5">{line.nama_barang}</span>
+              <span className="flex items-center gap-3">
+                <span className="text-xl font-semibold">{line.qty}</span>
+                <button
+                  type="button"
+                  className="text-sm text-ksa-amber"
+                  onClick={() => {
+                    setSelectedId(line.snapshot_item_id);
+                    setCode(line.barcode_4 ?? "");
+                    setQty(line.qty);
+                    setKondisi(line.kondisi);
+                    setFocusField("qty");
+                  }}
+                >
+                  ubah
+                </button>
               </span>
-              <button
-                type="button"
-                className="text-ksa-amber"
-                onClick={() => {
-                  setCode(line.barcode_4 ?? "");
-                  setQty(line.qty);
-                  setKondisi(line.kondisi);
-                  setFocusField("qty");
-                }}
-              >
-                ubah
-              </button>
             </li>
           ))}
         </ul>

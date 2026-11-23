@@ -55,6 +55,7 @@ model User {
   approvals       Approval[]
   reopens         SessionReopen[]
   staffActions    StaffAction[]
+  aisleAssignments AisleAssignment[]
 
   @@map("users")
 }
@@ -68,6 +69,7 @@ model Gudang {
 
   lokasi        Lokasi[]
   snapshotItems SnapshotItem[]
+  masterItems   MasterItem[]
 
   @@map("gudang")
 }
@@ -127,8 +129,10 @@ model OpnameSession {
   unknownItems  UnknownItem[]
   devices       UserDevice[]
   approvals     Approval[]
-  reopens       SessionReopen[]
-  staffActions  StaffAction[]
+  reopens          SessionReopen[]
+  staffActions     StaffAction[]
+  aisleMarks       AisleMark[]
+  aisleAssignments AisleAssignment[]
 
   @@map("opname_sessions")
 }
@@ -220,6 +224,7 @@ model Count {
   qty             Decimal  @db.Decimal(18, 4)
   qtyNote         String?  @map("qty_note") // the calculator expression
   kondisi         Kondisi
+  nomorKartu      String?  @map("nomor_kartu") // typed from the cardboard during the count
   deviceId        String   @map("device_id") // the device pair rule reads this
   clientCreatedAt DateTime @map("client_created_at") @db.Timestamptz(6) // ordering key
   serverCreatedAt DateTime @default(now()) @map("server_created_at") @db.Timestamptz(6)
@@ -243,6 +248,7 @@ model TagSubmission {
   pass            Int      @db.SmallInt
   submittedById   String   @map("submitted_by")
   isEmpty         Boolean  @default(false) @map("is_empty")
+  nomorKartu      String?  @map("nomor_kartu")
   deviceId        String   @map("device_id")
   clientCreatedAt DateTime @map("client_created_at") @db.Timestamptz(6)
   serverCreatedAt DateTime @default(now()) @map("server_created_at") @db.Timestamptz(6)
@@ -342,6 +348,57 @@ model StaffAction {
 
   @@index([createdAt])
   @@map("staff_actions")
+}
+
+/// The stock file, imported once for the whole site. A session copies this at open.
+model MasterItem {
+  id             String   @id @default(dbgenerated("('mst-' || nextval('master_items_id_seq'::regclass))"))
+  gudangId       String   @map("gudang_id")
+  kodeBarang     String   @map("kode_barang")
+  barcode4       String?  @map("barcode_4")
+  namaBarang     String   @map("nama_barang")
+  kodeBrand      String?  @map("kode_brand")
+  namaBrand      String?  @map("nama_brand")
+  kodeGroup      String?  @map("kode_group")
+  namaGroup      String?  @map("nama_group")
+  uom            String?
+  qtyOnhand      Decimal  @map("qty_onhand") @db.Decimal(18, 4)
+  hargaSatuan    Decimal? @map("harga_satuan") @db.Decimal(18, 2)
+  sourceRowCount Int      @default(1) @map("source_row_count")
+
+  gudang Gudang @relation(fields: [gudangId], references: [id])
+
+  @@unique([gudangId, kodeBarang])
+  @@map("master_items")
+}
+
+/// Survey mark for an aisle with no stock. Editable until the session leaves draft.
+model AisleMark {
+  sessionId String   @map("session_id")
+  gudang    Int
+  aisle     String
+  note      String   @default("")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  session OpnameSession @relation(fields: [sessionId], references: [id])
+
+  @@id([sessionId, gudang, aisle])
+  @@map("aisle_marks")
+}
+
+/// Pass 1 and pass 2 for one aisle. The same person may switch passes on the next aisle.
+model AisleAssignment {
+  sessionId String @map("session_id")
+  gudang    Int
+  aisle     String
+  pass      Int    @db.SmallInt
+  userId    String @map("user_id")
+
+  session OpnameSession @relation(fields: [sessionId], references: [id])
+  user    User          @relation(fields: [userId], references: [id])
+
+  @@id([sessionId, gudang, aisle, pass])
+  @@map("aisle_assignments")
 }
 
 // Prisma cannot express these, so they live in the init migration SQL:

@@ -1,5 +1,7 @@
 import { Prisma, type Kondisi, type SessionStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { isMissingColumn } from "@/lib/db-errors";
+import { cardAlreadyUsed } from "@/lib/aisle-rules";
 
 export type SyncCountIn = {
   client_row_id: string;
@@ -9,6 +11,7 @@ export type SyncCountIn = {
   qty: string;
   qty_note: string | null;
   kondisi: Kondisi;
+  nomor_kartu?: string | null;
   client_created_at: string;
 };
 
@@ -17,6 +20,7 @@ export type SyncSubmissionIn = {
   tag_id: string;
   pass: number;
   is_empty: boolean;
+  nomor_kartu?: string | null;
   client_created_at: string;
 };
 
@@ -71,25 +75,7 @@ export async function syncCounts(input: {
       rejected.push({ client_row_id: row.client_row_id, reason });
       continue;
     }
-    await prisma.$executeRaw`
-      INSERT INTO counts (
-        client_row_id, session_id, tag_id, pass, snapshot_item_id,
-        counted_by, qty, qty_note, kondisi, device_id, client_created_at
-      ) VALUES (
-        ${row.client_row_id}::uuid,
-        ${binding.sessionId},
-        ${row.tag_id},
-        ${row.pass},
-        ${row.snapshot_item_id},
-        ${binding.userId},
-        ${row.qty}::numeric,
-        ${row.qty_note},
-        ${row.kondisi}::"Kondisi",
-        ${input.deviceId},
-        ${row.client_created_at}::timestamptz
-      )
-      ON CONFLICT (client_row_id) DO NOTHING
-    `;
+    await insertCount(binding.sessionId, binding.userId, input.deviceId, row);
     accepted.push(row.client_row_id);
   }
 
@@ -99,22 +85,7 @@ export async function syncCounts(input: {
       rejected.push({ client_row_id: row.client_row_id, reason });
       continue;
     }
-    await prisma.$executeRaw`
-      INSERT INTO tag_submissions (
-        client_row_id, session_id, tag_id, pass, submitted_by,
-        is_empty, device_id, client_created_at
-      ) VALUES (
-        ${row.client_row_id}::uuid,
-        ${binding.sessionId},
-        ${row.tag_id},
-        ${row.pass},
-        ${binding.userId},
-        ${row.is_empty},
-        ${input.deviceId},
-        ${row.client_created_at}::timestamptz
-      )
-      ON CONFLICT (client_row_id) DO NOTHING
-    `;
+    await insertSubmission(binding.sessionId, binding.userId, input.deviceId, row);
     accepted.push(row.client_row_id);
   }
 
@@ -201,7 +172,10 @@ async function validateCount(
   }
 
   const pair = await pass2DeviceConflict(sessionId, row.tag_id, row.pass, deviceId, userId);
-  return pair;
+  if (pair) {
+    return pair;
+  }
+  return ownCardRepeat(sessionId, deviceId, row.tag_id, row.nomor_kartu);
 }
 
 async function validateSubmission(
@@ -224,7 +198,11 @@ async function validateSubmission(
   if (!assignment || assignment.userId !== userId) {
     return "Tag ini tidak ditugaskan kepada Anda.";
   }
-  return pass2DeviceConflict(sessionId, row.tag_id, row.pass, deviceId, userId);
+  const pair = await pass2DeviceConflict(sessionId, row.tag_id, row.pass, deviceId, userId);
+  if (pair) {
+    return pair;
+  }
+  return ownCardRepeat(sessionId, deviceId, row.tag_id, row.nomor_kartu);
 }
 
 async function validateUnknown(
@@ -274,4 +252,145 @@ async function pass2DeviceConflict(
     return "Hitung ke-2 harus dari HP berbeda";
   }
   return null;
+}
+
+async function insertCount(sessionId: string, userId: string, deviceId: string, row: SyncCountIn) {
+  const nomor = row.nomor_kartu?.trim() || null;
+  try {
+    await prisma.$executeRaw`
+      INSERT INTO counts (
+        client_row_id, session_id, tag_id, pass, snapshot_item_id,
+        counted_by, qty, qty_note, kondisi, nomor_kartu, device_id, client_created_at
+      ) VALUES (
+        ${row.client_row_id}::uuid,
+        ${sessionId},
+        ${row.tag_id},
+        ${row.pass},
+        ${row.snapshot_item_id},
+        ${userId},
+        ${row.qty}::numeric,
+        ${row.qty_note},
+        ${row.kondisi}::"Kondisi",
+        ${nomor},
+        ${deviceId},
+        ${row.client_created_at}::timestamptz
+      )
+      ON CONFLICT (client_row_id) DO NOTHING
+    `;
+  } catch (error) {
+    if (!isMissingColumn(error)) {
+      throw error;
+    }
+    await prisma.$executeRaw`
+      INSERT INTO counts (
+        client_row_id, session_id, tag_id, pass, snapshot_item_id,
+        counted_by, qty, qty_note, kondisi, device_id, client_created_at
+      ) VALUES (
+        ${row.client_row_id}::uuid,
+        ${sessionId},
+        ${row.tag_id},
+        ${row.pass},
+        ${row.snapshot_item_id},
+        ${userId},
+        ${row.qty}::numeric,
+        ${row.qty_note},
+        ${row.kondisi}::"Kondisi",
+        ${deviceId},
+        ${row.client_created_at}::timestamptz
+      )
+      ON CONFLICT (client_row_id) DO NOTHING
+    `;
+  }
+}
+
+async function insertSubmission(sessionId: string, userId: string, deviceId: string, row: SyncSubmissionIn) {
+  const nomor = row.nomor_kartu?.trim() || null;
+  try {
+    await prisma.$executeRaw`
+      INSERT INTO tag_submissions (
+        client_row_id, session_id, tag_id, pass, submitted_by,
+        is_empty, nomor_kartu, device_id, client_created_at
+      ) VALUES (
+        ${row.client_row_id}::uuid,
+        ${sessionId},
+        ${row.tag_id},
+        ${row.pass},
+        ${userId},
+        ${row.is_empty},
+        ${nomor},
+        ${deviceId},
+        ${row.client_created_at}::timestamptz
+      )
+      ON CONFLICT (client_row_id) DO NOTHING
+    `;
+  } catch (error) {
+    if (!isMissingColumn(error)) {
+      throw error;
+    }
+    await prisma.$executeRaw`
+      INSERT INTO tag_submissions (
+        client_row_id, session_id, tag_id, pass, submitted_by,
+        is_empty, device_id, client_created_at
+      ) VALUES (
+        ${row.client_row_id}::uuid,
+        ${sessionId},
+        ${row.tag_id},
+        ${row.pass},
+        ${userId},
+        ${row.is_empty},
+        ${deviceId},
+        ${row.client_created_at}::timestamptz
+      )
+      ON CONFLICT (client_row_id) DO NOTHING
+    `;
+  }
+}
+
+async function ownCardRepeat(
+  sessionId: string,
+  deviceId: string,
+  tagId: string,
+  nomorKartu: string | null | undefined,
+): Promise<string | null> {
+  const nomor = nomorKartu?.trim() ?? "";
+  if (!nomor) {
+    return null;
+  }
+  try {
+    const prior = await prisma.$queryRaw<Array<{ nomor_kartu: string }>>`
+      SELECT nomor_kartu FROM counts
+      WHERE session_id = ${sessionId}
+        AND device_id = ${deviceId}
+        AND tag_id <> ${tagId}
+        AND nomor_kartu IS NOT NULL
+    `;
+    if (cardAlreadyUsed(prior.map((row) => row.nomor_kartu), nomor)) {
+      return "Nomor kartu ini sudah Anda pakai di HP ini.";
+    }
+  } catch (error) {
+    if (!isMissingColumn(error)) {
+      throw error;
+    }
+  }
+  return null;
+}
+
+export async function cardClashes(sessionId: string): Promise<Array<{ nomor_kartu: string; pemakaian: number }>> {
+  try {
+    return await prisma.$queryRaw<Array<{ nomor_kartu: string; pemakaian: number }>>`
+      SELECT min(nomor_kartu) AS nomor_kartu, COUNT(DISTINCT device_id)::int AS pemakaian
+      FROM counts
+      WHERE session_id = ${sessionId}
+        AND nomor_kartu IS NOT NULL
+        AND btrim(nomor_kartu) <> ''
+      GROUP BY lower(nomor_kartu)
+      HAVING COUNT(DISTINCT device_id) > 1 OR COUNT(DISTINCT pass) > 1
+      ORDER BY min(nomor_kartu)
+    `;
+  } catch (error) {
+    if (isMissingColumn(error)) {
+      return [];
+    }
+    throw error;
+  }
 }

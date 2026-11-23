@@ -1,4 +1,7 @@
 import { prisma } from "@/lib/db";
+import { floorAisles, isFloorPlace } from "@/lib/floor-plan";
+import { missingAisleTasks } from "@/lib/aisle-rules";
+import { aisleBoard } from "@/lib/aisles";
 
 export function uniqueNames(values: Array<string | null | undefined>, blocked: readonly string[] = []) {
   const seen = new Set<string>(blocked);
@@ -43,10 +46,13 @@ export async function liveTags() {
 
 export async function missingAssignments(sessionId: string): Promise<string[]> {
   const tags = await liveTags();
+  const floorTags = tags.filter((tag) => isFloorPlace(tag.nomor));
+  const otherTags = tags.filter((tag) => !isFloorPlace(tag.nomor));
   const rows = await prisma.tagAssignment.findMany({ where: { sessionId } });
   const have = new Set(rows.map((row) => `${row.tagId}:${row.pass}`));
   const missing: string[] = [];
-  for (const tag of tags) {
+  const tagList = floorTags.length > 0 ? otherTags : tags;
+  for (const tag of tagList) {
     if (!have.has(`${tag.id}:1`)) {
       missing.push(`Tag ${tag.nomor} (${tag.lokasi.gudang.nama} / ${tag.lokasi.nama}) belum ada pass 1`);
     }
@@ -54,5 +60,35 @@ export async function missingAssignments(sessionId: string): Promise<string[]> {
       missing.push(`Tag ${tag.nomor} (${tag.lokasi.gudang.nama} / ${tag.lokasi.nama}) belum ada pass 2`);
     }
   }
+  if (floorTags.length === 0) {
+    return missing;
+  }
+  const board = await aisleBoard(sessionId);
+  if (!board.ready) {
+    for (const tag of floorTags) {
+      if (!have.has(`${tag.id}:1`)) {
+        missing.push(`Tag ${tag.nomor} (${tag.lokasi.gudang.nama} / ${tag.lokasi.nama}) belum ada pass 1`);
+      }
+      if (!have.has(`${tag.id}:2`)) {
+        missing.push(`Tag ${tag.nomor} (${tag.lokasi.gudang.nama} / ${tag.lokasi.nama}) belum ada pass 2`);
+      }
+    }
+    return missing;
+  }
+  const slots = floorAisles().map((aisle) => ({ gudang: aisle.gudang, aisle: aisle.aisle, label: aisle.label }));
+  const tasks = board.aisles.flatMap((aisle) => {
+    const out: { gudang: number; aisle: string; pass: 1 | 2; userId: string }[] = [];
+    if (aisle.pass1) {
+      out.push({ gudang: aisle.gudang, aisle: aisle.aisle, pass: 1, userId: aisle.pass1 });
+    }
+    if (aisle.pass2) {
+      out.push({ gudang: aisle.gudang, aisle: aisle.aisle, pass: 2, userId: aisle.pass2 });
+    }
+    return out;
+  });
+  const crosses = board.aisles
+    .filter((aisle) => aisle.crossed)
+    .map((aisle) => ({ gudang: aisle.gudang, aisle: aisle.aisle, note: aisle.note }));
+  missing.push(...missingAisleTasks(slots, tasks, crosses));
   return missing;
 }

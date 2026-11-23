@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode, Ref } from "react";
+import { LuClipboardList, LuHouse } from "react-icons/lu";
 import { BackMark, backControlClass } from "@/app/back-icon";
 
 export function BackButton({ onClick, light = false, className = "" }: { onClick: () => void; light?: boolean; className?: string }) {
@@ -50,29 +51,29 @@ export function TopBar({
   onHome?: () => void;
   dark?: boolean;
 }) {
+  const chip = dark
+    ? "border border-ksa-sage bg-ksa-sage text-ksa-teal-deep"
+    : "border border-ksa-teal bg-transparent text-ksa-teal-deep";
+  const dataLabel = pending > 0 ? `Data ${pending}` : "Data";
   return (
     <header className="mb-5 flex items-center justify-between gap-3">
-      <button type="button" className="flex min-w-0 items-center gap-2 text-left" onClick={onHome}>
-        <span
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm ${dark ? "bg-white/15" : "bg-white"}`}
-        >
-          ⌂
+      <button type="button" className="flex min-w-0 items-center gap-2 text-left" onClick={onHome} aria-label="Beranda">
+        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${chip}`}>
+          <LuHouse size={20} aria-hidden />
         </span>
-        <span className="truncate font-medium">{name}</span>
+        <span className="min-w-0">
+          <span className={`block text-[11px] leading-4 ${dark ? "text-white/60" : "text-[#8a8a8a]"}`}>Beranda</span>
+          <span className="block truncate text-sm font-medium">{name}</span>
+        </span>
       </button>
       <button
         type="button"
         onClick={onSync}
-        className={`flex h-11 w-11 items-center justify-center rounded-full text-sm font-semibold ${
-          pending > 0
-            ? "bg-ksa-amber text-[#1c1c1c]"
-            : dark
-              ? "bg-white/15 text-white"
-              : "bg-ksa-sage text-ksa-teal-deep"
-        }`}
-        aria-label={pending > 0 ? `${pending} belum terkirim` : "Semua terkirim"}
+        className={`flex h-11 shrink-0 items-center gap-2 rounded-full px-3 text-sm font-medium ${chip}`}
+        aria-label={pending > 0 ? `${pending} data belum terkirim` : "Data hitung"}
       >
-        {pending > 0 ? pending : "✓"}
+        <LuClipboardList size={18} aria-hidden />
+        <span>{dataLabel}</span>
       </button>
     </header>
   );

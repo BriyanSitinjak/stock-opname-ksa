@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { samePersonOnBothPasses } from "@/lib/assignment-rules";
+import { isFloorPlace } from "@/lib/floor-plan";
 import { fetchJson } from "@/app/siap/api";
+import { AisleTasks } from "./aisles";
 import { EmptyState } from "@/app/empty-state";
 import { ReportRow, ReportTable, Td } from "@/app/siap/report-table";
 import { BackLink, ErrorText, MissingList, PageLead, Select, TealButton } from "@/app/siap/ui";
@@ -73,6 +76,9 @@ export function TugasBoard({ id }: { id: string }) {
   const grouped = useMemo(() => {
     const map = new Map<string, Row[]>();
     for (const row of rows) {
+      if (isFloorPlace(row.nomor)) {
+        continue;
+      }
       const list = map.get(row.gudang) ?? [];
       list.push(row);
       map.set(row.gudang, list);
@@ -136,9 +142,15 @@ export function TugasBoard({ id }: { id: string }) {
       <BackLink href={`/siap/${id}`} />
       <h1 className="mt-3 text-2xl font-semibold">Bagi tugas</h1>
       <PageLead>
-        Setiap tag punya pass 1 dan pass 2. Dua kolom itu tidak boleh diisi orang yang sama, supaya hitung kedua benar-benar independen. Nama yang belum ada ditambah dulu di Pengguna. Tugas hanya bisa diubah selama sesi masih draft.
+        Setiap lorong punya hitung ke-1 dan hitung ke-2, orangnya boleh berganti di lorong berikutnya. Lorong yang ditandai kosong tidak dibagikan. Tag contoh yang masih ada tetap di daftar bawah. Tugas hanya bisa diubah selama sesi masih draft.
       </PageLead>
       {rows.length === 0 ? <EmptyState menu="tag" /> : null}
+      <AisleTasks id={id} counters={counters} />
+      <p className="mt-6 text-sm">
+        <Link className="text-ksa-teal-deep" href={`/siap/${id}/kartu`}>
+          Nomor kartu yang bentrok
+        </Link>
+      </p>
       {grouped.map(([gudang, tags]) => (
         <section key={gudang}>
           <ReportTable title={gudang} headers={["Tag", "Lokasi", "Pass 1", "Pass 2"]}>

@@ -44,7 +44,9 @@ import {
   writeStaffCookie,
   type StaffSession,
 } from "@/lib/staff-auth";
-import { syncCounts } from "@/lib/sync";
+import { aisleBoard, aisleCrosses, saveAisles } from "@/lib/aisles";
+import { copyMasterToSnapshot, replaceMasterFromSnapshot } from "@/lib/master-stock";
+import { cardClashes, syncCounts } from "@/lib/sync";
 
 const KondisiSchema = z.enum(["baik", "rusak", "kadaluarsa"]);
 
@@ -460,6 +462,70 @@ app.put("/sessions/:id/assignments", async (c) => {
   return c.json({ ok: true, missing_assignments: missing });
 });
 
+app.get("/sessions/:id/aisles", async (c) => {
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
+  return c.json(await aisleBoard(id));
+});
+
+app.put("/sessions/:id/aisles", async (c) => {
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
+  const session = await prisma.opnameSession.findUnique({ where: { id } });
+  if (!session) {
+    return c.json(sessionMissing, 404);
+  }
+  if (session.status !== "draft") {
+    return c.json({ error: "Tugas hanya bisa diubah saat sesi masih draft." }, 409);
+  }
+  const body = await c.req.json<{
+    aisles?: Array<{
+      gudang: number;
+      aisle: string;
+      pass_1: string | null;
+      pass_2: string | null;
+      crossed: boolean;
+      note: string;
+    }>;
+  }>();
+  const rows = body.aisles ?? [];
+  const counterIds = new Set((await activeStaff()).map((row) => row.id));
+  for (const row of rows) {
+    for (const userId of [row.pass_1, row.pass_2]) {
+      if (userId && !counterIds.has(userId)) {
+        return c.json({ error: "Petugas tidak ditemukan." }, 400);
+      }
+    }
+  }
+  const saved = await saveAisles(
+    id,
+    (body.aisles ?? []).map((row) => ({
+      gudang: row.gudang,
+      aisle: row.aisle,
+      pass1: row.pass_1,
+      pass2: row.pass_2,
+      crossed: row.crossed,
+      note: row.note ?? "",
+    })),
+  );
+  if ("error" in saved) {
+    return c.json({ error: saved.error }, 409);
+  }
+  await recordStaffAction({
+    actorId: c.get("staff").id,
+    action: "assignments",
+    sessionId: id,
+    summary: `Simpan tugas lorong pada ${session.nama}`,
+  });
+  return c.json({ ok: true, missing_assignments: saved.missing });
+});
+
+app.get("/sessions/:id/kartu-bentrok", async (c) => {
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
+  return c.json(await cardClashes(id));
+});
+
 const countersRoute = createRoute({
   method: "get",
   path: "/sessions/{id}/counters",
@@ -662,6 +728,7 @@ app.get("/sessions/:id/prepare", async (c) => {
       uom: item.uom,
     })),
     denah: [...denahMap.values()],
+    crosses: await aisleCrosses(id),
     assignments: assignments.map((row) => ({
       tag_id: row.tagId,
       pass: row.pass,
@@ -708,6 +775,7 @@ app.post("/sessions/:id/import", async (c) => {
     const widen =
       result.preview.addedBrands.length > 0 || result.preview.addedGroups.length > 0 ? result.scope : undefined;
     await commitImport(id, result.raw, result.items, widen);
+    await replaceMasterFromSnapshot(id);
   } catch (error) {
     console.error(error);
     return c.json({ error: "Import gagal. Tidak ada perubahan." }, 500);
@@ -731,9 +799,13 @@ app.post("/sessions/:id/open", async (c) => {
   if (session.status !== "draft") {
     return c.json({ error: "Sesi bukan draft." }, 409);
   }
-  const snapshotCount = await prisma.snapshotItem.count({ where: { sessionId: id } });
+  let snapshotCount = await prisma.snapshotItem.count({ where: { sessionId: id } });
   if (snapshotCount === 0) {
-    return c.json({ error: "Snapshot belum di-import." }, 409);
+    await copyMasterToSnapshot(id);
+    snapshotCount = await prisma.snapshotItem.count({ where: { sessionId: id } });
+  }
+  if (snapshotCount === 0) {
+    return c.json({ error: "Stok master belum diimpor." }, 409);
   }
   const tags = await liveTags();
   if (tags.length === 0) {
@@ -793,6 +865,7 @@ const syncRoute = createRoute({
                   snapshot_item_id: z.string().regex(idPattern("itm")),
                   qty: z.string(),
                   qty_note: z.string().nullable().optional(),
+                  nomor_kartu: z.string().nullable().optional(),
                   kondisi: KondisiSchema,
                   client_created_at: z.string(),
                 }),
@@ -805,6 +878,7 @@ const syncRoute = createRoute({
                   tag_id: z.string().regex(idPattern("tag")),
                   pass: z.number().int(),
                   is_empty: z.boolean(),
+                  nomor_kartu: z.string().nullable().optional(),
                   client_created_at: z.string(),
                 }),
               )
@@ -863,8 +937,12 @@ app.openapi(syncRoute, async (c) => {
     counts: body.counts.map((row) => ({
       ...row,
       qty_note: row.qty_note ?? null,
+      nomor_kartu: row.nomor_kartu ?? null,
     })),
-    submissions: body.submissions,
+    submissions: body.submissions.map((row) => ({
+      ...row,
+      nomor_kartu: row.nomor_kartu ?? null,
+    })),
     unknowns: body.unknowns.map((row) => ({
       ...row,
       kode_input: row.kode_input ?? null,
