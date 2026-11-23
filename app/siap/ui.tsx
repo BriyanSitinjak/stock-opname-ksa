@@ -130,12 +130,15 @@ export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={`mt-1 w-full rounded-xl border px-3 py-2 ${props.className ?? ""}`} />;
 }
 
+export const fieldControlClass =
+  "cursor-pointer rounded-xl border border-[#e7dfd2] bg-white text-sm text-[#1c1c1c] shadow-sm outline-none hover:border-ksa-teal/50 focus:border-ksa-teal focus:ring-2 focus:ring-ksa-teal/20 disabled:cursor-not-allowed disabled:opacity-50";
+
 export function Select({ className = "", ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <span className={`relative inline-flex min-w-0 align-middle ${className}`}>
       <select
         {...props}
-        className="w-full cursor-pointer appearance-none rounded-xl border border-[#e7dfd2] bg-white py-2 pr-9 pl-3 text-sm text-[#1c1c1c] shadow-sm outline-none transition-[border-color,box-shadow] duration-150 hover:border-ksa-teal/50 focus:border-ksa-teal focus:ring-2 focus:ring-ksa-teal/20 disabled:cursor-not-allowed disabled:opacity-50"
+        className={`w-full appearance-none py-2 pr-9 pl-3 transition-[border-color,box-shadow] duration-150 ${fieldControlClass}`}
       />
       <ChevronDown aria-hidden className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-ksa-teal-deep" size={16} strokeWidth={2} />
     </span>

@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { EmptyState } from "@/app/empty-state";
+import { PassSelect, type CounterOption } from "@/app/siap/pass-select";
 import { ReportRow, ReportTable, Td } from "@/app/siap/report-table";
-import { Select } from "@/app/siap/ui";
 import { useSiapInvalidate } from "@/app/siap/query";
 import { toast } from "@/app/toast";
 import { groupBy } from "@/lib/group";
@@ -24,8 +24,6 @@ export type SelisihHitungRow = {
   pass_3_user_id: string | null;
 };
 
-type Counter = { id: string; nama: string };
-
 export function SelisihHitungBoard({
   id,
   rows,
@@ -33,7 +31,7 @@ export function SelisihHitungBoard({
 }: {
   id: string;
   rows: SelisihHitungRow[];
-  counters: Counter[];
+  counters: CounterOption[];
 }) {
   const invalidate = useSiapInvalidate();
   const [assigned, setAssigned] = useState<Record<string, string>>(() => {
@@ -92,18 +90,12 @@ export function SelisihHitungBoard({
               </div>
               <label className="text-sm">
                 Tugaskan pass 3
-                <Select
-                  className="ml-2 min-w-44"
-                  value={assigned[tagId] ?? ""}
-                  onChange={(event) => void assign(tagId, event.target.value)}
-                >
-                  <option value="">Pilih petugas</option>
-                  {counters.map((counter) => (
-                    <option key={counter.id} value={counter.id}>
-                      {counter.nama}
-                    </option>
-                  ))}
-                </Select>
+                <PassSelect
+                  className="mt-1 min-w-44"
+                  counters={counters}
+                  value={assigned[tagId] ?? null}
+                  onChange={(userId) => void assign(tagId, userId)}
+                />
               </label>
             </div>
             <ReportTable title={`Perbandingan tag ${head.nomor}`} headers={["Kode", "Nama", "Hitung 1", "Hitung 2"]}>

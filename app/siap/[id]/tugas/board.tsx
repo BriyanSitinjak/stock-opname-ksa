@@ -9,7 +9,7 @@ import { fetchJson } from "@/app/siap/api";
 import { useDraftRows, useSiapInvalidate, useSiapQuery } from "@/app/siap/query";
 import { AisleTasks } from "./aisles";
 import { EmptyState } from "@/app/empty-state";
-import { PassSelect, petugasOnly, type CounterOption } from "@/app/siap/pass-select";
+import { PassSelect, petugasOnly, type CounterCatalog } from "@/app/siap/pass-select";
 import { ReportRow, ReportTable, Td } from "@/app/siap/report-table";
 import { BackLink, ErrorText, MissingList, PageLead, TealButton } from "@/app/siap/ui";
 import { toast } from "@/app/toast";
@@ -26,7 +26,7 @@ type Row = {
 export function TugasBoard({ id }: { id: string }) {
   const invalidate = useSiapInvalidate();
   const assignments = useSiapQuery<Row[]>(`/api/sessions/${id}/assignments`);
-  const catalog = useSiapQuery<{ counters: CounterOption[] }>("/api/setup/catalog");
+  const catalog = useSiapQuery<CounterCatalog>("/api/setup/catalog");
   const [rows, setRows] = useDraftRows(id, assignments.data);
   const [error, setError] = useState("");
   const [missing, setMissing] = useState<string[]>([]);
