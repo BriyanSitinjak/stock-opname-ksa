@@ -614,6 +614,10 @@ const bindRoute = createRoute({
 app.openapi(bindRoute, async (c) => {
   const { id } = c.req.valid("param");
   const body = c.req.valid("json");
+  const session = await prisma.opnameSession.findUnique({ where: { id }, select: { id: true } });
+  if (!session) {
+    return c.json({ error: "Sesi tidak ditemukan." }, 409);
+  }
   const user = await prisma.user.findUnique({ where: { id: body.user_id } });
   if (!user || user.retiredAt) {
     return c.json({ error: "Petugas tidak ditemukan." }, 409);
@@ -660,12 +664,15 @@ app.post("/sessions/:id/devices/release", async (c) => {
   if ("error" in result) {
     return c.json({ error: result.error }, result.status);
   }
-  await recordStaffAction({
-    actorId: c.get("staff").id,
-    action: "device-release",
-    sessionId: id,
-    summary: `Lepas device ${bound?.user.nama ?? body.device_id}`,
-  });
+  const staff = c.get("staff");
+  if (staff) {
+    await recordStaffAction({
+      actorId: staff.id,
+      action: "device-release",
+      sessionId: id,
+      summary: `Lepas device ${bound?.user.nama ?? body.device_id}`,
+    });
+  }
   return c.json(result);
 });
 

@@ -290,10 +290,16 @@ export function CountApp() {
     }
     let cancelled = false;
     void fetch("/api/sessions")
-      .then((response) => response.json())
-      .then((rows: { id?: string }[]) => {
+      .then(async (response) => {
+        if (!response.ok) {
+          return null;
+        }
+        const rows = (await response.json()) as { id?: string }[];
+        return Array.isArray(rows) ? rows[0]?.id : null;
+      })
+      .then((id) => {
         if (!cancelled) {
-          setSessionId(rows[0]?.id || SESSION_ID);
+          setSessionId(id || SESSION_ID);
         }
       })
       .catch(() => {

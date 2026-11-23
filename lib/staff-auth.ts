@@ -4,6 +4,7 @@ import type { Context } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { prisma } from "@/lib/db";
 import { ADMIN_ID } from "@/lib/fixture";
+import { SHARE_CURRENT_SESSION } from "@/lib/testing";
 
 export const STAFF_COOKIE = "ksa_staff";
 const TTL_MS = 12 * 60 * 60 * 1000;
@@ -139,6 +140,10 @@ export function clearStaffCookie(c: Context) {
 export function isOpenRoute(method: string, path: string) {
   const route = path.startsWith("/api") ? path.slice(4) : path;
   if (method === "GET" && (route === "/health" || route === "/docs" || route === "/docs/ui" || route === "/auth/staff")) {
+    return true;
+  }
+  // Testing share: the phone needs the newest session id without a staff cookie.
+  if (SHARE_CURRENT_SESSION && method === "GET" && route === "/sessions") {
     return true;
   }
   if (method === "POST" && (route === "/auth/login" || route === "/auth/logout" || route === "/counts/sync")) {
