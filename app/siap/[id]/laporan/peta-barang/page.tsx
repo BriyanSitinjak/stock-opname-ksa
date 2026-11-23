@@ -1,9 +1,6 @@
-import { EmptyState } from "@/app/empty-state";
 import { LaporanShell } from "@/app/siap/laporan-shell";
-import { ReportRow, ReportTable, Td } from "@/app/siap/report-table";
 import { AwaitParams } from "@/app/siap/session-id";
-import { SearchForm } from "@/app/siap/ui";
-import { petaBarang } from "@/lib/reports";
+import { PetaBarangView } from "./view";
 
 export default function Page({
   params,
@@ -14,39 +11,15 @@ export default function Page({
 }) {
   return (
     <AwaitParams params={Promise.all([params, searchParams])}>
-      {([route, query]) => <Body id={route.id} kode={(query.kode ?? "").trim()} />}
+      {([route, query]) => (
+        <LaporanShell
+          id={route.id}
+          title="Peta barang"
+          subtitle="Mencari di pin sesi, bukan di master denah. Lokasi muncul setelah pass 1 selesai dan qty pada tag itu sudah disepakati."
+        >
+          <PetaBarangView id={route.id} kode={(query.kode ?? "").trim()} />
+        </LaporanShell>
+      )}
     </AwaitParams>
-  );
-}
-
-async function Body({ id, kode }: { id: string; kode: string }) {
-  const items = kode ? await petaBarang(id, kode) : [];
-  return (
-    <LaporanShell
-      id={id}
-      title="Peta barang"
-      subtitle="Mencari di pin sesi, bukan di master denah. Lokasi muncul setelah pass 1 selesai dan qty pada tag itu sudah disepakati."
-    >
-      <SearchForm
-        action={`/siap/${id}/laporan/peta-barang`}
-        name="kode"
-        defaultValue={kode}
-        placeholder="Barcode 4 digit"
-      />
-      {!kode ? <p className="mt-6 text-sm">Cari barcode untuk lihat lokasi setelah pass 1 selesai.</p> : null}
-      {kode && items.length === 0 ? <EmptyState menu={`barang untuk kode ${kode}`} /> : null}
-      {items.length > 0 ? (
-        <ReportTable title="Lokasi pin" headers={["Gudang", "Lokasi", "Tag", "Qty"]}>
-          {items.map((row) => (
-            <ReportRow key={`${row.gudang_nama}-${row.lokasi_nama}-${row.nomor}`}>
-              <Td>{row.gudang_nama}</Td>
-              <Td>{row.lokasi_nama}</Td>
-              <Td>{row.nomor}</Td>
-              <Td>{row.qty}</Td>
-            </ReportRow>
-          ))}
-        </ReportTable>
-      ) : null}
-    </LaporanShell>
   );
 }

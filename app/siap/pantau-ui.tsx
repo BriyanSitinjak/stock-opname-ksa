@@ -1,4 +1,4 @@
-import { TAG_STATUS_LABEL, TAG_STATUS_MARK, TAG_STATUSES, type TagStatus } from "@/lib/monitor";
+import { TAG_STATUS_LABEL, TAG_STATUS_MARK, TAG_STATUSES, type TagStatus } from "@/lib/tag-status";
 
 export function tagBandClass(status: TagStatus) {
   switch (status) {

@@ -4,10 +4,12 @@ import { useMemo, useState } from "react";
 import { EmptyState } from "@/app/empty-state";
 import { ReportRow, ReportTable, Td } from "@/app/siap/report-table";
 import { Select } from "@/app/siap/ui";
+import { useSiapInvalidate } from "@/app/siap/query";
 import { toast } from "@/app/toast";
+import { groupBy } from "@/lib/group";
 import { qtyOrDash } from "@/lib/qty-display";
 
-type Row = {
+export type SelisihHitungRow = {
   tag_id: string;
   snapshot_item_id: string;
   nomor: string;
@@ -30,9 +32,10 @@ export function SelisihHitungBoard({
   counters,
 }: {
   id: string;
-  rows: Row[];
+  rows: SelisihHitungRow[];
   counters: Counter[];
 }) {
+  const invalidate = useSiapInvalidate();
   const [assigned, setAssigned] = useState<Record<string, string>>(() => {
     const start: Record<string, string> = {};
     for (const row of rows) {
@@ -43,15 +46,7 @@ export function SelisihHitungBoard({
     return start;
   });
 
-  const tags = useMemo(() => {
-    const map = new Map<string, Row[]>();
-    for (const row of rows) {
-      const list = map.get(row.tag_id) ?? [];
-      list.push(row);
-      map.set(row.tag_id, list);
-    }
-    return [...map.entries()];
-  }, [rows]);
+  const tags = useMemo(() => [...groupBy(rows, (row) => row.tag_id)], [rows]);
 
   async function assign(tagId: string, userId: string) {
     if (!userId) {
@@ -68,6 +63,7 @@ export function SelisihHitungBoard({
       return;
     }
     setAssigned((current) => ({ ...current, [tagId]: userId }));
+    invalidate([`/api/sessions/${id}/selisih-hitung`, `/api/sessions/${id}`]);
     toast(`Pass 3 ditugaskan${json.nama ? ` ke ${json.nama}` : ""}.`);
   }
 

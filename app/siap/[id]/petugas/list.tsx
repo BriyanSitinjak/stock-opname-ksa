@@ -1,14 +1,39 @@
 "use client";
 
 import { RefreshCw } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { confirm } from "@/app/confirm";
 import { EmptyState } from "@/app/empty-state";
 import { fetchJson } from "@/app/siap/api";
+import { QueryView, useSiapInvalidate } from "@/app/siap/query";
+import { formatSyncAge } from "@/lib/sync-age";
 import { scrollListClass } from "@/app/siap/report-table";
 import { OutlineButton, TealButton } from "@/app/siap/ui";
 import { toast } from "@/app/toast";
+
+type RemoteDevice = {
+  device_id: string;
+  nama: string;
+  last_sync_at: string | null;
+  pending_reported: number;
+  stale: boolean;
+};
+
+export function PetugasBody({ id }: { id: string }) {
+  return (
+    <QueryView<{ devices: RemoteDevice[] }> path={`/api/sessions/${id}/devices`}>
+      {(data) => (
+        <PetugasList
+          id={id}
+          devices={data.devices.map((row) => ({
+            ...row,
+            age: formatSyncAge(row.last_sync_at),
+          }))}
+        />
+      )}
+    </QueryView>
+  );
+}
 
 type Device = {
   device_id: string;
@@ -19,14 +44,18 @@ type Device = {
   age: string;
 };
 
-export function RefreshStatusButton() {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
+export function RefreshStatusButton({ id }: { id: string }) {
+  const invalidate = useSiapInvalidate();
+  const [pending, setPending] = useState(false);
   return (
     <OutlineButton
       className="inline-flex shrink-0 items-center gap-2 px-4 py-2"
       disabled={pending}
-      onClick={() => startTransition(() => router.refresh())}
+      onClick={() => {
+        setPending(true);
+        invalidate([`/api/sessions/${id}/devices`]);
+        window.setTimeout(() => setPending(false), 400);
+      }}
     >
       <RefreshCw aria-hidden size={16} strokeWidth={2} className={pending ? "animate-spin" : ""} />
       Muat ulang
@@ -35,6 +64,7 @@ export function RefreshStatusButton() {
 }
 
 export function PetugasList({ id, devices }: { id: string; devices: Device[] }) {
+  const invalidate = useSiapInvalidate();
   const [released, setReleased] = useState<string[]>([]);
   const rows = devices.filter((row) => !released.includes(row.device_id));
 
@@ -58,6 +88,7 @@ export function PetugasList({ id, devices }: { id: string; devices: Device[] }) 
       return;
     }
     setReleased((current) => [...current, row.device_id]);
+    invalidate([`/api/sessions/${id}/devices`]);
     toast("Device dilepas. Petugas bisa di-bind ke HP lain.");
   }
 

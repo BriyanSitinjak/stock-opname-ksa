@@ -19,6 +19,7 @@ import {
 import {
   assignPass3,
   daftarBarang,
+  daftarBarangChoices,
   kondisiReport,
   pass3Compare,
   petaBarang,
@@ -45,6 +46,7 @@ import {
   type StaffSession,
 } from "@/lib/staff-auth";
 import { aisleBoard, aisleCrosses, saveAisles } from "@/lib/aisles";
+import { SHARE_CURRENT_SESSION } from "@/lib/testing";
 import { copyMasterToSnapshot, replaceMasterFromSnapshot } from "@/lib/master-stock";
 import { cardClashes, syncCounts } from "@/lib/sync";
 
@@ -552,20 +554,24 @@ const countersRoute = createRoute({
 
 app.openapi(countersRoute, async (c) => {
   const { id } = c.req.valid("param");
-  const assigned = await prisma.tagAssignment.findMany({
-    where: { sessionId: id },
-    distinct: ["userId"],
-    include: { user: true },
-  });
   const live = await prisma.userDevice.findMany({
     where: { sessionId: id, releasedAt: null },
   });
   const liveUsers = new Set(live.map((row) => row.userId));
+  const people = SHARE_CURRENT_SESSION
+    ? await activeStaff()
+    : (
+        await prisma.tagAssignment.findMany({
+          where: { sessionId: id },
+          distinct: ["userId"],
+          include: { user: true },
+        })
+      ).map((row) => ({ id: row.userId, nama: row.user.nama }));
   return c.json(
-    assigned.map((row) => ({
-      user_id: row.userId,
-      nama: row.user.nama,
-      already_bound: liveUsers.has(row.userId),
+    people.map((person) => ({
+      user_id: person.id,
+      nama: person.nama,
+      already_bound: liveUsers.has(person.id),
     })),
     200,
   );
@@ -1019,6 +1025,15 @@ app.get("/sessions/:id/rekap-tag", async (c) => {
   const id = sessionId(c);
   if (id == null) return c.json(sessionMissing, 404);
   return c.json(await rekapTag(id));
+});
+
+app.get("/sessions/:id/item-choices", async (c) => {
+  const id = sessionId(c);
+  if (id == null) return c.json(sessionMissing, 404);
+  if (!(await requireSession(id))) {
+    return c.json(sessionMissing, 404);
+  }
+  return c.json(await daftarBarangChoices(id));
 });
 
 app.get("/sessions/:id/items", async (c) => {

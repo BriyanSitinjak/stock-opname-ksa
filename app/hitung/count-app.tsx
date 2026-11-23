@@ -13,6 +13,7 @@ import { cardAlreadyUsed } from "@/lib/aisle-rules";
 import { evaluateQtyNote } from "@/lib/calculator";
 import { isFloorPlace } from "@/lib/floor-plan";
 import { SESSION_ID } from "@/lib/fixture";
+import { SHARE_CURRENT_SESSION } from "@/lib/testing";
 import { maybeActivate } from "@/lib/offline/register-sw";
 import { qtyOrDash } from "@/lib/qty-display";
 import {
@@ -172,7 +173,7 @@ function deviceIdFromStore(): string {
 }
 
 export function CountApp() {
-  const sessionId = SESSION_ID;
+  const [sessionId, setSessionId] = useState(SHARE_CURRENT_SESSION ? "" : SESSION_ID);
   const [deviceId] = useState(deviceIdFromStore);
   const [screen, setScreen] = useState<Screen>("bind");
   const [counters, setCounters] = useState<CounterOption[]>([]);
@@ -284,6 +285,31 @@ export function CountApp() {
   );
 
   useEffect(() => {
+    if (!SHARE_CURRENT_SESSION) {
+      return;
+    }
+    let cancelled = false;
+    void fetch("/api/sessions")
+      .then((response) => response.json())
+      .then((rows: { id?: string }[]) => {
+        if (!cancelled) {
+          setSessionId(rows[0]?.id || SESSION_ID);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSessionId(SESSION_ID);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!sessionId) {
+      return;
+    }
     void (async () => {
       try {
         await refreshPending();

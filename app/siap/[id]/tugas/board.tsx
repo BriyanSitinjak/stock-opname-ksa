@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { samePersonOnBothPasses } from "@/lib/assignment-rules";
 import { isFloorPlace } from "@/lib/floor-plan";
+import { groupBy } from "@/lib/group";
 import { fetchJson } from "@/app/siap/api";
+import { useDraftRows, useSiapInvalidate, useSiapQuery } from "@/app/siap/query";
 import { AisleTasks } from "./aisles";
 import { EmptyState } from "@/app/empty-state";
 import { PassSelect, type CounterOption } from "@/app/siap/pass-select";
@@ -21,53 +23,25 @@ type Row = {
   pass_2: string | null;
 };
 
-async function fetchBoard(id: string) {
-  const [assign, catalog] = await Promise.all([
-    fetchJson<Row[]>(`/api/sessions/${id}/assignments`),
-    fetchJson<{ counters: CounterOption[] }>("/api/setup/catalog"),
-  ]);
-  return {
-    rows: assign.ok ? assign.data : [],
-    counters: catalog.ok ? catalog.data.counters : [],
-  };
-}
-
 export function TugasBoard({ id }: { id: string }) {
-  const [rows, setRows] = useState<Row[]>([]);
-  const [counters, setCounters] = useState<CounterOption[]>([]);
+  const invalidate = useSiapInvalidate();
+  const assignments = useSiapQuery<Row[]>(`/api/sessions/${id}/assignments`);
+  const catalog = useSiapQuery<{ counters: CounterOption[] }>("/api/setup/catalog");
+  const [rows, setRows] = useDraftRows(id, assignments.data);
   const [error, setError] = useState("");
   const [missing, setMissing] = useState<string[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void fetchBoard(id).then((board) => {
-      if (!cancelled) {
-        setRows(board.rows);
-        setCounters(board.counters);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
+  const counters = catalog.data?.counters ?? [];
+  const list = rows ?? [];
 
   const grouped = useMemo(() => {
-    const map = new Map<string, Row[]>();
-    for (const row of rows) {
-      if (isFloorPlace(row.nomor)) {
-        continue;
-      }
-      const list = map.get(row.gudang) ?? [];
-      list.push(row);
-      map.set(row.gudang, list);
-    }
-    return [...map.entries()];
+    const kept = (rows ?? []).filter((row) => !isFloorPlace(row.nomor));
+    return [...groupBy(kept, (row) => row.gudang)];
   }, [rows]);
 
   function setPass(tagId: string, pass: 1 | 2, userId: string) {
     setError("");
     setRows((current) =>
-      current.map((row) => {
+      (current ?? []).map((row) => {
         if (row.tag_id !== tagId) {
           return row;
         }
@@ -87,7 +61,7 @@ export function TugasBoard({ id }: { id: string }) {
 
   async function save() {
     setError("");
-    const assignments = rows.flatMap((row) => {
+    const assignments = list.flatMap((row) => {
       const out: { tag_id: string; pass: number; user_id: string }[] = [];
       if (row.pass_1) {
         out.push({ tag_id: row.tag_id, pass: 1, user_id: row.pass_1 });
@@ -112,6 +86,7 @@ export function TugasBoard({ id }: { id: string }) {
       return;
     }
     setMissing(data.missing_assignments ?? []);
+    invalidate([`/api/sessions/${id}/assignments`, `/api/sessions/${id}`]);
     toast("Tugas tersimpan.");
   }
 
@@ -122,7 +97,7 @@ export function TugasBoard({ id }: { id: string }) {
       <PageLead>
         Setiap lorong punya hitung ke-1 dan hitung ke-2, orangnya boleh berganti di lorong berikutnya. Lorong yang ditandai kosong tidak dibagikan. Tag contoh yang masih ada tetap di daftar bawah. Tugas hanya bisa diubah selama sesi masih draft.
       </PageLead>
-      {rows.length === 0 ? <EmptyState menu="tag" /> : null}
+      {assignments.isPending ? null : list.length === 0 ? <EmptyState menu="tag" /> : null}
       <AisleTasks id={id} counters={counters} />
       <p className="mt-6 text-sm">
         <Link className="text-ksa-teal-deep" href={`/siap/${id}/kartu`}>

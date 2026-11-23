@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { fetchJson } from "@/app/siap/api";
+import { useSiapInvalidate, useSiapQuery } from "@/app/siap/query";
 import { Card, ErrorText, Field, PageLead, ScopeTicks, TealButton, TextInput, toggleValue } from "@/app/siap/ui";
 import { toast } from "@/app/toast";
 
@@ -13,21 +14,11 @@ export default function SesiBaruPage() {
   const [snapshotAt, setSnapshotAt] = useState("2026-12-15T18:00");
   const [brands, setBrands] = useState<string[]>([]);
   const [groups, setGroups] = useState<string[]>([]);
-  const [catalog, setCatalog] = useState<{ brands: string[]; groups: string[] }>({ brands: [], groups: [] });
+  const catalogQuery = useSiapQuery<{ brands: string[]; groups: string[] }>("/api/setup/catalog");
+  const catalog = catalogQuery.data ?? { brands: [], groups: [] };
+  const invalidate = useSiapInvalidate();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    void fetchJson<{ brands: string[]; groups: string[] }>("/api/setup/catalog").then(({ ok, data }) => {
-      if (!cancelled && ok) {
-        setCatalog(data);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   async function submit() {
     setBusy(true);
@@ -48,6 +39,7 @@ export default function SesiBaruPage() {
       toast(data.error ?? "Gagal membuat sesi.", setError);
       return;
     }
+    invalidate(["/api/sessions"]);
     toast("Sesi tersimpan.");
     router.push(`/siap/${data.id}`);
   }

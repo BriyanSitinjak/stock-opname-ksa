@@ -1,26 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { fetchJson } from "@/app/siap/api";
+import { useSiapQuery } from "@/app/siap/query";
 import { BackLink, PageLead } from "@/app/siap/ui";
 import { ReportRow, ReportTable, Td } from "@/app/siap/report-table";
 
 export function KartuBoard({ id }: { id: string }) {
-  const [rows, setRows] = useState<Array<{ nomor_kartu: string; pemakaian: number }>>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void fetchJson<Array<{ nomor_kartu: string; pemakaian: number }>>(`/api/sessions/${id}/kartu-bentrok`).then(
-      ({ ok, data }) => {
-        if (!cancelled && ok) {
-          setRows(data);
-        }
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
+  const clashes = useSiapQuery<Array<{ nomor_kartu: string; pemakaian: number }>>(`/api/sessions/${id}/kartu-bentrok`);
+  const rows = clashes.data ?? [];
 
   return (
     <>

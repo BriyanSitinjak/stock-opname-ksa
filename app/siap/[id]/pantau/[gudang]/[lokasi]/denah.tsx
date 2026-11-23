@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { StatusChip, tagBandClass } from "@/app/siap/pantau-ui";
-import { statusCaption, TAG_STATUS_LABEL, type DenahTag } from "@/lib/monitor";
+import { statusCaption, TAG_STATUS_LABEL, type DenahTag } from "@/lib/tag-status";
 
 export function LokasiDenah({ tags }: { tags: DenahTag[] }) {
   const [openId, setOpenId] = useState<string | null>(tags[0]?.tag_id ?? null);

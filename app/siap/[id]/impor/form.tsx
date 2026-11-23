@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { IMPORT_ACCEPT, importFileList } from "@/lib/import-kinds";
+import { useSiapInvalidate } from "@/app/siap/query";
 import { BackLink, Card, ErrorText, OutlineButton, PageLead, TealButton } from "@/app/siap/ui";
 import { toast } from "@/app/toast";
 
@@ -20,6 +21,7 @@ type Preview = {
 };
 
 export function ImporForm({ id }: { id: string }) {
+  const invalidate = useSiapInvalidate();
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
@@ -71,6 +73,13 @@ export function ImporForm({ id }: { id: string }) {
       setProgressLabel("Selesai");
       if (confirm) {
         resetForm();
+        invalidate([
+          `/api/sessions/${id}`,
+          `/api/sessions/${id}/items`,
+          `/api/sessions/${id}/item-choices`,
+          "/api/setup/catalog",
+          "/api/sessions",
+        ]);
         toast("Snapshot tersimpan.");
       } else {
         setPreview(data);

@@ -1,90 +1,24 @@
 import { prisma } from "@/lib/db";
+import { groupBy } from "@/lib/group";
 import { liveTags } from "@/lib/setup";
+import { PENDING_CAPTION } from "@/lib/sync-age";
+import { TAG_STATUSES, type DenahGudang, type DenahTag, type TagStatus } from "@/lib/tag-status";
 
-export const TAG_STATUSES = ["belum", "menunggu_hitung_2", "selisih_hitung", "selesai", "kosong"] as const;
-export type TagStatus = (typeof TAG_STATUSES)[number];
-
-export const TAG_STATUS_LABEL: Record<TagStatus, string> = {
-  belum: "Belum dihitung",
-  menunggu_hitung_2: "Menunggu hitung ke-2",
-  selisih_hitung: "Selisih hitung",
-  selesai: "Selesai",
-  kosong: "Kosong",
-};
-
-export const TAG_STATUS_MARK: Record<TagStatus, string> = {
-  belum: "B",
-  menunggu_hitung_2: "2",
-  selisih_hitung: "≠",
-  selesai: "S",
-  kosong: "K",
-};
+export {
+  SAMPLE_DENAH_NOTE,
+  TAG_STATUS_LABEL,
+  TAG_STATUS_MARK,
+  TAG_STATUSES,
+  pantauHref,
+  selesaiCaption,
+  statusCaption,
+  type DenahGudang,
+  type DenahLokasi,
+  type DenahTag,
+  type TagStatus,
+} from "@/lib/tag-status";
 
 const STALE_AFTER_MS = 3 * 60 * 60 * 1000;
-
-export const PENDING_CAPTION = "Angka dari HP saat sync terakhir, bukan antrian di server.";
-
-export function statusCaption(status: TagStatus) {
-  return `${TAG_STATUS_MARK[status]} ${TAG_STATUS_LABEL[status]}`;
-}
-
-export function selesaiCaption(row: { selesai: number; total: number; selisih_hitung: number }) {
-  const base = `${row.selesai} / ${row.total} tag selesai`;
-  return row.selisih_hitung > 0 ? `${base} · ≠ ${row.selisih_hitung} selisih hitung` : base;
-}
-
-export function pantauHref(sessionId: string, gudang?: string, lokasi?: string) {
-  const parts = ["/siap", sessionId, "pantau"];
-  if (gudang) {
-    parts.push(encodeURIComponent(gudang));
-  }
-  if (lokasi) {
-    parts.push(encodeURIComponent(lokasi));
-  }
-  return parts.join("/");
-}
-
-export function formatSyncAge(iso: string | null, now = Date.now()) {
-  if (!iso) {
-    return "Belum pernah sinkron";
-  }
-  const minutes = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60_000));
-  if (minutes < 1) {
-    return "Baru saja";
-  }
-  if (minutes < 60) {
-    return `${minutes} menit lalu`;
-  }
-  return `${Math.floor(minutes / 60)} jam lalu`;
-}
-
-export type DenahTag = {
-  tag_id: string;
-  nomor: string;
-  lokasi_nama: string;
-  gudang_nama: string;
-  weight: number;
-  urutan: number;
-  status: TagStatus;
-  pass_1_nama: string | null;
-  pass_2_nama: string | null;
-};
-
-export type DenahLokasi = {
-  nama: string;
-  selesai: number;
-  total: number;
-  selisih_hitung: number;
-  tags: DenahTag[];
-};
-
-export type DenahGudang = {
-  nama: string;
-  selesai: number;
-  total: number;
-  selisih_hitung: number;
-  lokasi: DenahLokasi[];
-};
 
 type StatusRow = {
   tag_id: string;
@@ -105,19 +39,8 @@ function isDone(status: TagStatus) {
 }
 
 function groupDenah(tags: DenahTag[]): DenahGudang[] {
-  const gudangMap = new Map<string, Map<string, DenahTag[]>>();
-  for (const tag of tags) {
-    let lokasiMap = gudangMap.get(tag.gudang_nama);
-    if (!lokasiMap) {
-      lokasiMap = new Map();
-      gudangMap.set(tag.gudang_nama, lokasiMap);
-    }
-    const list = lokasiMap.get(tag.lokasi_nama) ?? [];
-    list.push(tag);
-    lokasiMap.set(tag.lokasi_nama, list);
-  }
-  return [...gudangMap.entries()].map(([nama, lokasiMap]) => {
-    const lokasi = [...lokasiMap.entries()].map(([lokasiNama, lokasiTags]) => ({
+  return [...groupBy(tags, (tag) => tag.gudang_nama)].map(([nama, gudangTags]) => {
+    const lokasi = [...groupBy(gudangTags, (tag) => tag.lokasi_nama)].map(([lokasiNama, lokasiTags]) => ({
       nama: lokasiNama,
       selesai: lokasiTags.filter((tag) => isDone(tag.status)).length,
       total: lokasiTags.length,
@@ -204,9 +127,6 @@ async function masterPreview(sessionId: string): Promise<DenahTag[]> {
 // Draft sessions have no pin yet. The board may show the current master
 // layout so the sample denah can be walked and replaced before open.
 // Reports keep sessionDenah, which reads session_tags only.
-export const SAMPLE_DENAH_NOTE =
-  "Denah contoh, belum di-pin. Layout ini bisa diganti selama sesi masih draft. Pin terjadi saat sesi dibuka.";
-
 export async function coordinatorDenah(sessionId: string) {
   const pinnedCount = await prisma.sessionTag.count({ where: { sessionId } });
   if (pinnedCount > 0) {

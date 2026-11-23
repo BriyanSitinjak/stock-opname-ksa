@@ -26,7 +26,7 @@ import {
 import { BrandIcon } from "@/app/brand-lockup";
 import { confirm } from "@/app/confirm";
 import { LoadingMark } from "@/app/loading-mark";
-import { fetchJson } from "@/app/siap/api";
+import { siapKey, useSiapQuery, useSiapQueryClient } from "@/app/siap/query";
 import { CoordinatorGate } from "@/app/siap/gate";
 import { parseId } from "@/lib/ids";
 import type { StaffSession } from "@/lib/staff-auth";
@@ -231,44 +231,20 @@ function NavLinks({ sessionId, pathname, onNavigate }: { sessionId: string | nul
 export function CoordinatorShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const pathSession = sessionFromPath(pathname);
-  const [fallbackId, setFallbackId] = useState<string | null>(null);
   const [menuPath, setMenuPath] = useState<string | null>(null);
-  const [staff, setStaff] = useState<StaffSession | null | undefined>(undefined);
-  const sessionId = pathSession ?? fallbackId;
+  const [signedOut, setSignedOut] = useState(false);
+  const queryClient = useSiapQueryClient();
+  const me = useSiapQuery<StaffSession>("/api/auth/me", undefined, !signedOut);
+  const staff = signedOut ? null : me.isPending ? undefined : me.isError ? null : me.data;
+  const sessions = useSiapQuery<{ id: string }[]>("/api/sessions", undefined, Boolean(staff) && !pathSession);
+  const sessionId = pathSession ?? sessions.data?.[0]?.id ?? null;
   const menuOpen = menuPath === pathname;
 
   useEffect(() => {
-    let cancelled = false;
-    void fetchJson<StaffSession>("/api/auth/me").then(({ ok, data }) => {
-      if (!cancelled) {
-        setStaff(ok ? data : null);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    const onRequired = () => setStaff(null);
+    const onRequired = () => setSignedOut(true);
     window.addEventListener("ksa-staff-required", onRequired);
     return () => window.removeEventListener("ksa-staff-required", onRequired);
   }, []);
-
-  useEffect(() => {
-    if (pathSession || !staff) {
-      return;
-    }
-    let cancelled = false;
-    void fetchJson<{ id: string }[]>("/api/sessions").then(({ ok, data }) => {
-      if (!cancelled && ok) {
-        setFallbackId(data[0]?.id ?? null);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [pathSession, staff]);
 
   async function leave() {
     const ok = await confirm({
@@ -281,14 +257,22 @@ export function CoordinatorShell({ children }: { children: ReactNode }) {
       return;
     }
     await fetch("/api/auth/logout", { method: "POST" });
-    setStaff(null);
+    setSignedOut(true);
+    queryClient.clear();
   }
 
   if (staff === undefined) {
     return <LoadingMark />;
   }
   if (staff === null) {
-    return <CoordinatorGate onReady={setStaff} />;
+    return (
+      <CoordinatorGate
+        onReady={(next) => {
+          setSignedOut(false);
+          queryClient.setQueryData(siapKey("/api/auth/me"), next);
+        }}
+      />
+    );
   }
 
   return (

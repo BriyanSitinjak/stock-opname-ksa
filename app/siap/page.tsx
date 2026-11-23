@@ -2,10 +2,10 @@
 
 import { CalendarDays, ChevronRight, ClipboardList, Clock } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { EmptyState } from "@/app/empty-state";
-import { fetchJson } from "@/app/siap/api";
+import { LoadingMark } from "@/app/loading-mark";
 import { formatDateTime, stringList } from "@/app/siap/format";
+import { useSiapQuery } from "@/app/siap/query";
 import { scrollListClass } from "@/app/siap/report-table";
 import { ErrorText, PageLead } from "@/app/siap/ui";
 
@@ -19,25 +19,12 @@ type SessionRow = {
 };
 
 export default function SiapPage() {
-  const [sessions, setSessions] = useState<SessionRow[]>([]);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    let cancelled = false;
-    void fetchJson<SessionRow[]>("/api/sessions").then(({ ok, data }) => {
-      if (cancelled) {
-        return;
-      }
-      if (!ok) {
-        setError("Gagal memuat sesi.");
-        return;
-      }
-      setSessions(data);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const sessions = useSiapQuery<SessionRow[]>("/api/sessions");
+  if (sessions.isPending) {
+    return <LoadingMark />;
+  }
+  const error = sessions.isError ? "Gagal memuat sesi." : "";
+  const rows = sessions.data ?? [];
 
   return (
     <>
@@ -53,9 +40,9 @@ export default function SiapPage() {
         </Link>
       </div>
       <ErrorText>{error}</ErrorText>
-      {sessions.length === 0 && !error ? <EmptyState menu="sesi" /> : null}
+      {rows.length === 0 && !error ? <EmptyState menu="sesi" /> : null}
       <ul className={`flex flex-col gap-3 ${scrollListClass}`}>
-        {sessions.map((session) => {
+        {rows.map((session) => {
           const brands = stringList(session.scopeFilter?.brands);
           const groups = stringList(session.scopeFilter?.groups);
           return (

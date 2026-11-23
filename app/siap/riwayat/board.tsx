@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { EmptyState } from "@/app/empty-state";
-import { fetchJson } from "@/app/siap/api";
+import { useSiapQuery } from "@/app/siap/query";
 import { formatDateTime } from "@/app/siap/format";
 import { ReportRow, ReportTable, Td } from "@/app/siap/report-table";
 import { ErrorText } from "@/app/siap/ui";
@@ -17,32 +16,15 @@ type ActionRow = {
 };
 
 export function RiwayatBoard() {
-  const [rows, setRows] = useState<ActionRow[] | null>(null);
-  const [error, setError] = useState("");
+  const history = useSiapQuery<{ actions: ActionRow[] }>("/api/staff-actions");
+  const rows = history.data?.actions ?? null;
+  const error = history.isError ? "Riwayat belum bisa dimuat." : "";
 
-  useEffect(() => {
-    let cancelled = false;
-    void fetchJson<{ actions: ActionRow[] }>("/api/staff-actions").then(({ ok, data }) => {
-      if (cancelled) {
-        return;
-      }
-      if (!ok) {
-        setError("Riwayat belum bisa dimuat.");
-        setRows([]);
-        return;
-      }
-      setRows(data.actions);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (rows == null) {
-    return null;
-  }
   if (error) {
     return <ErrorText>{error}</ErrorText>;
+  }
+  if (rows == null) {
+    return null;
   }
   if (rows.length === 0) {
     return <EmptyState menu="riwayat" />;

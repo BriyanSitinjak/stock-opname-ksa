@@ -15,9 +15,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { fetchJson } from "@/app/siap/api";
-import { SAMPLE_DENAH_NOTE } from "@/lib/monitor";
+import { siapKey, useSiapInvalidate, useSiapQuery, useSiapQueryClient } from "@/app/siap/query";
+import { SAMPLE_DENAH_NOTE } from "@/lib/tag-status";
 import { LoadingMark } from "@/app/loading-mark";
 import { formatDateTime, type SessionScope } from "@/app/siap/format";
 import { IconLabel, InfoCard, MissingList, ScopeLists, TealButton } from "@/app/siap/ui";
@@ -54,33 +54,14 @@ const STATUS_LABEL: Record<string, string> = {
   closed: "Closed",
 };
 
-async function fetchSession(id: string) {
-  const { ok, data } = await fetchJson<Detail>(`/api/sessions/${id}`);
-  return ok ? data : null;
-}
-
 export function SesiDetail({ id }: { id: string }) {
-  const [detail, setDetail] = useState<Detail | null>(null);
-  const [gudang, setGudang] = useState<GudangProgress[]>([]);
-  const [pinned, setPinned] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    void fetchSession(id).then((next) => {
-      if (!cancelled && next) {
-        setDetail(next);
-      }
-    });
-    void fetchJson<DenahPayload>(`/api/sessions/${id}/denah`).then(({ ok, data }) => {
-      if (!cancelled && ok) {
-        setGudang(data.gudang);
-        setPinned(data.pinned);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
+  const invalidate = useSiapInvalidate();
+  const queryClient = useSiapQueryClient();
+  const session = useSiapQuery<Detail>(`/api/sessions/${id}`);
+  const denah = useSiapQuery<DenahPayload>(`/api/sessions/${id}/denah`);
+  const detail = session.data ?? null;
+  const gudang = denah.data?.gudang ?? [];
+  const pinned = denah.data?.pinned ?? true;
 
   async function openSession() {
     const { ok, data } = await fetchJson<{ error?: string; missing_assignments?: string[] }>(`/api/sessions/${id}/open`, {
@@ -89,19 +70,21 @@ export function SesiDetail({ id }: { id: string }) {
     if (!ok) {
       toast(data.error ?? "Belum bisa dibuka.");
       if (data.missing_assignments) {
-        setDetail((current) => (current ? { ...current, missing_assignments: data.missing_assignments ?? [] } : current));
+        queryClient.setQueryData<Detail>(siapKey(`/api/sessions/${id}`), (current) =>
+          current ? { ...current, missing_assignments: data.missing_assignments ?? [] } : current,
+        );
       }
       return;
     }
-    const next = await fetchSession(id);
-    if (next) {
-      setDetail(next);
-    }
+    invalidate([`/api/sessions/${id}`, `/api/sessions/${id}/denah`, "/api/sessions"]);
     toast("Sesi dibuka. Tag sudah di-pin.");
   }
 
-  if (!detail) {
+  if (session.isPending) {
     return <LoadingMark />;
+  }
+  if (!detail) {
+    return <p className="text-sm">Sesi belum bisa dimuat.</p>;
   }
 
   const scope = detail.scope;

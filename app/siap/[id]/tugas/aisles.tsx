@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { fetchJson } from "@/app/siap/api";
+import { useDraftRows, useSiapInvalidate, useSiapQuery } from "@/app/siap/query";
+import { groupBy } from "@/lib/group";
 import { PassSelect, type CounterOption } from "@/app/siap/pass-select";
 import { ReportRow, ReportTable, Td } from "@/app/siap/report-table";
 import { ErrorText, MissingList, TealButton } from "@/app/siap/ui";
@@ -20,31 +22,20 @@ type AisleRow = {
 };
 
 export function AisleTasks({ id, counters }: { id: string; counters: CounterOption[] }) {
-  const [rows, setRows] = useState<AisleRow[]>([]);
-  const [ready, setReady] = useState(false);
+  const invalidate = useSiapInvalidate();
+  const board = useSiapQuery<{ ready: boolean; aisles: AisleRow[] }>(`/api/sessions/${id}/aisles`);
+  const [rows, setRows] = useDraftRows(id, board.data?.aisles);
   const [error, setError] = useState("");
   const [missing, setMissing] = useState<string[]>([]);
+  const ready = board.data?.ready ?? false;
+  const list = rows ?? [];
 
-  useEffect(() => {
-    let cancelled = false;
-    void fetchJson<{ ready: boolean; aisles: AisleRow[] }>(`/api/sessions/${id}/aisles`).then(({ ok, data }) => {
-      if (cancelled || !ok) {
-        return;
-      }
-      setReady(data.ready);
-      setRows(data.aisles);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
-
-  if (rows.length === 0) {
+  if (list.length === 0) {
     return null;
   }
 
   function update(key: string, patch: Partial<AisleRow>) {
-    setRows((current) => current.map((row) => (aisleKey(row.gudang, row.aisle) === key ? { ...row, ...patch } : row)));
+    setRows((current) => (current ?? []).map((row) => (aisleKey(row.gudang, row.aisle) === key ? { ...row, ...patch } : row)));
   }
 
   async function save() {
@@ -53,7 +44,7 @@ export function AisleTasks({ id, counters }: { id: string; counters: CounterOpti
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        aisles: rows.map((row) => ({
+        aisles: list.map((row) => ({
           gudang: row.gudang,
           aisle: row.aisle,
           pass_1: row.crossed ? null : row.pass1,
@@ -68,15 +59,11 @@ export function AisleTasks({ id, counters }: { id: string; counters: CounterOpti
       return;
     }
     setMissing(data.missing_assignments ?? []);
+    invalidate([`/api/sessions/${id}/aisles`, `/api/sessions/${id}`]);
     toast("Tugas lorong tersimpan.");
   }
 
-  const groups = new Map<number, AisleRow[]>();
-  for (const row of rows) {
-    const list = groups.get(row.gudang) ?? [];
-    list.push(row);
-    groups.set(row.gudang, list);
-  }
+  const groups = groupBy(list, (row) => row.gudang);
 
   return (
     <div className="mt-6">

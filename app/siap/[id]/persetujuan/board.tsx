@@ -12,9 +12,10 @@ import {
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { confirm } from "@/app/confirm";
 import { fetchJson } from "@/app/siap/api";
+import { useSiapInvalidate, useSiapQuery } from "@/app/siap/query";
 import { LoadingMark } from "@/app/loading-mark";
 import { formatDateTime, type SessionScope } from "@/app/siap/format";
 import { BackLink, Card, ErrorText, Field, IconLabel, InfoCard, OutlineButton, PageLead, ScopeLists, TealButton, TextInput } from "@/app/siap/ui";
@@ -34,35 +35,14 @@ type Detail = {
 };
 
 export function PersetujuanBoard({ id }: { id: string }) {
-  const [detail, setDetail] = useState<Detail | null>(null);
-  const [me, setMe] = useState<StaffSession | null>(null);
+  const invalidate = useSiapInvalidate();
+  const session = useSiapQuery<Detail>(`/api/sessions/${id}`);
+  const meQuery = useSiapQuery<StaffSession>("/api/auth/me");
+  const detail = session.data ?? null;
+  const me = meQuery.data ?? null;
   const [catatan, setCatatan] = useState("");
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
-
-  async function load() {
-    const { ok, data } = await fetchJson<Detail>(`/api/sessions/${id}`);
-    if (ok) {
-      setDetail(data);
-    }
-  }
-
-  useEffect(() => {
-    let cancelled = false;
-    void fetchJson<Detail>(`/api/sessions/${id}`).then(({ ok, data }) => {
-      if (!cancelled && ok) {
-        setDetail(data);
-      }
-    });
-    void fetchJson<StaffSession>("/api/auth/me").then(({ ok, data }) => {
-      if (!cancelled && ok) {
-        setMe(data);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
 
   async function post(path: string, body: Record<string, unknown>) {
     setError("");
@@ -73,11 +53,11 @@ export function PersetujuanBoard({ id }: { id: string }) {
     });
     if (!ok) {
       toast(data.error ?? "Gagal.", setError);
-      await load();
+      invalidate([`/api/sessions/${id}`, "/api/staff-actions"]);
       return;
     }
     toast("Tersimpan.");
-    await load();
+    invalidate([`/api/sessions/${id}`, "/api/staff-actions", "/api/sessions"]);
   }
 
   async function askThen(ask: { title: string; message: string; confirmLabel: string; tone?: "teal" | "danger" }, action: () => Promise<void>) {

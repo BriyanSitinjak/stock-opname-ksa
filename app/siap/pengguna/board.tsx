@@ -1,10 +1,11 @@
 "use client";
 
 import { KeyRound, UserMinus } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { confirm } from "@/app/confirm";
 import { EmptyState } from "@/app/empty-state";
 import { fetchJson } from "@/app/siap/api";
+import { useSiapInvalidate, useSiapQuery } from "@/app/siap/query";
 import { ReportRow, ReportTable, Td } from "@/app/siap/report-table";
 import { ErrorText, PageLead, Select, TealButton } from "@/app/siap/ui";
 import { toast } from "@/app/toast";
@@ -63,11 +64,6 @@ function RoleSelect({
   );
 }
 
-async function readUsers() {
-  const { ok, data } = await fetchJson<{ users: Person[] }>("/api/users");
-  return ok ? data.users : null;
-}
-
 function patchUser(id: string, body: { role?: StaffRole; retired?: boolean; password?: string }) {
   return fetchJson<{ error?: string }>(`/api/users/${id}`, {
     method: "PATCH",
@@ -77,31 +73,17 @@ function patchUser(id: string, body: { role?: StaffRole; retired?: boolean; pass
 }
 
 export function PenggunaBoard() {
-  const [people, setPeople] = useState<Person[]>([]);
+  const users = useSiapQuery<{ users: Person[] }>("/api/users");
+  const meQuery = useSiapQuery<StaffSession>("/api/auth/me");
+  const invalidate = useSiapInvalidate();
+  const people = users.data?.users ?? [];
+  const me = meQuery.data ?? null;
   const [nama, setNama] = useState("");
   const [role, setRole] = useState<StaffRole>("counter");
   const [password, setPassword] = useState("");
   const [draft, setDraft] = useState<{ id: string; role: StaffRole; password: string } | null>(null);
   const [reset, setReset] = useState<{ id: string; password: string } | null>(null);
   const [error, setError] = useState("");
-  const [me, setMe] = useState<StaffSession | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void readUsers().then((users) => {
-      if (!cancelled && users) {
-        setPeople(users);
-      }
-    });
-    void fetchJson<StaffSession>("/api/auth/me").then(({ ok, data }) => {
-      if (!cancelled && ok) {
-        setMe(data);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   async function addPerson() {
     setError("");
@@ -124,11 +106,8 @@ export function PenggunaBoard() {
     }
     setNama("");
     setPassword("");
+    invalidate(["/api/users"]);
     toast("Pengguna tersimpan.");
-    const users = await readUsers();
-    if (users) {
-      setPeople(users);
-    }
   }
 
   function chooseRole(person: Person, next: StaffRole) {
@@ -151,7 +130,7 @@ export function PenggunaBoard() {
       toast(data.error ?? "Gagal mengubah role.", setError);
       return;
     }
-    setPeople((current) => current.map((row) => (row.id === person.id ? { ...row, role: next } : row)));
+    invalidate(["/api/users"]);
     setDraft(null);
     toast("Role diubah.");
   }
@@ -211,7 +190,7 @@ export function PenggunaBoard() {
       toast(data.error ?? "Gagal menonaktifkan.", setError);
       return;
     }
-    setPeople((current) => current.filter((row) => row.id !== person.id));
+    invalidate(["/api/users"]);
     toast(`${person.nama} dinonaktifkan.`);
   }
 

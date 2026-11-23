@@ -5,7 +5,7 @@ import { EmptyState } from "@/app/empty-state";
 import { ReportRow, ReportTable, Td } from "@/app/siap/report-table";
 import { SearchForm, Select } from "@/app/siap/ui";
 
-type Item = {
+export type DaftarItem = {
   id: string;
   kode_barang: string;
   nama_barang: string;
@@ -14,7 +14,7 @@ type Item = {
   qty_onhand: string;
 };
 
-type Choice = { id: string; nama: string };
+export type GudangChoice = { id: string; nama: string };
 
 export function DaftarBrowse({
   id,
@@ -29,14 +29,14 @@ export function DaftarBrowse({
   brandChoices,
 }: {
   id: string;
-  items: Item[];
+  items: DaftarItem[];
   total: number;
   page: number;
   take: number;
   q: string;
   gudang: string;
   brand: string;
-  gudangChoices: Choice[];
+  gudangChoices: GudangChoice[];
   brandChoices: string[];
 }) {
   const router = useRouter();
