@@ -387,6 +387,33 @@ export function UnknownItemOverlay({
   );
 }
 
+const CREDIT_SRC = "/brand/briyan-sitinjak.webp";
+
+function CreditPortrait({
+  size,
+  alt = "",
+  className,
+  priority = false,
+}: {
+  size: number;
+  alt?: string;
+  className?: string;
+  priority?: boolean;
+}) {
+  return <Image src={CREDIT_SRC} alt={alt} width={size} height={size} className={className} priority={priority} />;
+}
+
+/** Warm the credit portrait so Tentang does not wait on first paint. */
+export function PrefetchDeveloperCredit() {
+  return (
+    <CreditPortrait
+      size={1}
+      priority
+      className="pointer-events-none absolute h-px w-px opacity-0"
+    />
+  );
+}
+
 export function DeveloperCredit({ onOpen }: { onOpen: () => void }) {
   return (
     <button
@@ -395,7 +422,7 @@ export function DeveloperCredit({ onOpen }: { onOpen: () => void }) {
       onClick={onOpen}
     >
       <span>developed by</span>
-      <Image src="/brand/briyan-sitinjak.webp" alt="BS" width={28} height={28} className="rounded-md" />
+      <CreditPortrait size={28} alt="BS" className="rounded-md" />
     </button>
   );
 }
@@ -404,7 +431,7 @@ export function DeveloperCreditDialog({ onClose }: { onClose: () => void }) {
   return (
     <Overlay>
       <div className="flex flex-col items-center text-center">
-        <Image src="/brand/briyan-sitinjak.webp" alt="" width={64} height={64} className="rounded-xl" />
+        <CreditPortrait size={64} className="rounded-xl" />
         <p className="mt-4 text-lg font-semibold">Briyan Sitinjak</p>
         <TextLink className="mt-4" onClick={onClose}>
           Tutup

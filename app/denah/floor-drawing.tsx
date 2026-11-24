@@ -6,11 +6,14 @@ import { placeAt, type Floor, type FloorPlace } from "@/lib/floor-plan";
 const DEFAULT_PLACE =
   "bg-ksa-sage text-ksa-teal-deep disabled:bg-[#e8e4dc] disabled:text-[#8a8a8a]";
 
+const PLACE_LAYOUT = "flex flex-col items-center justify-center";
+
 type PlaceHooks = {
   selectedId: string | null;
   onSelect: (place: FloorPlace) => void;
   placeClassName?: (place: FloorPlace) => string;
   disabledPlace?: (place: FloorPlace) => boolean;
+  placeContent?: (place: FloorPlace, fallback: string) => ReactNode;
 };
 
 function PlaceButton({
@@ -19,9 +22,10 @@ function PlaceButton({
   onSelect,
   placeClassName,
   disabledPlace,
+  placeContent,
   className,
-  children,
-}: PlaceHooks & { place: FloorPlace; className: string; children: ReactNode }) {
+  fallback,
+}: PlaceHooks & { place: FloorPlace; className: string; fallback: string }) {
   const disabled = disabledPlace?.(place) ?? false;
   const tone = placeClassName?.(place) ?? DEFAULT_PLACE;
   const selected = selectedId === place.id ? "ring-2 ring-[#1c1c1c]" : "";
@@ -32,7 +36,7 @@ function PlaceButton({
       onClick={() => onSelect(place)}
       className={`${className} disabled:cursor-not-allowed ${tone} ${selected}`}
     >
-      {children}
+      {placeContent?.(place, fallback) ?? fallback}
     </button>
   );
 }
@@ -43,10 +47,11 @@ export function FloorDrawing({
   onSelect,
   placeClassName,
   disabledPlace,
+  placeContent,
 }: {
   floor: Floor;
 } & PlaceHooks) {
-  const hooks = { selectedId, onSelect, placeClassName, disabledPlace };
+  const hooks = { selectedId, onSelect, placeClassName, disabledPlace, placeContent };
   return (
     <div className="mt-4 overflow-x-auto rounded-3xl bg-white p-4 shadow-sm">
       <p className="mb-3 text-center text-xs tracking-wide text-[#8a8a8a] uppercase">Ujung jauh</p>
@@ -80,14 +85,18 @@ function Row({ floor, row, ...hooks }: { floor: Floor; row: number } & PlaceHook
       {floor.aisles.map((aisle) => {
         const places = placeAt(floor, aisle.id, row);
         if (places.length === 0) {
-          return <span key={aisle.id} className="min-h-10 rounded-lg bg-[#f3eee4]" />;
+          return <span key={aisle.id} className="min-h-12 rounded-lg bg-[#f3eee4]" />;
         }
         return (
-          <span key={aisle.id} className="flex min-h-10 gap-1">
+          <span key={aisle.id} className="flex min-h-12 gap-1">
             {places.map((place) => (
-              <PlaceButton key={place.id} place={place} className="flex-1 rounded-lg text-xs font-medium" {...hooks}>
-                {place.side}
-              </PlaceButton>
+              <PlaceButton
+                key={place.id}
+                place={place}
+                fallback={place.side ?? place.label}
+                className={`${PLACE_LAYOUT} flex-1 rounded-lg px-0.5 py-1 text-xs font-medium`}
+                {...hooks}
+              />
             ))}
           </span>
         );
@@ -102,9 +111,13 @@ function ExtraBand({ floor, ...hooks }: { floor: Floor } & PlaceHooks) {
       <p className="mb-2 text-xs text-[#6b6b6b]">{floor.extras.title}</p>
       <div className="flex flex-wrap gap-2">
         {floor.extras.places.map((place) => (
-          <PlaceButton key={place.id} place={place} className="rounded-xl px-4 py-3 text-sm font-semibold" {...hooks}>
-            {place.label}
-          </PlaceButton>
+          <PlaceButton
+            key={place.id}
+            place={place}
+            fallback={place.label}
+            className={`${PLACE_LAYOUT} min-h-14 rounded-xl px-4 py-2 text-sm font-semibold`}
+            {...hooks}
+          />
         ))}
       </div>
     </div>

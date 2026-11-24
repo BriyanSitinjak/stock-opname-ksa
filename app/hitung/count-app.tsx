@@ -20,6 +20,7 @@ import {
   PassAckNote,
   PassBadge,
   Phone,
+  PrefetchDeveloperCredit,
   PrimaryButton,
   QtyRow,
   TextLink,
@@ -68,7 +69,6 @@ type Screen =
   | "bind"
   | "prepare"
   | "home"
-  | "open-aisle"
   | "confirm-aisle"
   | "denah"
   | "count"
@@ -627,13 +627,6 @@ export function CountApp() {
   }
 
   function pickPlace(nomor: string, pass: number, lokasi: string) {
-    // One paper number binds to one lorong only. Consume any pending paper once.
-    const paper = tagNomor.trim();
-    setTagNomor("");
-    if (paper) {
-      void openTag(nomor, pass, paper);
-      return;
-    }
     // Same counter who already marked Lorong Selesai/Kosong on this phone may reopen without paper.
     const prior = prepare ? sameUserProgressForNomor(prepare, progress, nomor, pass) : null;
     if (prior) {
@@ -641,6 +634,7 @@ export function CountApp() {
       return;
     }
     setPendingAisle({ nomor, pass, lokasi });
+    setTagNomor("");
     setMessage("");
     setScreen("confirm-aisle");
   }
@@ -754,6 +748,7 @@ export function CountApp() {
       nomor_kartu: card.nomor,
       is_empty: isEmpty,
       user_id: prepare?.counter.id,
+      user_nama: prepare?.counter.nama,
     });
     await refreshPending();
     setEmptyConfirm(false);
@@ -932,38 +927,71 @@ export function CountApp() {
   }
 
   if (screen === "home") {
+    const finishedLorong = progress.length;
     return (
       <Phone>
+        <PrefetchDeveloperCredit />
         {bar}
         <h1 className="sr-only">Beranda</h1>
-        <p className="text-sm leading-6 text-[#5c5c5c]">
-          Ketik nomor dari kertas hari ini, lalu pilih posisi di denah. Cari barang, isi jumlah, lalu simpan. Kirim
-          hasil lewat tombol di kanan atas saat ada sinyal.
+        <p className="text-xs tracking-wide text-[#8a8a8a] uppercase">
+          {prepare?.session.nama ?? "Sesi"} · {prepare?.session.periode ?? "—"}
         </p>
-        <div className="mt-5 flex flex-col gap-3">
+        <p className="mt-2 text-3xl font-semibold leading-tight tracking-tight">
+          Halo, {prepare?.counter.nama?.split(/\s+/)[0] ?? "Petugas"}
+        </p>
+        <p className="mt-2 text-sm leading-6 text-[#5c5c5c]">
+          Pilih lorong di denah, isi nomor kertas, lalu catat barang. Kirim lewat Data di kanan atas saat ada sinyal.
+        </p>
+
+        <div className="mt-6 grid grid-cols-2 gap-3">
+          <div className="rounded-2xl bg-white px-4 py-4 shadow-sm">
+            <p className="text-[11px] tracking-wide text-[#8a8a8a] uppercase">Belum kirim</p>
+            <p className="mt-1 text-3xl font-semibold text-ksa-teal-deep">{pendingItems}</p>
+          </div>
+          <div className="rounded-2xl bg-white px-4 py-4 shadow-sm">
+            <p className="text-[11px] tracking-wide text-[#8a8a8a] uppercase">Lorong selesai</p>
+            <p className="mt-1 text-3xl font-semibold">{finishedLorong}</p>
+          </div>
+        </div>
+
+        <ol className="mt-6 space-y-3 text-sm text-[#5c5c5c]">
+          <li className="flex gap-3">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ksa-teal text-xs font-semibold text-white">
+              1
+            </span>
+            <span className="pt-1">Buka denah dan pilih lorong tugas Anda</span>
+          </li>
+          <li className="flex gap-3">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ksa-teal text-xs font-semibold text-white">
+              2
+            </span>
+            <span className="pt-1">Ketik nomor kertas, lalu mulai hitung</span>
+          </li>
+          <li className="flex gap-3">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ksa-teal text-xs font-semibold text-white">
+              3
+            </span>
+            <span className="pt-1">Simpan barang, tutup lorong, sinkronkan</span>
+          </li>
+        </ol>
+
+        <div className="mt-auto pt-8">
           <button
             type="button"
-            className="rounded-[28px] bg-ksa-teal px-5 py-8 text-left text-white"
+            className="w-full rounded-[28px] bg-ksa-teal px-5 py-7 text-left text-white shadow-sm transition active:scale-[0.99]"
             onClick={() => {
               setTagNomor("");
-              setMessage("");
-              setScreen("open-aisle");
-            }}
-          >
-            <p className="text-xl font-semibold">Masukkan Nomor Kertas</p>
-            <p className="mt-1 text-sm text-white/80">Nomor acak di kertas / kartu hari ini</p>
-          </button>
-          <GhostButton
-            onClick={() => {
               setMessage("");
               setScreen("denah");
             }}
           >
-            Pilih dari Denah
-          </GhostButton>
+            <p className="text-xl font-semibold">Buka Denah</p>
+            <p className="mt-1 text-sm text-white/80">Pilih lorong, lalu isi nomor kertas</p>
+          </button>
         </div>
+
         {message ? <p className="mt-4 text-sm">{message}</p> : null}
-        <div className="mt-auto h-16 shrink-0" />
+        <div className="h-16 shrink-0" />
         <div className="pointer-events-none fixed inset-x-0 bottom-0 z-20">
           <div className="mx-auto flex w-full max-w-[390px] items-center justify-between px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
             <button
@@ -1010,30 +1038,6 @@ export function CountApp() {
     );
   }
 
-  if (screen === "open-aisle") {
-    return (
-      <Phone>
-        <BackButton className="mb-3" onClick={() => setScreen("home")} />
-        {bar}
-        <h1 className="text-2xl font-semibold">Nomor Kertas</h1>
-        <p className="mt-2 text-sm text-[#6b6b6b]">Ketik nomor di kertas yang Anda terima hari ini. Nomor ini acak tiap hari.</p>
-        <PaperNumberField value={tagNomor} onChange={setTagNomor} />
-        <ActionColumn>
-          <PrimaryButton
-            disabled={!tagNomor.trim()}
-            onClick={() => {
-              setMessage("");
-              setScreen("denah");
-            }}
-          >
-            Lanjut ke Denah
-          </PrimaryButton>
-        </ActionColumn>
-        {message ? <MessageOverlay message={message} onClose={() => setMessage("")} /> : null}
-      </Phone>
-    );
-  }
-
   if (screen === "confirm-aisle") {
     return (
       <Phone>
@@ -1074,8 +1078,8 @@ export function CountApp() {
         {bar}
         <h1 className="text-2xl font-semibold">Pilih dari Denah</h1>
         <p className="mt-1 text-sm text-[#6b6b6b]">
-          Huruf di atas, nomor di kiri. Satu nomor kertas hanya untuk satu lorong
-          {tagNomor.trim() ? ` · kertas ${tagNomor.trim()} siap untuk posisi berikutnya` : ""}.
+          Huruf di atas, nomor di kiri. Setelah pilih lorong, isi nomor kertas. Kotak hitam menampilkan inisial
+          Hitung ke-1 / ke-2.
         </p>
         {prepare ? (
           <PhoneDenah
