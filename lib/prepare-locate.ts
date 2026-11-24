@@ -24,6 +24,10 @@ export function locatePrepareTagByNomor(prepare: PreparePayload, nomor: string) 
   return locatePrepareTag(prepare, (tag) => tag.nomor === nomor);
 }
 
+export function locatePrepareTagById(prepare: PreparePayload, tagId: string) {
+  return locatePrepareTag(prepare, (tag) => tag.id === tagId);
+}
+
 export function latestAssignment(prepare: PreparePayload, tagId: string, pass?: number) {
   const mine = prepare.assignments.filter((row) => row.tag_id === tagId);
   if (pass != null) {

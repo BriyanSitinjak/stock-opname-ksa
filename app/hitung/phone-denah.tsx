@@ -16,6 +16,22 @@ const PLACE_TONE: Record<PlaceStatus, string> = {
   empty: "bg-[#f3eee4] text-[#b0b0b0]",
 };
 
+function resolvePlace(
+  prepare: PreparePayload,
+  crossed: Set<string>,
+  place: FloorPlace,
+): { status: PlaceStatus; tag: LocatedPrepareTag | null } {
+  if (crossed.has(place.aisle) || crossed.has(place.label)) {
+    return { status: "crossed", tag: null };
+  }
+  const tag = locatePrepareTagByNomor(prepare, place.label);
+  if (!tag) {
+    return { status: "empty", tag: null };
+  }
+  const mine = prepare.assignments.some((row) => row.tag_id === tag.id);
+  return { status: mine ? "mine" : "other", tag };
+}
+
 export function PhoneDenah({
   prepare,
   onPick,
@@ -28,28 +44,17 @@ export function PhoneDenah({
   const floor = floorByGudang(gudang) ?? floors[0]!;
   const crossed = useMemo(() => new Set((prepare.crosses ?? []).map((row) => row.aisle)), [prepare.crosses]);
 
-  function statusFor(place: FloorPlace): PlaceStatus {
-    if (crossed.has(place.aisle) || crossed.has(place.label)) {
-      return "crossed";
-    }
-    const tag = locatePrepareTagByNomor(prepare, place.label);
-    if (!tag) {
-      return "empty";
-    }
-    return prepare.assignments.some((row) => row.tag_id === tag.id) ? "mine" : "other";
-  }
-
   function onSelect(place: FloorPlace) {
-    if (statusFor(place) !== "mine") {
+    const resolved = resolvePlace(prepare, crossed, place);
+    if (resolved.status !== "mine" || !resolved.tag) {
       return;
     }
-    const tag = locatePrepareTagByNomor(prepare, place.label);
-    const assignment = tag ? latestAssignment(prepare, tag.id) : null;
-    if (!tag || !assignment) {
+    const assignment = latestAssignment(prepare, resolved.tag.id);
+    if (!assignment) {
       return;
     }
     setSelectedId(place.id);
-    onPick(tag, assignment.pass);
+    onPick(resolved.tag, assignment.pass);
   }
 
   return (
@@ -81,8 +86,8 @@ export function PhoneDenah({
         floor={floor}
         selectedId={selectedId}
         onSelect={onSelect}
-        placeClassName={(place) => PLACE_TONE[statusFor(place)]}
-        disabledPlace={(place) => statusFor(place) !== "mine"}
+        placeClassName={(place) => PLACE_TONE[resolvePlace(prepare, crossed, place).status]}
+        disabledPlace={(place) => resolvePlace(prepare, crossed, place).status !== "mine"}
       />
     </div>
   );

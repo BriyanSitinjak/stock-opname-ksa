@@ -9,23 +9,28 @@ import {
   ActionColumn,
   AisleMeta,
   BackButton,
+  ConfirmOverlay,
   DeveloperCredit,
   DeveloperCreditDialog,
   GhostButton,
   MessageOverlay,
   Overlay,
   PaperNumberField,
+  PassAckNote,
+  PassBadge,
   Phone,
   PrimaryButton,
   TextLink,
   TopBar,
+  UnknownItemOverlay,
   WaitNote,
 } from "@/app/hitung/ui";
+import { hasPassAck, setPassAck } from "@/app/hitung/pass-ack";
 import { toast } from "@/app/toast";
 import { cardAlreadyUsed } from "@/lib/aisle-rules";
 import { isFloorPlace } from "@/lib/floor-plan";
 import { SESSION_ID } from "@/lib/fixture";
-import { latestAssignment, locatePrepareTagByNomor } from "@/lib/prepare-locate";
+import { latestAssignment, locatePrepareTagById, locatePrepareTagByNomor } from "@/lib/prepare-locate";
 import { SHARE_CURRENT_SESSION } from "@/lib/testing";
 import { maybeActivate } from "@/lib/offline/register-sw";
 import { qtyOrDash } from "@/lib/qty-display";
@@ -64,7 +69,6 @@ type Screen =
   | "denah"
   | "count"
   | "search"
-  | "unknown"
   | "sync"
   | "about";
 
@@ -239,6 +243,10 @@ export function CountApp() {
   const [search, setSearch] = useState("");
   const [duplicate, setDuplicate] = useState<{ existing: LocalLine; incoming: string } | null>(null);
   const [emptyConfirm, setEmptyConfirm] = useState(false);
+  const [selesaiConfirm, setSelesaiConfirm] = useState(false);
+  const [closeConfirm, setCloseConfirm] = useState(false);
+  const [unknownOpen, setUnknownOpen] = useState(false);
+  const [passAcked, setPassAcked] = useState(true);
   const [exitBlock, setExitBlock] = useState(false);
   const [booting, setBooting] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -555,19 +563,25 @@ export function CountApp() {
     setKondisi("baik");
     setFocusField("qty");
     setEmptyConfirm(false);
+    setSelesaiConfirm(false);
+    setCloseConfirm(false);
+    setUnknownOpen(false);
+    setPassAcked(hasPassAck(sessionId, tag.id, assignment.pass));
     setMessage("");
     setPendingAisle(null);
+    setTagNomor("");
     setScreen("count");
   }
 
   function pickPlace(nomor: string, pass: number, lokasi: string) {
+    // One paper number binds to one lorong only. Consume any pending paper once.
     const paper = tagNomor.trim();
+    setTagNomor("");
     if (paper) {
       void openTag(nomor, pass, paper);
       return;
     }
     setPendingAisle({ nomor, pass, lokasi });
-    setTagNomor("");
     setMessage("");
     setScreen("confirm-aisle");
   }
@@ -671,6 +685,9 @@ export function CountApp() {
     });
     await refreshPending();
     setEmptyConfirm(false);
+    setSelesaiConfirm(false);
+    setTagNomor("");
+    setCardNo("");
     setScreen("home");
     setMessage(isEmpty ? `Lorong ${activeTag.nomor} ditandai kosong.` : `Lorong ${activeTag.nomor} selesai.`);
   }
@@ -693,9 +710,37 @@ export function CountApp() {
     await refreshPending();
     setUnknownNama("");
     setUnknownQty("");
-    setScreen("count");
+    setUnknownOpen(false);
     setMessage("Dicatat sebagai tidak dikenal.");
   }
+
+  const aisleRecords = useMemo(() => {
+    if (!prepare) {
+      return [];
+    }
+    const byKey = new Map<
+      string,
+      { tag_id: string; nomor: string; lokasi: string; pass: number; nomor_kartu: string | null; items: number }
+    >();
+    for (const line of doneLines) {
+      const key = `${line.tag_id}:${line.pass}`;
+      const place = locatePrepareTagById(prepare, line.tag_id);
+      const current = byKey.get(key) ?? {
+        tag_id: line.tag_id,
+        nomor: place?.nomor ?? line.tag_id,
+        lokasi: place?.lokasi ?? "—",
+        pass: line.pass,
+        nomor_kartu: line.nomor_kartu ?? null,
+        items: 0,
+      };
+      current.items += 1;
+      if (!current.nomor_kartu && line.nomor_kartu) {
+        current.nomor_kartu = line.nomor_kartu;
+      }
+      byKey.set(key, current);
+    }
+    return [...byKey.values()].sort((left, right) => left.nomor.localeCompare(right.nomor) || left.pass - right.pass);
+  }, [doneLines, prepare]);
 
   function onDigit(digit: string) {
     if (focusField === "code") {
@@ -975,8 +1020,8 @@ export function CountApp() {
         {bar}
         <h1 className="text-2xl font-semibold">Pilih dari Denah</h1>
         <p className="mt-1 text-sm text-[#6b6b6b]">
-          Huruf di atas, nomor di kiri. Pilih posisi tugas Anda
-          {tagNomor.trim() ? ` · kertas ${tagNomor.trim()}` : ""}.
+          Huruf di atas, nomor di kiri. Satu nomor kertas hanya untuk satu lorong
+          {tagNomor.trim() ? ` · kertas ${tagNomor.trim()} siap untuk posisi berikutnya` : ""}.
         </p>
         {prepare ? (
           <PhoneDenah prepare={prepare} onPick={(tag, pass) => pickPlace(tag.nomor, pass, tag.lokasi)} />
@@ -1038,38 +1083,6 @@ export function CountApp() {
     );
   }
 
-  if (screen === "unknown") {
-    return (
-      <Phone>
-        <BackButton className="mb-3" onClick={() => setScreen("count")} />
-        {bar}
-        <h1 className="text-2xl font-semibold">Barang tidak dikenal</h1>
-        <label className="mt-5 block text-sm">
-          Nama
-          <input
-            className="mt-1 w-full rounded-2xl bg-white px-4 py-3"
-            value={unknownNama}
-            onChange={(e) => setUnknownNama(e.target.value)}
-          />
-        </label>
-        <label className="mt-3 block text-sm">
-          Jumlah
-          <input
-            className="mt-1 w-full rounded-2xl bg-white px-4 py-3"
-            inputMode="decimal"
-            value={unknownQty}
-            onChange={(e) => setUnknownQty(e.target.value)}
-          />
-        </label>
-        <ActionColumn>
-          <PrimaryButton onClick={() => void saveUnknown()}>Simpan</PrimaryButton>
-          <TextLink onClick={() => setScreen("count")}>Batal</TextLink>
-        </ActionColumn>
-        {message ? <p className="mt-3 text-sm">{message}</p> : null}
-      </Phone>
-    );
-  }
-
   if (screen === "sync") {
     return (
       <Phone tone="sync">
@@ -1103,7 +1116,29 @@ export function CountApp() {
         <div className="mt-4">
           <PrimaryButton onClick={() => void syncNow(false)}>Kirim Sekarang</PrimaryButton>
         </div>
-        <h2 className="mt-6 text-sm font-medium text-[#6b6b6b]">Sudah dicatat ({doneLines.length})</h2>
+        <h2 className="mt-6 text-sm font-medium text-[#6b6b6b]">Lorong & nomor kertas ({aisleRecords.length})</h2>
+        <ul className="mt-2 flex flex-col gap-2">
+          {aisleRecords.length === 0 ? (
+            <li className="rounded-2xl bg-white px-4 py-3 text-sm text-[#6b6b6b]">Belum ada lorong yang dicatat.</li>
+          ) : (
+            aisleRecords.map((row) => (
+              <li key={`${row.tag_id}-${row.pass}`} className="rounded-2xl bg-white px-4 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold">Lorong {row.nomor}</p>
+                    <p className="mt-0.5 text-xs text-[#8a8a8a]">{row.lokasi}</p>
+                  </div>
+                  <PassBadge pass={row.pass} />
+                </div>
+                <p className="mt-2 text-sm">
+                  Nomor kertas: <span className="font-semibold">{row.nomor_kartu || "—"}</span>
+                </p>
+                <p className="mt-1 text-xs text-[#8a8a8a]">{row.items} barang dicatat</p>
+              </li>
+            ))
+          )}
+        </ul>
+        <h2 className="mt-6 text-sm font-medium text-[#6b6b6b]">Barang ({doneLines.length})</h2>
         <ul className="mt-2 flex flex-col gap-2">
           {doneLines.map((line) => (
             <li key={line.key} className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3">
@@ -1148,22 +1183,35 @@ export function CountApp() {
     );
   }
 
+  const countingBlocked = !passAcked && (activeTag?.pass === 1 || activeTag?.pass === 2);
+
+  function openUnknownForm() {
+    setUnknownNama("");
+    setUnknownQty("");
+    setUnknownOpen(true);
+  }
+
   return (
     <Phone tone="ink">
-      <BackButton light className="mb-3" onClick={() => setScreen("home")} />
+      <BackButton light className="mb-3" onClick={() => setCloseConfirm(true)} />
       {bar}
       {activeTag ? (
         <AisleMeta nomor={activeTag.nomor} lokasi={activeTag.lokasi} pass={activeTag.pass} tone="ink" />
+      ) : null}
+      {activeTag && countingBlocked ? (
+        <PassAckNote
+          pass={activeTag.pass}
+          onAck={() => {
+            setPassAck(sessionId, activeTag.id, activeTag.pass);
+            setPassAcked(true);
+          }}
+        />
       ) : null}
       <p className="mt-3 text-base font-medium text-white/70">Cari barang, isi jumlah, lalu simpan.</p>
       {activeTag && isFloorPlace(activeTag.nomor) ? (
         <label className="mt-4 block text-sm">
           <span className="text-white/70">Nomor kertas</span>
-          <input
-            className="mt-1 w-full rounded-2xl bg-ksa-panel px-4 py-3 text-white outline-none"
-            value={cardNo}
-            onChange={(event) => setCardNo(event.target.value)}
-          />
+          <PaperNumberField tone="ink" autoFocus={false} value={cardNo} onChange={setCardNo} />
         </label>
       ) : null}
       {activeTag?.pass === 3 && (activeTag.compare?.length ?? 0) > 0 ? (
@@ -1180,7 +1228,8 @@ export function CountApp() {
       ) : null}
       <button
         type="button"
-        className="mt-4 w-full rounded-full border border-white/40 py-3 text-sm font-medium"
+        disabled={countingBlocked}
+        className="mt-4 w-full rounded-full border border-white/40 py-3 text-sm font-medium disabled:opacity-40"
         onClick={() => setScreen("search")}
       >
         Cari Barang
@@ -1189,7 +1238,7 @@ export function CountApp() {
       <p className="mt-5 text-xs uppercase tracking-wide text-white/40">Jumlah</p>
       <button
         type="button"
-        disabled={!matched}
+        disabled={!matched || countingBlocked}
         className={`mt-1 w-full text-left text-5xl font-semibold disabled:opacity-30 ${focusField === "qty" ? "text-white" : "text-white/50"}`}
         onClick={() => setFocusField("qty")}
       >
@@ -1213,19 +1262,22 @@ export function CountApp() {
         <NumericKeypad variant="dark" onDigit={onDigit} onBack={onBack} />
       </div>
       <div className="mt-4">
-        <PrimaryButton disabled={!matched || !qty} onClick={() => void saveLine(qty)}>
+        <PrimaryButton disabled={!matched || !qty || countingBlocked} onClick={() => void saveLine(qty)}>
           Simpan Barang
         </PrimaryButton>
       </div>
-      <div className="mt-3 text-sm">
-        <button type="button" className="text-white/70" onClick={() => setScreen("unknown")}>
-          Tidak dikenal
-        </button>
-      </div>
+      <button
+        type="button"
+        disabled={countingBlocked}
+        className="mt-3 w-full rounded-full border border-ksa-amber bg-ksa-amber/20 py-3 text-sm font-semibold text-ksa-amber disabled:opacity-40"
+        onClick={openUnknownForm}
+      >
+        Tidak dikenal
+      </button>
       {!matched && code.length >= 4 ? (
         <p className="mt-3 text-sm text-ksa-amber">
           Kode {code} tidak ditemukan.{" "}
-          <button type="button" className="underline" onClick={() => setScreen("unknown")}>
+          <button type="button" className="underline" onClick={openUnknownForm}>
             Catat sebagai Tidak Dikenal
           </button>
         </p>
@@ -1260,7 +1312,7 @@ export function CountApp() {
         <button
           type="button"
           className="flex-1 rounded-full border border-white/30 py-3 text-sm"
-          onClick={() => void submitTag(false)}
+          onClick={() => setSelesaiConfirm(true)}
         >
           Lorong Selesai
         </button>
@@ -1272,20 +1324,39 @@ export function CountApp() {
           Lorong Kosong
         </button>
       </div>
-      <button type="button" className="mt-3 text-sm text-white/50" onClick={() => setScreen("home")}>
+      <button type="button" className="mt-3 text-sm text-white/50" onClick={() => setCloseConfirm(true)}>
         Tutup lorong
       </button>
+      {selesaiConfirm ? (
+        <ConfirmOverlay
+          title={`Selesaikan lorong ${activeTag?.nomor}?`}
+          body={`${lines.length} barang sudah dicatat. Setelah selesai, lorong ini ditutup untuk hitung ini.`}
+          confirmLabel="Ya, selesai"
+          onCancel={() => setSelesaiConfirm(false)}
+          onConfirm={() => void submitTag(false)}
+        />
+      ) : null}
       {emptyConfirm ? (
-        <Overlay>
-          <p className="text-lg font-semibold">Tandai lorong {activeTag?.nomor} sebagai kosong?</p>
-          <p className="mt-2 text-sm text-[#5c5c5c]">
-            Artinya Anda sudah mengecek dan tidak ada barang di area ini.
-          </p>
-          <div className="mt-5 flex gap-3">
-            <GhostButton onClick={() => setEmptyConfirm(false)}>Batal</GhostButton>
-            <PrimaryButton onClick={() => void submitTag(true)}>Ya, kosong</PrimaryButton>
-          </div>
-        </Overlay>
+        <ConfirmOverlay
+          title={`Tandai lorong ${activeTag?.nomor} sebagai kosong?`}
+          body="Artinya Anda sudah mengecek dan tidak ada barang di area ini."
+          confirmLabel="Ya, kosong"
+          onCancel={() => setEmptyConfirm(false)}
+          onConfirm={() => void submitTag(true)}
+        />
+      ) : null}
+      {closeConfirm ? (
+        <ConfirmOverlay
+          title={`Tutup lorong ${activeTag?.nomor}?`}
+          body="Barang yang sudah disimpan tetap di HP. Anda bisa membuka lorong ini lagi nanti."
+          confirmLabel="Ya, tutup"
+          onCancel={() => setCloseConfirm(false)}
+          onConfirm={() => {
+            setCloseConfirm(false);
+            setTagNomor("");
+            setScreen("home");
+          }}
+        />
       ) : null}
       {duplicate ? (
         <Overlay>
@@ -1311,8 +1382,19 @@ export function CountApp() {
             >
               Jadikan {duplicateTotal}
             </PrimaryButton>
+            <TextLink onClick={() => setDuplicate(null)}>Batal</TextLink>
           </div>
         </Overlay>
+      ) : null}
+      {unknownOpen ? (
+        <UnknownItemOverlay
+          nama={unknownNama}
+          qty={unknownQty}
+          onNama={setUnknownNama}
+          onQty={setUnknownQty}
+          onSave={() => void saveUnknown()}
+          onCancel={() => setUnknownOpen(false)}
+        />
       ) : null}
       {message ? <p className="mt-3 text-sm text-ksa-amber">{message}</p> : null}
     </Phone>

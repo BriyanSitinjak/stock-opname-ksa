@@ -4,6 +4,7 @@ import Image from "next/image";
 import type { ReactNode, Ref } from "react";
 import { LuClipboardList, LuHouse } from "react-icons/lu";
 import { BackMark, backControlClass } from "@/app/back-icon";
+import { passAckCopy } from "@/app/hitung/pass-ack";
 
 export function BackButton({ onClick, light = false, className = "" }: { onClick: () => void; light?: boolean; className?: string }) {
   return (
@@ -103,6 +104,32 @@ export function PassBadge({ pass }: { pass: number }) {
     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${tone}`}>
       Hitung ke-{pass}
     </span>
+  );
+}
+
+export function PassAckNote({
+  pass,
+  onAck,
+}: {
+  pass: number;
+  onAck: () => void;
+}) {
+  const copy = passAckCopy(pass);
+  if (!copy) {
+    return null;
+  }
+  return (
+    <div className="mt-3 rounded-2xl bg-[#f3d4a0] px-4 py-3 text-[#5a3b00]">
+      <p className="text-sm font-semibold">{copy.title}</p>
+      <p className="mt-1 text-sm leading-5">{copy.body}</p>
+      <button
+        type="button"
+        className="mt-3 w-full rounded-full bg-[#5a3b00] py-2.5 text-sm font-medium text-white"
+        onClick={onAck}
+      >
+        Saya mengerti
+      </button>
+    </div>
   );
 }
 
@@ -225,6 +252,70 @@ export function MessageOverlay({ message, onClose }: { message: string; onClose:
   );
 }
 
+export function ConfirmOverlay({
+  title,
+  body,
+  confirmLabel,
+  onConfirm,
+  onCancel,
+}: {
+  title: string;
+  body: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <Overlay>
+      <p className="text-lg font-semibold">{title}</p>
+      <p className="mt-2 text-sm text-[#5c5c5c]">{body}</p>
+      <div className="mt-5 flex gap-3">
+        <GhostButton onClick={onCancel}>Batal</GhostButton>
+        <PrimaryButton onClick={onConfirm}>{confirmLabel}</PrimaryButton>
+      </div>
+    </Overlay>
+  );
+}
+
+export function UnknownItemOverlay({
+  nama,
+  qty,
+  onNama,
+  onQty,
+  onSave,
+  onCancel,
+}: {
+  nama: string;
+  qty: string;
+  onNama: (value: string) => void;
+  onQty: (value: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <Overlay>
+      <p className="text-lg font-semibold">Barang tidak dikenal</p>
+      <label className="mt-4 block text-sm">
+        Nama
+        <input className="mt-1 w-full rounded-2xl bg-white px-4 py-3" value={nama} onChange={(e) => onNama(e.target.value)} />
+      </label>
+      <label className="mt-3 block text-sm">
+        Jumlah
+        <input
+          className="mt-1 w-full rounded-2xl bg-white px-4 py-3"
+          inputMode="decimal"
+          value={qty}
+          onChange={(e) => onQty(e.target.value)}
+        />
+      </label>
+      <div className="mt-5 flex flex-col gap-3">
+        <PrimaryButton onClick={onSave}>Simpan</PrimaryButton>
+        <TextLink onClick={onCancel}>Batal</TextLink>
+      </div>
+    </Overlay>
+  );
+}
+
 export function DeveloperCredit({ onOpen }: { onOpen: () => void }) {
   return (
     <button
@@ -255,16 +346,28 @@ export function DeveloperCreditDialog({ onClose }: { onClose: () => void }) {
 export function PaperNumberField({
   value,
   onChange,
+  tone = "cream",
+  autoFocus = true,
 }: {
   value: string;
   onChange: (value: string) => void;
+  tone?: "cream" | "ink";
+  autoFocus?: boolean;
 }) {
+  const field =
+    tone === "ink"
+      ? "mt-1 w-full rounded-2xl bg-ksa-panel px-4 py-3 text-white outline-none"
+      : "mt-6 w-full rounded-2xl bg-white px-4 py-4 text-center text-2xl font-semibold tracking-wide shadow-sm outline-none";
   return (
     <input
-      className="mt-6 w-full rounded-2xl bg-white px-4 py-4 text-center text-2xl font-semibold tracking-widest shadow-sm outline-none"
-      inputMode="numeric"
+      className={field}
+      type="text"
+      inputMode="text"
+      autoCapitalize="characters"
+      autoCorrect="off"
+      spellCheck={false}
       enterKeyHint="done"
-      autoFocus
+      autoFocus={autoFocus}
       value={value}
       onChange={(event) => onChange(event.target.value)}
       placeholder="—"
