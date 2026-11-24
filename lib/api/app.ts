@@ -1,8 +1,7 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import { samePersonOnBothPasses, type AssignmentInput } from "@/lib/assignment-rules";
 import { prisma } from "@/lib/db";
-import { releaseDevice } from "@/lib/devices";
-import { ADMIN_ID } from "@/lib/fixture";
+import { bindDevice, releaseDevice } from "@/lib/devices";
 import { idPattern, parseId } from "@/lib/ids";
 import { ROLE_LABEL, parseRole } from "@/lib/roles";
 import { commitImport, commitMaster, parseImportFile, validateAndAggregate } from "@/lib/import";
@@ -564,7 +563,7 @@ app.openapi(countersRoute, async (c) => {
   });
   const liveUsers = new Set(live.map((row) => row.userId));
   const people = SHARE_CURRENT_SESSION
-    ? await activeStaff()
+    ? (await activeStaff()).filter((person) => person.role === "counter")
     : (
         await prisma.tagAssignment.findMany({
           where: { sessionId: id },
@@ -625,28 +624,11 @@ app.openapi(bindRoute, async (c) => {
   if (!user || user.retiredAt) {
     return c.json({ error: "Petugas tidak ditemukan." }, 409);
   }
-  const existing = await prisma.userDevice.findFirst({
-    where: { sessionId: id, userId: body.user_id, releasedAt: null },
-  });
-  if (existing && existing.deviceId !== body.device_id) {
-    return c.json(
-      {
-        error: `Petugas masih terikat pada ${existing.deviceId}. Pending terakhir yang dilaporkan: ${existing.lastReportedPending}.`,
-      },
-      409,
-    );
+  const bound = await bindDevice(id, body.user_id, body.device_id);
+  if ("ok" in bound) {
+    return c.json({ ok: true, device_id: bound.device_id }, 200);
   }
-  if (!existing) {
-    await prisma.userDevice.create({
-      data: {
-        sessionId: id,
-        deviceId: body.device_id,
-        userId: body.user_id,
-        boundById: ADMIN_ID,
-      },
-    });
-  }
-  return c.json({ ok: true, device_id: body.device_id }, 200);
+  return c.json({ error: bound.error }, 409);
 });
 
 app.post("/sessions/:id/devices/release", async (c) => {
@@ -678,6 +660,49 @@ app.post("/sessions/:id/devices/release", async (c) => {
   }
   return c.json(result);
 });
+
+type PrepareDenahTag = { lokasi: string; id: string; nomor: string; weight: number };
+
+function foldPrepareDenah(tags: PrepareDenahTag[]) {
+  const denahMap = new Map<string, { lokasi: string; tags: { id: string; nomor: string; weight: number }[] }>();
+  for (const tag of tags) {
+    const group = denahMap.get(tag.lokasi) ?? { lokasi: tag.lokasi, tags: [] };
+    group.tags.push({ id: tag.id, nomor: tag.nomor, weight: tag.weight });
+    denahMap.set(tag.lokasi, group);
+  }
+  return [...denahMap.values()];
+}
+
+// Pinned sessions read session_tags. Draft still has no pin, so the phone uses
+// the live denah the same way the coordinator board does before open.
+async function prepareDenah(sessionId: string, status: string) {
+  const sessionTags = await prisma.sessionTag.findMany({
+    where: { sessionId },
+    orderBy: [{ lokasiNama: "asc" }, { urutan: "asc" }],
+  });
+  if (sessionTags.length > 0) {
+    return foldPrepareDenah(
+      sessionTags.map((tag) => ({
+        lokasi: tag.lokasiNama,
+        id: tag.tagId,
+        nomor: tag.nomor,
+        weight: tag.weight,
+      })),
+    );
+  }
+  if (status !== "draft") {
+    return [];
+  }
+  const tags = await liveTags();
+  return foldPrepareDenah(
+    tags.map((tag) => ({
+      lokasi: tag.lokasi.nama,
+      id: tag.id,
+      nomor: tag.nomor,
+      weight: tag.weight,
+    })),
+  );
+}
 
 app.get("/sessions/:id/prepare", async (c) => {
   const id = sessionId(c);
@@ -711,16 +736,6 @@ app.get("/sessions/:id/prepare", async (c) => {
     },
     orderBy: { namaBarang: "asc" },
   });
-  const sessionTags = await prisma.sessionTag.findMany({
-    where: { sessionId: id },
-    orderBy: [{ lokasiNama: "asc" }, { urutan: "asc" }],
-  });
-  const denahMap = new Map<string, { lokasi: string; tags: { id: string; nomor: string; weight: number }[] }>();
-  for (const tag of sessionTags) {
-    const group = denahMap.get(tag.lokasiNama) ?? { lokasi: tag.lokasiNama, tags: [] };
-    group.tags.push({ id: tag.tagId, nomor: tag.nomor, weight: tag.weight });
-    denahMap.set(tag.lokasiNama, group);
-  }
   const assignments = await prisma.tagAssignment.findMany({
     where: { sessionId: id, userId: binding.userId },
     select: { tagId: true, pass: true },
@@ -745,7 +760,7 @@ app.get("/sessions/:id/prepare", async (c) => {
       nama_group: item.namaGroup,
       uom: item.uom,
     })),
-    denah: [...denahMap.values()],
+    denah: await prepareDenah(id, session.status),
     crosses: await aisleCrosses(id),
     assignments: assignments.map((row) => ({
       tag_id: row.tagId,
