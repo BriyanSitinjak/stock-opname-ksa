@@ -7,6 +7,8 @@ export type LocalProgress = {
   pass: number;
   nomor_kartu: string | null;
   is_empty: boolean;
+  /** Counter who marked the lorong selesai/kosong on this device. */
+  user_id?: string;
 };
 
 function key(sessionId: string) {
@@ -35,4 +37,21 @@ export function upsertProgress(sessionId: string, row: LocalProgress) {
   );
   next.push(row);
   localStorage.setItem(key(sessionId), JSON.stringify(next));
+}
+
+/** Same counter who finished this lorong on this phone may reopen without a new paper number. */
+export function progressForSameUser(
+  progress: LocalProgress[],
+  tagId: string,
+  pass: number,
+  userId: string,
+): LocalProgress | null {
+  return (
+    progress.find(
+      (row) =>
+        row.tag_id === tagId &&
+        row.pass === pass &&
+        (!row.user_id || row.user_id === userId),
+    ) ?? null
+  );
 }

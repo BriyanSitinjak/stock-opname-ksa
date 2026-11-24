@@ -1,8 +1,8 @@
-import type { LocalProgress } from "@/app/hitung/local-progress";
-import { locatePrepareTagById } from "@/lib/prepare-locate";
+import { progressForSameUser, type LocalProgress } from "@/app/hitung/local-progress";
+import { locatePrepareTagById, locatePrepareTagByNomor } from "@/lib/prepare-locate";
 import type { LocalLine, PreparePayload } from "@/lib/offline/queue";
 
-export type AisleRecord = {
+type AisleRecord = {
   tag_id: string;
   nomor: string;
   lokasi: string;
@@ -48,4 +48,18 @@ export function buildAisleRecords(
   }
 
   return [...byKey.values()].sort((left, right) => left.nomor.localeCompare(right.nomor) || left.pass - right.pass);
+}
+
+/** Same counter who finished this lorong may reopen without typing a new paper number. */
+export function sameUserProgressForNomor(
+  prepare: PreparePayload,
+  progress: LocalProgress[],
+  nomor: string,
+  pass: number,
+): LocalProgress | null {
+  const tag = locatePrepareTagByNomor(prepare, nomor);
+  if (!tag) {
+    return null;
+  }
+  return progressForSameUser(progress, tag.id, pass, prepare.counter.id);
 }

@@ -4,6 +4,7 @@ import Image from "next/image";
 import type { ReactNode, Ref } from "react";
 import { LuClipboardList, LuHouse } from "react-icons/lu";
 import { BackMark, backControlClass } from "@/app/back-icon";
+import type { UnknownRow } from "@/lib/offline/queue";
 
 export function BackButton({ onClick, light = false, className = "" }: { onClick: () => void; light?: boolean; className?: string }) {
   return (
@@ -130,19 +131,54 @@ export function PassAckNote({ pass }: { pass: number }) {
   );
 }
 
-export function UnknownRowsList({
-  rows,
+export function QtyRow({
   tone = "cream",
-  emptyLabel = "Belum ada barang tidak dikenal.",
+  label,
+  detail,
+  qty,
+  onEdit,
 }: {
-  rows: Array<{ client_row_id: string; nama_input: string | null; kode_input?: string | null; qty: string }>;
   tone?: "cream" | "ink";
-  emptyLabel?: string;
+  label: string;
+  detail?: string | null;
+  qty: string;
+  onEdit?: () => void;
 }) {
   const item =
     tone === "ink"
       ? "flex items-center justify-between gap-3 rounded-xl bg-ksa-panel px-3 py-2"
       : "flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3";
+  return (
+    <li className={item}>
+      <span className="min-w-0">
+        <span className={`block text-sm leading-5 ${tone === "ink" ? "text-white" : ""}`}>{label}</span>
+        {detail ? (
+          <span className={`text-xs ${tone === "ink" ? "text-white/50" : "text-[#8a8a8a]"}`}>{detail}</span>
+        ) : null}
+      </span>
+      <span className="flex items-center gap-3">
+        <span className="text-xl font-semibold">{qty}</span>
+        {onEdit ? (
+          <button type="button" className="text-sm text-ksa-amber" onClick={onEdit}>
+            ubah
+          </button>
+        ) : null}
+      </span>
+    </li>
+  );
+}
+
+export function UnknownRowsList({
+  rows,
+  tone = "cream",
+  emptyLabel = "Belum ada barang tidak dikenal.",
+  onEdit,
+}: {
+  rows: UnknownRow[];
+  tone?: "cream" | "ink";
+  emptyLabel?: string;
+  onEdit?: (row: UnknownRow) => void;
+}) {
   if (rows.length === 0) {
     return (
       <ul className="mt-2 flex flex-col gap-2">
@@ -155,17 +191,14 @@ export function UnknownRowsList({
   return (
     <ul className={`${tone === "ink" ? "" : "mt-2"} flex flex-col gap-2`}>
       {rows.map((row) => (
-        <li key={row.client_row_id} className={item}>
-          <span className="min-w-0">
-            <span className={`block text-sm leading-5 ${tone === "ink" ? "text-white" : ""}`}>
-              {row.nama_input || "Tanpa nama"}
-            </span>
-            {row.kode_input ? (
-              <span className={`text-xs ${tone === "ink" ? "text-white/50" : "text-[#8a8a8a]"}`}>Kode {row.kode_input}</span>
-            ) : null}
-          </span>
-          <span className="text-xl font-semibold">{row.qty}</span>
-        </li>
+        <QtyRow
+          key={row.client_row_id}
+          tone={tone}
+          label={row.nama_input || "Tanpa nama"}
+          detail={row.kode_input ? `Kode ${row.kode_input}` : null}
+          qty={row.qty}
+          onEdit={onEdit ? () => onEdit(row) : undefined}
+        />
       ))}
     </ul>
   );
