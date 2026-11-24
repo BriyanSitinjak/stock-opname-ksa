@@ -3,15 +3,11 @@
 type Props = {
   onDigit: (digit: string) => void;
   onBack: () => void;
-  variant?: "light" | "dark";
 };
 
-export function NumericKeypad({ onDigit, onBack, variant = "light" }: Props) {
+export function NumericKeypad({ onDigit, onBack }: Props) {
   const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "back"];
-  const cell =
-    variant === "dark"
-      ? "min-h-14 rounded-2xl bg-ksa-panel text-xl text-white"
-      : "min-h-14 rounded-2xl bg-white text-xl text-[#1c1c1c] shadow-sm";
+  const cell = "min-h-14 rounded-2xl bg-ksa-panel text-xl text-white";
   return (
     <div className="w-full max-w-full overflow-x-auto">
       <div className="grid min-w-0 grid-cols-3 gap-2">

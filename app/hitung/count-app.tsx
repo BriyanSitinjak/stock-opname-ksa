@@ -5,6 +5,7 @@ import { LuDoorOpen } from "react-icons/lu";
 import { BrandLockup } from "@/app/brand-lockup";
 import { NumericKeypad } from "@/app/hitung/keypad";
 import { PhoneDenah } from "@/app/hitung/phone-denah";
+import { buildAisleRecords } from "@/app/hitung/aisle-records";
 import {
   ActionColumn,
   AisleMeta,
@@ -23,14 +24,15 @@ import {
   TextLink,
   TopBar,
   UnknownItemOverlay,
+  UnknownRowsList,
   WaitNote,
 } from "@/app/hitung/ui";
-import { hasPassAck, setPassAck } from "@/app/hitung/pass-ack";
+import { loadProgress, upsertProgress } from "@/app/hitung/local-progress";
 import { toast } from "@/app/toast";
 import { cardAlreadyUsed } from "@/lib/aisle-rules";
 import { isFloorPlace } from "@/lib/floor-plan";
 import { SESSION_ID } from "@/lib/fixture";
-import { latestAssignment, locatePrepareTagById, locatePrepareTagByNomor } from "@/lib/prepare-locate";
+import { latestAssignment, locatePrepareTagByNomor } from "@/lib/prepare-locate";
 import { SHARE_CURRENT_SESSION } from "@/lib/testing";
 import { maybeActivate } from "@/lib/offline/register-sw";
 import { qtyOrDash } from "@/lib/qty-display";
@@ -55,6 +57,7 @@ import {
   type Kondisi,
   type LocalLine,
   type PreparePayload,
+  type UnknownRow,
 } from "@/lib/offline/queue";
 
 const edgeIcon =
@@ -77,7 +80,7 @@ type CounterOption = { user_id: string; nama: string; already_bound: boolean };
 const PULL_START = 12;
 const PULL_RELOAD = 64;
 
-function watchNamePull(node: HTMLDivElement, reload: () => void) {
+function watchNamePull(node: HTMLDivElement, reload: () => void, onOffline?: () => void) {
   const page = document.documentElement;
   const previous = page.style.overscrollBehaviorY;
   page.style.overscrollBehaviorY = "contain";
@@ -89,10 +92,6 @@ function watchNamePull(node: HTMLDivElement, reload: () => void) {
   }
 
   function begin(y: number) {
-    if (!navigator.onLine) {
-      tracking = false;
-      return;
-    }
     startY = y;
     tracking = atTop();
   }
@@ -108,13 +107,15 @@ function watchNamePull(node: HTMLDivElement, reload: () => void) {
       return;
     }
     tracking = false;
-    if (!navigator.onLine) {
+    if (y - startY <= PULL_RELOAD) {
       return;
     }
-    if (y - startY > PULL_RELOAD) {
-      event.preventDefault();
-      reload();
+    event.preventDefault();
+    if (!navigator.onLine) {
+      onOffline?.();
+      return;
     }
+    reload();
   }
 
   function onTouchStart(event: TouchEvent) {
@@ -236,6 +237,8 @@ export function CountApp() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [cardNo, setCardNo] = useState("");
   const [doneLines, setDoneLines] = useState<LocalLine[]>([]);
+  const [doneUnknowns, setDoneUnknowns] = useState<UnknownRow[]>([]);
+  const [tagUnknowns, setTagUnknowns] = useState<UnknownRow[]>([]);
   const [qty, setQty] = useState("");
   const [kondisi, setKondisi] = useState<Kondisi>("baik");
   const [focusField, setFocusField] = useState<"code" | "qty">("code");
@@ -244,9 +247,8 @@ export function CountApp() {
   const [duplicate, setDuplicate] = useState<{ existing: LocalLine; incoming: string } | null>(null);
   const [emptyConfirm, setEmptyConfirm] = useState(false);
   const [selesaiConfirm, setSelesaiConfirm] = useState(false);
-  const [closeConfirm, setCloseConfirm] = useState(false);
+  const [leaveTarget, setLeaveTarget] = useState<"home" | "sync" | null>(null);
   const [unknownOpen, setUnknownOpen] = useState(false);
-  const [passAcked, setPassAcked] = useState(true);
   const [exitBlock, setExitBlock] = useState(false);
   const [booting, setBooting] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -314,8 +316,10 @@ export function CountApp() {
           setMessage(
             `${json.accepted?.length ?? 0} dari ${remaining} data terkirim. ${json.rejected?.length} ditolak.`,
           );
+        } else if (left === 0) {
+          setMessage("Semua terkirim. Denah hitung dan Pantau koordinator menampilkan status terbaru.");
         } else {
-          setMessage(left === 0 ? "Semua terkirim." : `${json.accepted?.length ?? 0} data terkirim.`);
+          setMessage(`${json.accepted?.length ?? 0} data terkirim.`);
         }
       }
     },
@@ -387,11 +391,17 @@ export function CountApp() {
     if (!node) {
       return;
     }
-    return watchNamePull(node, () => {
-      ignoreNameTap.current = true;
-      setRefreshing(true);
-      void loadCounters().finally(() => setRefreshing(false));
-    });
+    return watchNamePull(
+      node,
+      () => {
+        ignoreNameTap.current = true;
+        setRefreshing(true);
+        void loadCounters().finally(() => setRefreshing(false));
+      },
+      () => {
+        toast("Tidak ada internet. Tetap di layar ini. Coba lagi saat ada sinyal.");
+      },
+    );
   }, [loadCounters, screen, refreshing, booting]);
 
   useEffect(() => {
@@ -399,7 +409,30 @@ export function CountApp() {
       return;
     }
     void allLines().then(setDoneLines);
+    void snapshotQueue().then((queue) => setDoneUnknowns(queue.unknowns));
   }, [screen, pending]);
+
+  useEffect(() => {
+    if (screen !== "count" || !activeTag) {
+      return;
+    }
+    let cancelled = false;
+    void snapshotQueue().then((queue) => {
+      if (cancelled) {
+        return;
+      }
+      setTagUnknowns(
+        queue.unknowns.filter((row) => row.tag_id === activeTag.id && row.pass === activeTag.pass),
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [screen, activeTag, pending]);
+
+  // pending busts the cache after submit / sync so Denah reflects finished lorong.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- pending is a deliberate refresh token
+  const progress = useMemo(() => (sessionId ? loadProgress(sessionId) : []), [sessionId, pending]);
 
   useEffect(() => {
     const onOnline = () => {
@@ -564,13 +597,20 @@ export function CountApp() {
     setFocusField("qty");
     setEmptyConfirm(false);
     setSelesaiConfirm(false);
-    setCloseConfirm(false);
+    setLeaveTarget(null);
     setUnknownOpen(false);
-    setPassAcked(hasPassAck(sessionId, tag.id, assignment.pass));
     setMessage("");
     setPendingAisle(null);
     setTagNomor("");
     setScreen("count");
+  }
+
+  function requestLeaveCount(target: "home" | "sync") {
+    if (screen === "count" || screen === "search") {
+      setLeaveTarget(target);
+      return;
+    }
+    setScreen(target);
   }
 
   function pickPlace(nomor: string, pass: number, lokasi: string) {
@@ -683,13 +723,23 @@ export function CountApp() {
       nomor_kartu: card.nomor,
       client_created_at: new Date().toISOString(),
     });
+    upsertProgress(sessionId, {
+      tag_id: activeTag.id,
+      pass: activeTag.pass,
+      nomor_kartu: card.nomor,
+      is_empty: isEmpty,
+    });
     await refreshPending();
     setEmptyConfirm(false);
     setSelesaiConfirm(false);
     setTagNomor("");
     setCardNo("");
     setScreen("home");
-    setMessage(isEmpty ? `Lorong ${activeTag.nomor} ditandai kosong.` : `Lorong ${activeTag.nomor} selesai.`);
+    setMessage(
+      isEmpty
+        ? `Lorong ${activeTag.nomor} ditandai kosong. Sinkronkan agar denah dan Pantau koordinator ikut berubah.`
+        : `Lorong ${activeTag.nomor} selesai. Sinkronkan agar denah dan Pantau koordinator ikut berubah.`,
+    );
   }
 
   async function saveUnknown() {
@@ -714,33 +764,10 @@ export function CountApp() {
     setMessage("Dicatat sebagai tidak dikenal.");
   }
 
-  const aisleRecords = useMemo(() => {
-    if (!prepare) {
-      return [];
-    }
-    const byKey = new Map<
-      string,
-      { tag_id: string; nomor: string; lokasi: string; pass: number; nomor_kartu: string | null; items: number }
-    >();
-    for (const line of doneLines) {
-      const key = `${line.tag_id}:${line.pass}`;
-      const place = locatePrepareTagById(prepare, line.tag_id);
-      const current = byKey.get(key) ?? {
-        tag_id: line.tag_id,
-        nomor: place?.nomor ?? line.tag_id,
-        lokasi: place?.lokasi ?? "—",
-        pass: line.pass,
-        nomor_kartu: line.nomor_kartu ?? null,
-        items: 0,
-      };
-      current.items += 1;
-      if (!current.nomor_kartu && line.nomor_kartu) {
-        current.nomor_kartu = line.nomor_kartu;
-      }
-      byKey.set(key, current);
-    }
-    return [...byKey.values()].sort((left, right) => left.nomor.localeCompare(right.nomor) || left.pass - right.pass);
-  }, [doneLines, prepare]);
+  const aisleRecords = useMemo(
+    () => (prepare ? buildAisleRecords(prepare, doneLines, progress) : []),
+    [doneLines, prepare, progress],
+  );
 
   function onDigit(digit: string) {
     if (focusField === "code") {
@@ -776,8 +803,8 @@ export function CountApp() {
       pending={pending}
       dark={screen === "count" || screen === "search"}
       locked={screen === "prepare"}
-      onSync={() => setScreen("sync")}
-      onHome={() => setScreen("home")}
+      onSync={() => requestLeaveCount("sync")}
+      onHome={() => requestLeaveCount("home")}
     />
   );
 
@@ -1024,7 +1051,11 @@ export function CountApp() {
           {tagNomor.trim() ? ` · kertas ${tagNomor.trim()} siap untuk posisi berikutnya` : ""}.
         </p>
         {prepare ? (
-          <PhoneDenah prepare={prepare} onPick={(tag, pass) => pickPlace(tag.nomor, pass, tag.lokasi)} />
+          <PhoneDenah
+            prepare={prepare}
+            progress={progress}
+            onPick={(tag, pass) => pickPlace(tag.nomor, pass, tag.lokasi)}
+          />
         ) : null}
         {message ? <p className="mt-3 text-sm">{message}</p> : null}
       </Phone>
@@ -1133,7 +1164,9 @@ export function CountApp() {
                 <p className="mt-2 text-sm">
                   Nomor kertas: <span className="font-semibold">{row.nomor_kartu || "—"}</span>
                 </p>
-                <p className="mt-1 text-xs text-[#8a8a8a]">{row.items} barang dicatat</p>
+                <p className="mt-1 text-xs text-[#8a8a8a]">
+                  {row.is_empty ? "Ditandai kosong" : `${row.items} barang dicatat`}
+                </p>
               </li>
             ))
           )}
@@ -1147,6 +1180,10 @@ export function CountApp() {
             </li>
           ))}
         </ul>
+        <h2 className="mt-6 text-sm font-medium text-[#6b6b6b]">
+          Barang tidak dikenal ({doneUnknowns.length})
+        </h2>
+        <UnknownRowsList rows={doneUnknowns} />
         {message ? <p className="mt-3 text-sm">{message}</p> : null}
       </Phone>
     );
@@ -1183,8 +1220,6 @@ export function CountApp() {
     );
   }
 
-  const countingBlocked = !passAcked && (activeTag?.pass === 1 || activeTag?.pass === 2);
-
   function openUnknownForm() {
     setUnknownNama("");
     setUnknownQty("");
@@ -1193,20 +1228,12 @@ export function CountApp() {
 
   return (
     <Phone tone="ink">
-      <BackButton light className="mb-3" onClick={() => setCloseConfirm(true)} />
+      <BackButton light className="mb-3" onClick={() => setLeaveTarget("home")} />
       {bar}
       {activeTag ? (
         <AisleMeta nomor={activeTag.nomor} lokasi={activeTag.lokasi} pass={activeTag.pass} tone="ink" />
       ) : null}
-      {activeTag && countingBlocked ? (
-        <PassAckNote
-          pass={activeTag.pass}
-          onAck={() => {
-            setPassAck(sessionId, activeTag.id, activeTag.pass);
-            setPassAcked(true);
-          }}
-        />
-      ) : null}
+      {activeTag ? <PassAckNote pass={activeTag.pass} /> : null}
       <p className="mt-3 text-base font-medium text-white/70">Cari barang, isi jumlah, lalu simpan.</p>
       {activeTag && isFloorPlace(activeTag.nomor) ? (
         <label className="mt-4 block text-sm">
@@ -1228,8 +1255,7 @@ export function CountApp() {
       ) : null}
       <button
         type="button"
-        disabled={countingBlocked}
-        className="mt-4 w-full rounded-full border border-white/40 py-3 text-sm font-medium disabled:opacity-40"
+        className="mt-4 w-full rounded-full border border-white/40 py-3 text-sm font-medium"
         onClick={() => setScreen("search")}
       >
         Cari Barang
@@ -1238,7 +1264,7 @@ export function CountApp() {
       <p className="mt-5 text-xs uppercase tracking-wide text-white/40">Jumlah</p>
       <button
         type="button"
-        disabled={!matched || countingBlocked}
+        disabled={!matched}
         className={`mt-1 w-full text-left text-5xl font-semibold disabled:opacity-30 ${focusField === "qty" ? "text-white" : "text-white/50"}`}
         onClick={() => setFocusField("qty")}
       >
@@ -1259,17 +1285,16 @@ export function CountApp() {
         ))}
       </fieldset>
       <div className="mt-4">
-        <NumericKeypad variant="dark" onDigit={onDigit} onBack={onBack} />
+        <NumericKeypad onDigit={onDigit} onBack={onBack} />
       </div>
       <div className="mt-4">
-        <PrimaryButton disabled={!matched || !qty || countingBlocked} onClick={() => void saveLine(qty)}>
+        <PrimaryButton disabled={!matched || !qty} onClick={() => void saveLine(qty)}>
           Simpan Barang
         </PrimaryButton>
       </div>
       <button
         type="button"
-        disabled={countingBlocked}
-        className="mt-3 w-full rounded-full border border-ksa-amber bg-ksa-amber/20 py-3 text-sm font-semibold text-ksa-amber disabled:opacity-40"
+        className="mt-3 w-full rounded-full border border-ksa-amber bg-ksa-amber/20 py-3 text-sm font-semibold text-ksa-amber"
         onClick={openUnknownForm}
       >
         Tidak dikenal
@@ -1307,6 +1332,8 @@ export function CountApp() {
             </li>
           ))}
         </ul>
+        <h2 className="mb-2 mt-4 text-sm text-white/50">Tidak dikenal ({tagUnknowns.length})</h2>
+        {tagUnknowns.length > 0 ? <UnknownRowsList rows={tagUnknowns} tone="ink" /> : null}
       </section>
       <div className="mt-4 flex gap-2">
         <button
@@ -1324,7 +1351,7 @@ export function CountApp() {
           Lorong Kosong
         </button>
       </div>
-      <button type="button" className="mt-3 text-sm text-white/50" onClick={() => setCloseConfirm(true)}>
+      <button type="button" className="mt-3 text-sm text-white/50" onClick={() => setLeaveTarget("home")}>
         Tutup lorong
       </button>
       {selesaiConfirm ? (
@@ -1345,16 +1372,21 @@ export function CountApp() {
           onConfirm={() => void submitTag(true)}
         />
       ) : null}
-      {closeConfirm ? (
+      {leaveTarget ? (
         <ConfirmOverlay
-          title={`Tutup lorong ${activeTag?.nomor}?`}
-          body="Barang yang sudah disimpan tetap di HP. Anda bisa membuka lorong ini lagi nanti."
-          confirmLabel="Ya, tutup"
-          onCancel={() => setCloseConfirm(false)}
+          title={leaveTarget === "sync" ? "Buka data hitung?" : `Tutup lorong ${activeTag?.nomor}?`}
+          body={
+            leaveTarget === "sync"
+              ? "Barang yang sudah disimpan tetap di HP. Anda bisa kembali ke lorong ini dari denah."
+              : "Barang yang sudah disimpan tetap di HP. Anda bisa membuka lorong ini lagi nanti."
+          }
+          confirmLabel={leaveTarget === "sync" ? "Ya, buka data" : "Ya, tutup"}
+          onCancel={() => setLeaveTarget(null)}
           onConfirm={() => {
-            setCloseConfirm(false);
+            const target = leaveTarget;
+            setLeaveTarget(null);
             setTagNomor("");
-            setScreen("home");
+            setScreen(target);
           }}
         />
       ) : null}

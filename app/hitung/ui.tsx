@@ -4,7 +4,6 @@ import Image from "next/image";
 import type { ReactNode, Ref } from "react";
 import { LuClipboardList, LuHouse } from "react-icons/lu";
 import { BackMark, backControlClass } from "@/app/back-icon";
-import { passAckCopy } from "@/app/hitung/pass-ack";
 
 export function BackButton({ onClick, light = false, className = "" }: { onClick: () => void; light?: boolean; className?: string }) {
   return (
@@ -107,14 +106,19 @@ export function PassBadge({ pass }: { pass: number }) {
   );
 }
 
-export function PassAckNote({
-  pass,
-  onAck,
-}: {
-  pass: number;
-  onAck: () => void;
-}) {
-  const copy = passAckCopy(pass);
+export function PassAckNote({ pass }: { pass: number }) {
+  const copy =
+    pass === 1
+      ? {
+          title: "Ingat untuk Hitung ke-2",
+          body: "Setelah lorong selesai, beritahu petugas Hitung ke-2 bahwa lorong siap dicek ulang. Data tetap di HP meski offline.",
+        }
+      : pass === 2
+        ? {
+            title: "Pastikan Hitung ke-1 selesai",
+            body: "Jangan mulai sebelum Hitung ke-1 selesai di lorong ini. Tanya petugas ke-1 atau koordinator jika ragu. Bisa tetap offline.",
+          }
+        : null;
   if (!copy) {
     return null;
   }
@@ -122,14 +126,48 @@ export function PassAckNote({
     <div className="mt-3 rounded-2xl bg-[#f3d4a0] px-4 py-3 text-[#5a3b00]">
       <p className="text-sm font-semibold">{copy.title}</p>
       <p className="mt-1 text-sm leading-5">{copy.body}</p>
-      <button
-        type="button"
-        className="mt-3 w-full rounded-full bg-[#5a3b00] py-2.5 text-sm font-medium text-white"
-        onClick={onAck}
-      >
-        Saya mengerti
-      </button>
     </div>
+  );
+}
+
+export function UnknownRowsList({
+  rows,
+  tone = "cream",
+  emptyLabel = "Belum ada barang tidak dikenal.",
+}: {
+  rows: Array<{ client_row_id: string; nama_input: string | null; kode_input?: string | null; qty: string }>;
+  tone?: "cream" | "ink";
+  emptyLabel?: string;
+}) {
+  const item =
+    tone === "ink"
+      ? "flex items-center justify-between gap-3 rounded-xl bg-ksa-panel px-3 py-2"
+      : "flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3";
+  if (rows.length === 0) {
+    return (
+      <ul className="mt-2 flex flex-col gap-2">
+        <li className={tone === "ink" ? "text-sm text-white/50" : "rounded-2xl bg-white px-4 py-3 text-sm text-[#6b6b6b]"}>
+          {emptyLabel}
+        </li>
+      </ul>
+    );
+  }
+  return (
+    <ul className={`${tone === "ink" ? "" : "mt-2"} flex flex-col gap-2`}>
+      {rows.map((row) => (
+        <li key={row.client_row_id} className={item}>
+          <span className="min-w-0">
+            <span className={`block text-sm leading-5 ${tone === "ink" ? "text-white" : ""}`}>
+              {row.nama_input || "Tanpa nama"}
+            </span>
+            {row.kode_input ? (
+              <span className={`text-xs ${tone === "ink" ? "text-white/50" : "text-[#8a8a8a]"}`}>Kode {row.kode_input}</span>
+            ) : null}
+          </span>
+          <span className="text-xl font-semibold">{row.qty}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
