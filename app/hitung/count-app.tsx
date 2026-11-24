@@ -49,7 +49,7 @@ import {
   loadPrepare,
   newClientRowId,
   newDeviceId,
-  pendingCount,
+  pendingBreakdown,
   queueSize,
   removeAccepted,
   savePrepare,
@@ -197,7 +197,9 @@ export function CountApp() {
   const [screen, setScreen] = useState<Screen>("bind");
   const [counters, setCounters] = useState<CounterOption[]>([]);
   const [prepare, setPrepare] = useState<PreparePayload | null>(null);
-  const [pending, setPending] = useState(0);
+  const [pendingItems, setPendingItems] = useState(0);
+  const [pendingClosures, setPendingClosures] = useState(0);
+  const pending = pendingItems + pendingClosures;
   const [storageOk, setStorageOk] = useState<boolean | null>(null);
   const [message, setMessage] = useState("");
   useEffect(() => {
@@ -270,7 +272,9 @@ export function CountApp() {
   }, [prepare, selectedId]);
 
   const refreshPending = useCallback(async () => {
-    setPending(await pendingCount());
+    const next = await pendingBreakdown();
+    setPendingItems(next.items);
+    setPendingClosures(next.closures);
   }, []);
 
   const loadCounters = useCallback(async () => {
@@ -823,7 +827,7 @@ export function CountApp() {
   const bar = (
     <TopBar
       name={prepare?.counter.nama ?? "Belum terikat"}
-      pending={pending}
+      pending={pendingItems}
       dark={screen === "count" || screen === "search"}
       locked={screen === "prepare"}
       onSync={() => requestLeaveCount("sync")}
@@ -1150,16 +1154,22 @@ export function CountApp() {
         {bar}
         <h1 className="text-2xl font-semibold">Data hitung</h1>
         <p className="mt-1 text-sm text-[#6b6b6b]">
-          Barang yang sudah Anda simpan tetap di HP ini. Angka di kanan atas adalah yang belum terkirim.
+          Angka di kanan atas = barang + tidak dikenal yang belum terkirim. Lorong Selesai/Kosong ikut dikirim, tapi
+          tidak menambah angka itu.
         </p>
         <div className="mt-5 rounded-[28px] bg-[#f3e2b0] px-5 py-8 text-center">
-          <p className="text-5xl font-semibold">{pending}</p>
-          <p className="mt-2 text-sm">data belum terkirim</p>
+          <p className="text-5xl font-semibold">{pendingItems}</p>
+          <p className="mt-2 text-sm">barang belum terkirim</p>
+          {pendingClosures > 0 ? (
+            <p className="mt-2 text-sm text-[#6b6b6b]">
+              + {pendingClosures} penutupan lorong siap dikirim
+            </p>
+          ) : null}
         </div>
         {exitBlock && pending > 0 ? (
           <p className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm">
-            Masih ada {pending} data belum terkirim. Jangan tinggalkan gudang sebelum angka ini nol. Cari area
-            bersinyal, lalu tekan Kirim Sekarang.
+            Masih ada data belum terkirim. Jangan tinggalkan gudang sebelum angka ini nol. Cari area bersinyal, lalu
+            tekan Kirim Sekarang.
           </p>
         ) : null}
         {rejected.map((row) => (
@@ -1231,7 +1241,7 @@ export function CountApp() {
           </div>
           <div>
             <dt className="text-xs tracking-wide text-[#8a8a8a] uppercase">Belum terkirim</dt>
-            <dd className="mt-1 text-base">{pending}</dd>
+            <dd className="mt-1 text-base">{pendingItems}</dd>
           </div>
         </dl>
         <DeveloperCredit onOpen={() => setCreditOpen(true)} />

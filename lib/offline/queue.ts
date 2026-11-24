@@ -141,16 +141,30 @@ export async function snapshotQueue() {
   };
 }
 
-export function queueSize(queue: Awaited<ReturnType<typeof snapshotQueue>>): number {
-  return queue.counts.length + queue.submissions.length + queue.unknowns.length;
+type QueueSnapshot = Awaited<ReturnType<typeof snapshotQueue>>;
+
+/** Barang + tidak dikenal. Lorong Selesai/Kosong is counted separately as a submission. */
+function itemsInQueue(queue: QueueSnapshot): number {
+  return queue.counts.length + queue.unknowns.length;
+}
+
+export function queueSize(queue: QueueSnapshot): number {
+  return itemsInQueue(queue) + queue.submissions.length;
+}
+
+export async function pendingBreakdown(): Promise<{
+  items: number;
+  closures: number;
+  total: number;
+}> {
+  const database = await db();
+  const items = (await database.count("counts")) + (await database.count("unknowns"));
+  const closures = await database.count("submissions");
+  return { items, closures, total: items + closures };
 }
 
 export async function pendingCount(): Promise<number> {
-  const database = await db();
-  const counts = await database.count("counts");
-  const submissions = await database.count("submissions");
-  const unknowns = await database.count("unknowns");
-  return counts + submissions + unknowns;
+  return (await pendingBreakdown()).total;
 }
 
 export async function removeAccepted(ids: string[]): Promise<void> {
