@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuDoorOpen } from "react-icons/lu";
 import { BrandLockup } from "@/app/brand-lockup";
-import { AisleNumberPad, NumericKeypad } from "@/app/hitung/keypad";
+import { NumericKeypad } from "@/app/hitung/keypad";
+import { PhoneDenah } from "@/app/hitung/phone-denah";
 import {
   ActionColumn,
   AisleMeta,
@@ -13,6 +14,7 @@ import {
   GhostButton,
   MessageOverlay,
   Overlay,
+  PaperNumberField,
   Phone,
   PrimaryButton,
   TextLink,
@@ -23,6 +25,7 @@ import { toast } from "@/app/toast";
 import { cardAlreadyUsed } from "@/lib/aisle-rules";
 import { isFloorPlace } from "@/lib/floor-plan";
 import { SESSION_ID } from "@/lib/fixture";
+import { latestAssignment, locatePrepareTagByNomor } from "@/lib/prepare-locate";
 import { SHARE_CURRENT_SESSION } from "@/lib/testing";
 import { maybeActivate } from "@/lib/offline/register-sw";
 import { qtyOrDash } from "@/lib/qty-display";
@@ -58,7 +61,6 @@ type Screen =
   | "home"
   | "open-aisle"
   | "confirm-aisle"
-  | "tugas"
   | "denah"
   | "count"
   | "search"
@@ -83,6 +85,10 @@ function watchNamePull(node: HTMLDivElement, reload: () => void) {
   }
 
   function begin(y: number) {
+    if (!navigator.onLine) {
+      tracking = false;
+      return;
+    }
     startY = y;
     tracking = atTop();
   }
@@ -98,6 +104,9 @@ function watchNamePull(node: HTMLDivElement, reload: () => void) {
       return;
     }
     tracking = false;
+    if (!navigator.onLine) {
+      return;
+    }
     if (y - startY > PULL_RELOAD) {
       event.preventDefault();
       reload();
@@ -152,16 +161,6 @@ function watchNamePull(node: HTMLDivElement, reload: () => void) {
   };
 }
 
-function locateTag(prepare: PreparePayload, match: (tag: { id: string; nomor: string }) => boolean) {
-  for (const lokasi of prepare.denah) {
-    const tag = lokasi.tags.find(match);
-    if (tag) {
-      return { ...tag, lokasi: lokasi.lokasi };
-    }
-  }
-  return null;
-}
-
 async function fetchPrepare(sessionId: string, deviceId: string) {
   const response = await fetch(`/api/sessions/${sessionId}/prepare`, {
     headers: { "x-device-id": deviceId },
@@ -200,10 +199,22 @@ export function CountApp() {
       toast(message);
     }
   }, [message]);
+  useEffect(() => {
+    function syncOnline() {
+      setOnline(navigator.onLine);
+    }
+    syncOnline();
+    window.addEventListener("online", syncOnline);
+    window.addEventListener("offline", syncOnline);
+    return () => {
+      window.removeEventListener("online", syncOnline);
+      window.removeEventListener("offline", syncOnline);
+    };
+  }, []);
   const [busy, setBusy] = useState(false);
   const [bindingId, setBindingId] = useState<string | null>(null);
   const [tagNomor, setTagNomor] = useState("");
-  const [aisleUnlocked, setAisleUnlocked] = useState(false);
+  const [online, setOnline] = useState(true);
   const [creditOpen, setCreditOpen] = useState(false);
   const [pendingAisle, setPendingAisle] = useState<{
     nomor: string;
@@ -433,7 +444,6 @@ export function CountApp() {
       setActiveTag(null);
       setTagNomor("");
       setPendingAisle(null);
-      setAisleUnlocked(false);
       setLines([]);
       setExitBlock(false);
       await loadCounters();
@@ -516,27 +526,18 @@ export function CountApp() {
     : [];
   const ready = ticks.length > 0 && ticks.every((tick) => tick.ok);
 
-  function askAisleConfirm(nomor: string, pass: number, lokasi: string) {
-    setPendingAisle({ nomor, pass, lokasi });
-    setTagNomor("");
-    setMessage("");
-    setScreen("confirm-aisle");
-  }
-
-  async function openTag(nomor: string, pass?: number) {
+  async function openTag(nomor: string, pass?: number, paperNomor?: string) {
     if (!prepare) {
       return;
     }
-    const tag = locateTag(prepare, (row) => row.nomor === nomor);
+    const tag = locatePrepareTagByNomor(prepare, nomor);
     if (!tag) {
-      setMessage(`Lorong ${nomor} tidak ada di gudang ini. Periksa nomor di kertas, atau pilih dari denah.`);
+      setMessage(`Posisi ${nomor} tidak ada di denah sesi ini.`);
       return;
     }
-    const mine = prepare.assignments.filter((row) => row.tag_id === tag.id);
-    const assignment =
-      pass != null ? mine.find((row) => row.pass === pass) : [...mine].sort((left, right) => right.pass - left.pass)[0];
+    const assignment = latestAssignment(prepare, tag.id, pass);
     if (!assignment) {
-      setMessage("Lorong ini bukan tugas Anda.");
+      setMessage("Posisi ini bukan tugas Anda.");
       return;
     }
     setActiveTag({
@@ -549,15 +550,26 @@ export function CountApp() {
     setLines(await linesForTag(tag.id, assignment.pass));
     setCode("");
     setSelectedId(null);
-    setCardNo("");
+    setCardNo(paperNomor?.trim() || "");
     setQty("");
     setKondisi("baik");
     setFocusField("qty");
     setEmptyConfirm(false);
     setMessage("");
     setPendingAisle(null);
-    setAisleUnlocked(true);
     setScreen("count");
+  }
+
+  function pickPlace(nomor: string, pass: number, lokasi: string) {
+    const paper = tagNomor.trim();
+    if (paper) {
+      void openTag(nomor, pass, paper);
+      return;
+    }
+    setPendingAisle({ nomor, pass, lokasi });
+    setTagNomor("");
+    setMessage("");
+    setScreen("confirm-aisle");
   }
 
   async function confirmAisleAndOpen() {
@@ -566,14 +578,11 @@ export function CountApp() {
     }
     const typed = tagNomor.trim();
     if (!typed) {
-      setMessage("Ketik nomor lorong dari kertas Anda.");
+      setMessage("Ketik nomor dari kertas Anda.");
       return;
     }
-    if (typed !== pendingAisle.nomor) {
-      setMessage(`Nomor tidak cocok. Lorong ini ${pendingAisle.nomor}.`);
-      return;
-    }
-    await openTag(pendingAisle.nomor, pendingAisle.pass);
+    // Paper number is random each day and becomes nomor_kartu; it is not the floor place label.
+    await openTag(pendingAisle.nomor, pendingAisle.pass, typed);
   }
 
   function readCard(): { nomor: string | null } | null {
@@ -688,16 +697,6 @@ export function CountApp() {
     setMessage("Dicatat sebagai tidak dikenal.");
   }
 
-  const assignedTags = useMemo(() => {
-    if (!prepare) {
-      return [];
-    }
-    return prepare.assignments.flatMap((row) => {
-      const tag = locateTag(prepare, (item) => item.id === row.tag_id);
-      return tag ? [{ ...row, nomor: tag.nomor, lokasi: tag.lokasi, weight: tag.weight }] : [];
-    });
-  }, [prepare]);
-
   function onDigit(digit: string) {
     if (focusField === "code") {
       const next = (code + digit).slice(0, 4);
@@ -751,7 +750,11 @@ export function CountApp() {
         <BrandLockup className="h-auto w-40" />
         <h1 className="mt-6 text-3xl font-semibold leading-tight">Siapa yang memakai HP ini?</h1>
         <p className="mt-2 text-sm text-[#6b6b6b]">
-          {busy ? "Sedang mengikat nama. Tunggu sebentar." : "Tarik ke bawah untuk memperbarui"}
+          {busy
+            ? "Sedang mengikat nama. Tunggu sebentar."
+            : online
+              ? "Tarik ke bawah untuk memperbarui"
+              : "Tidak ada internet. Perbarui daftar saat ada sinyal."}
         </p>
         <div className="mt-6 flex flex-col gap-3">
           {counters.map((counter) => {
@@ -835,8 +838,8 @@ export function CountApp() {
         {bar}
         <h1 className="sr-only">Beranda</h1>
         <p className="text-sm leading-6 text-[#5c5c5c]">
-          Ketik nomor lorong dari kertas yang Anda terima hari ini. Cari barang, isi jumlah, lalu simpan. Kirim hasil
-          lewat tombol di kanan atas saat ada sinyal.
+          Ketik nomor dari kertas hari ini, lalu pilih posisi di denah. Cari barang, isi jumlah, lalu simpan. Kirim
+          hasil lewat tombol di kanan atas saat ada sinyal.
         </p>
         <div className="mt-5 flex flex-col gap-3">
           <button
@@ -848,15 +851,17 @@ export function CountApp() {
               setScreen("open-aisle");
             }}
           >
-            <p className="text-xl font-semibold">Masukkan Nomor Lorong</p>
-            <p className="mt-1 text-sm text-white/80">Nomor di kertas / kartu hari ini</p>
+            <p className="text-xl font-semibold">Masukkan Nomor Kertas</p>
+            <p className="mt-1 text-sm text-white/80">Nomor acak di kertas / kartu hari ini</p>
           </button>
-          <GhostButton disabled={!aisleUnlocked} onClick={() => setScreen("tugas")}>
-            Tugas Saya
+          <GhostButton
+            onClick={() => {
+              setMessage("");
+              setScreen("denah");
+            }}
+          >
+            Pilih dari Denah
           </GhostButton>
-          {!aisleUnlocked ? (
-            <p className="text-center text-xs text-[#8a8a8a]">Masukkan nomor lorong dulu sebelum membuka daftar tugas.</p>
-          ) : null}
         </div>
         {message ? <p className="mt-4 text-sm">{message}</p> : null}
         <div className="mt-auto h-16 shrink-0" />
@@ -906,42 +911,24 @@ export function CountApp() {
     );
   }
 
-  if (screen === "tugas") {
-    return (
-      <Phone>
-        <BackButton className="mb-3" onClick={() => setScreen("home")} />
-        {bar}
-        <h1 className="text-2xl font-semibold">Tugas Saya</h1>
-        <p className="mt-1 text-sm text-[#6b6b6b]">{assignedTags.length} lorong untuk hitung ini</p>
-        <ul className="mt-5 flex flex-col gap-2">
-          {assignedTags.map((tag) => (
-            <li key={`${tag.tag_id}-${tag.pass}`}>
-              <button
-                type="button"
-                className="flex w-full items-center justify-between gap-3 rounded-2xl bg-white px-4 py-4 text-left shadow-sm"
-                onClick={() => askAisleConfirm(tag.nomor, tag.pass, tag.lokasi)}
-              >
-                <AisleMeta nomor={tag.nomor} lokasi={tag.lokasi} pass={tag.pass} />
-                <span className="shrink-0 text-xs text-ksa-teal">Buka</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </Phone>
-    );
-  }
-
   if (screen === "open-aisle") {
     return (
       <Phone>
         <BackButton className="mb-3" onClick={() => setScreen("home")} />
         {bar}
-        <h1 className="text-2xl font-semibold">Nomor Lorong</h1>
-        <p className="mt-2 text-sm text-[#6b6b6b]">Ketik nomor di kertas yang Anda terima hari ini, atau pilih dari denah.</p>
-        <AisleNumberPad value={tagNomor} onChange={setTagNomor} />
+        <h1 className="text-2xl font-semibold">Nomor Kertas</h1>
+        <p className="mt-2 text-sm text-[#6b6b6b]">Ketik nomor di kertas yang Anda terima hari ini. Nomor ini acak tiap hari.</p>
+        <PaperNumberField value={tagNomor} onChange={setTagNomor} />
         <ActionColumn>
-          <PrimaryButton onClick={() => void openTag(tagNomor)}>Mulai Hitung</PrimaryButton>
-          <GhostButton onClick={() => setScreen("denah")}>Pilih dari Denah</GhostButton>
+          <PrimaryButton
+            disabled={!tagNomor.trim()}
+            onClick={() => {
+              setMessage("");
+              setScreen("denah");
+            }}
+          >
+            Lanjut ke Denah
+          </PrimaryButton>
         </ActionColumn>
         {message ? <MessageOverlay message={message} onClose={() => setMessage("")} /> : null}
       </Phone>
@@ -955,24 +942,26 @@ export function CountApp() {
           className="mb-3"
           onClick={() => {
             setPendingAisle(null);
-            setTagNomor("");
             setMessage("");
-            setScreen("tugas");
+            setScreen("denah");
           }}
         />
         {bar}
-        <h1 className="text-2xl font-semibold">Konfirmasi Lorong</h1>
+        <h1 className="text-2xl font-semibold">Nomor Kertas</h1>
         <p className="mt-2 text-sm text-[#6b6b6b]">
-          Sebelum mulai hitung, ketik nomor di kertas untuk lorong ini.
+          Sebelum mulai hitung, ketik nomor di kertas untuk posisi ini. Nomor kertas tidak harus sama dengan label
+          denah.
         </p>
         {pendingAisle ? (
           <div className="mt-5 rounded-2xl bg-white px-4 py-4 shadow-sm">
             <AisleMeta nomor={pendingAisle.nomor} lokasi={pendingAisle.lokasi} pass={pendingAisle.pass} />
           </div>
         ) : null}
-        <AisleNumberPad value={tagNomor} onChange={setTagNomor} />
+        <PaperNumberField value={tagNomor} onChange={setTagNomor} />
         <ActionColumn>
-          <PrimaryButton onClick={() => void confirmAisleAndOpen()}>Mulai Hitung</PrimaryButton>
+          <PrimaryButton disabled={!tagNomor.trim()} onClick={() => void confirmAisleAndOpen()}>
+            Mulai Hitung
+          </PrimaryButton>
         </ActionColumn>
         {message ? <MessageOverlay message={message} onClose={() => setMessage("")} /> : null}
       </Phone>
@@ -982,39 +971,16 @@ export function CountApp() {
   if (screen === "denah") {
     return (
       <Phone>
-        <BackButton className="mb-3" onClick={() => setScreen("open-aisle")} />
+        <BackButton className="mb-3" onClick={() => setScreen("home")} />
         {bar}
         <h1 className="text-2xl font-semibold">Pilih dari Denah</h1>
-        {prepare?.denah.map((lokasi) => (
-          <section key={lokasi.lokasi} className="mt-5">
-            <h2 className="mb-2 text-sm text-[#6b6b6b]">{lokasi.lokasi}</h2>
-            <div className="flex flex-col gap-2">
-              {lokasi.tags.map((tag) => {
-                const cross = prepare?.crosses?.find((row) => row.aisle === lokasi.lokasi);
-                const mine = prepare?.assignments.filter((row) => row.tag_id === tag.id) ?? [];
-                const assignment = [...mine].sort((left, right) => right.pass - left.pass)[0];
-                return (
-                  <button
-                    key={tag.id}
-                    type="button"
-                    disabled={Boolean(cross) || !assignment}
-                    className="rounded-2xl bg-ksa-sage px-4 py-4 text-left font-semibold text-ksa-teal-deep disabled:bg-[#f3d4d0]"
-                    style={{ minHeight: `${40 + tag.weight * 18}px` }}
-                    onClick={() => {
-                      if (!assignment) {
-                        return;
-                      }
-                      askAisleConfirm(tag.nomor, assignment.pass, lokasi.lokasi);
-                    }}
-                  >
-                    <AisleMeta nomor={tag.nomor} pass={assignment?.pass} />
-                    {cross ? <span className="mt-1 block text-sm font-normal">Kosong. {cross.note}</span> : null}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-        ))}
+        <p className="mt-1 text-sm text-[#6b6b6b]">
+          Huruf di atas, nomor di kiri. Pilih posisi tugas Anda
+          {tagNomor.trim() ? ` · kertas ${tagNomor.trim()}` : ""}.
+        </p>
+        {prepare ? (
+          <PhoneDenah prepare={prepare} onPick={(tag, pass) => pickPlace(tag.nomor, pass, tag.lokasi)} />
+        ) : null}
         {message ? <p className="mt-3 text-sm">{message}</p> : null}
       </Phone>
     );
@@ -1192,7 +1158,7 @@ export function CountApp() {
       <p className="mt-3 text-base font-medium text-white/70">Cari barang, isi jumlah, lalu simpan.</p>
       {activeTag && isFloorPlace(activeTag.nomor) ? (
         <label className="mt-4 block text-sm">
-          <span className="text-white/70">Nomor pada kartu</span>
+          <span className="text-white/70">Nomor kertas</span>
           <input
             className="mt-1 w-full rounded-2xl bg-ksa-panel px-4 py-3 text-white outline-none"
             value={cardNo}

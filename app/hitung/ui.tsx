@@ -34,7 +34,7 @@ export function Phone({
         : "bg-ksa-cream text-[#1c1c1c]";
   return (
     <div ref={rootRef} className={`flex min-h-dvh w-full flex-1 flex-col ${bg}`}>
-      <main className="mx-auto flex w-full max-w-[390px] flex-1 flex-col px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-6">
+      <main className="mx-auto flex w-full max-w-[390px] flex-1 flex-col overflow-x-hidden px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-6">
         {children}
       </main>
     </div>
@@ -249,5 +249,26 @@ export function DeveloperCreditDialog({ onClose }: { onClose: () => void }) {
         </TextLink>
       </div>
     </Overlay>
+  );
+}
+
+export function PaperNumberField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <input
+      className="mt-6 w-full rounded-2xl bg-white px-4 py-4 text-center text-2xl font-semibold tracking-widest shadow-sm outline-none"
+      inputMode="numeric"
+      enterKeyHint="done"
+      autoFocus
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      placeholder="—"
+      aria-label="Nomor kertas"
+    />
   );
 }
