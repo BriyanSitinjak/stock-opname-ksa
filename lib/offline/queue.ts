@@ -34,6 +34,15 @@ export type UnknownRow = {
   client_created_at: string;
 };
 
+export type TagProgressRow = {
+  tag_id: string;
+  pass: number;
+  user_id: string;
+  user_nama: string;
+  nomor_kartu: string | null;
+  is_empty: boolean;
+};
+
 export type PreparePayload = {
   session: { id: string; nama: string; periode: string; status: string };
   counter: { id: string; nama: string };
@@ -49,9 +58,19 @@ export type PreparePayload = {
   }[];
   denah: { lokasi: string; tags: { id: string; nomor: string; weight: number }[] }[];
   crosses?: { aisle: string; note: string }[];
+  /** Server-side lorong closures (after sync) for shared denah initials. */
+  tag_progress?: TagProgressRow[];
   assignments: {
     tag_id: string;
     pass: number;
+    /** Hitung ke-1 rows for this tag — Hitung ke-2 reviews these. */
+    pass1?: {
+      snapshot_item_id: string;
+      barcode_4: string | null;
+      nama_barang: string;
+      qty_1: string;
+    }[];
+    pass1_nomor_kartu?: string | null;
     compare?: {
       snapshot_item_id: string;
       barcode_4: string | null;
@@ -73,6 +92,10 @@ export type LocalLine = {
   kondisi: Kondisi;
   qty_note: string | null;
   nomor_kartu?: string | null;
+  /** Hitung ke-2 only: agreed with pass 1, or revised qty/nama. */
+  review_status?: "sesuai" | "revisi";
+  /** When pass 2 swaps catalog item, links back to the pass-1 row under review. */
+  pass1_snapshot_item_id?: string | null;
 };
 
 interface QueueSchema extends DBSchema {

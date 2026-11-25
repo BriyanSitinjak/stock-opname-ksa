@@ -112,12 +112,12 @@ export function PassAckNote({ pass }: { pass: number }) {
     pass === 1
       ? {
           title: "Ingat untuk Hitung ke-2",
-          body: "Setelah lorong selesai, beritahu petugas Hitung ke-2 bahwa lorong siap dicek ulang. Data tetap di HP meski offline.",
+          body: "Satu lorong satu nomor tag. Setelah selesai, beritahu petugas Hitung ke-2 untuk cek ulang qty dan nama. Data tetap di HP meski offline.",
         }
       : pass === 2
         ? {
-            title: "Pastikan Hitung ke-1 selesai",
-            body: "Jangan mulai sebelum Hitung ke-1 selesai di lorong ini. Tanya petugas ke-1 atau koordinator jika ragu. Bisa tetap offline.",
+            title: "Cek ulang Hitung ke-1",
+            body: "Tandai Sesuai atau Tidak Sesuai per barang. Revisi tidak menghapus data petugas 1. Nomor tag boleh dikoreksi.",
           }
         : null;
   if (!copy) {
@@ -304,6 +304,27 @@ export function WaitNote({ compact = false }: { compact?: boolean }) {
   );
 }
 
+/** Full-screen blocker while Kirim Sekarang syncs and builds the Excel backup. */
+export function SyncBusyOverlay({ label, percent }: { label: string; percent: number }) {
+  const clamped = Math.max(0, Math.min(100, Math.round(percent)));
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-5" role="alertdialog" aria-busy="true">
+      <div className="w-full max-w-[320px] rounded-[28px] bg-[#f3eee4] p-6 text-center text-[#1c1c1c] shadow-lg">
+        <span
+          className="mx-auto block h-12 w-12 animate-spin rounded-full border-[3px] border-[#e7dfd2] border-t-ksa-teal"
+          aria-hidden
+        />
+        <p className="mt-4 text-lg font-semibold">{label}</p>
+        <div className="mt-5 h-2.5 overflow-hidden rounded-full bg-white">
+          <div className="h-full rounded-full bg-ksa-teal transition-[width] duration-300" style={{ width: `${clamped}%` }} />
+        </div>
+        <p className="mt-2 text-sm text-[#6b6b6b]">{clamped}%</p>
+        <p className="mt-3 text-xs text-[#8a8a8a]">Jangan tutup atau keluar dari layar ini.</p>
+      </div>
+    </div>
+  );
+}
+
 export function Overlay({ children }: { children: ReactNode }) {
   return (
     <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/45 p-5 sm:items-center">
@@ -368,7 +389,12 @@ export function UnknownItemOverlay({
       <p className="text-lg font-semibold">Barang tidak dikenal</p>
       <label className="mt-4 block text-sm">
         Nama
-        <input className="mt-1 w-full rounded-2xl bg-white px-4 py-3" value={nama} onChange={(e) => onNama(e.target.value)} />
+        <input
+          className="mt-1 w-full rounded-2xl bg-white px-4 py-3 uppercase"
+          autoCapitalize="characters"
+          value={nama}
+          onChange={(e) => onNama(e.target.value.toUpperCase())}
+        />
       </label>
       <label className="mt-3 block text-sm">
         Jumlah
@@ -469,7 +495,7 @@ export function PaperNumberField({
       value={value}
       onChange={(event) => onChange(event.target.value)}
       placeholder="—"
-      aria-label="Nomor kertas"
+      aria-label="Nomor tag"
     />
   );
 }

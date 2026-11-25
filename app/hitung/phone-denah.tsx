@@ -3,7 +3,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { FloorDrawing } from "@/app/denah/floor-drawing";
 import { GudangTabs } from "@/app/denah/gudang-tabs";
-import { progressPassInitials, type LocalProgress, type PassInitials } from "@/app/hitung/local-progress";
+import { mergedPassInitials, type LocalProgress, type PassInitials } from "@/app/hitung/local-progress";
 import { floorByGudang, floors, type FloorPlace } from "@/lib/floor-plan";
 import { latestAssignment, locatePrepareTagByNomor, type LocatedPrepareTag } from "@/lib/prepare-locate";
 import type { PreparePayload } from "@/lib/offline/queue";
@@ -80,7 +80,10 @@ export function PhoneDenah({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const floor = floorByGudang(gudang) ?? floors[0]!;
   const crossed = useMemo(() => new Set((prepare.crosses ?? []).map((row) => row.aisle)), [prepare.crosses]);
-  const byTag = useMemo(() => progressPassInitials(progress, prepare.counter), [prepare.counter, progress]);
+  const byTag = useMemo(
+    () => mergedPassInitials(progress, prepare.tag_progress, prepare.counter),
+    [prepare.counter, prepare.tag_progress, progress],
+  );
   const placeInfo = useMemo(() => {
     const map = new Map<string, PlaceInfo>();
     for (const place of [...floor.places, ...floor.extras.places]) {

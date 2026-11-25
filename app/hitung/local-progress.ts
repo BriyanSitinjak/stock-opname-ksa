@@ -3,6 +3,7 @@
 // the server once Sinkronisasi succeeds.
 
 import { nameInitials } from "@/lib/name-initials";
+import type { TagProgressRow } from "@/lib/offline/queue";
 
 export type LocalProgress = {
   tag_id: string;
@@ -74,8 +75,7 @@ function initialsForRow(
   );
 }
 
-/** Map tag_id → Hitung ke-1 / ke-2 initials for denah cells. */
-export function progressPassInitials(
+function passInitialsMap(
   progress: LocalProgress[],
   counter: { id: string; nama: string },
 ): Map<string, PassInitials> {
@@ -92,4 +92,30 @@ export function progressPassInitials(
     map.set(row.tag_id, current);
   }
   return map;
+}
+
+/**
+ * Merge server tag_progress (from unduh ulang after sync) with local progress.
+ * Local wins on the same tag+pass so unfinished phone work stays visible.
+ */
+export function mergedPassInitials(
+  local: LocalProgress[],
+  server: TagProgressRow[] | undefined,
+  counter: { id: string; nama: string },
+): Map<string, PassInitials> {
+  const byKey = new Map<string, LocalProgress>();
+  for (const row of server ?? []) {
+    byKey.set(`${row.tag_id}:${row.pass}`, {
+      tag_id: row.tag_id,
+      pass: row.pass,
+      nomor_kartu: row.nomor_kartu,
+      is_empty: row.is_empty,
+      user_id: row.user_id,
+      user_nama: row.user_nama,
+    });
+  }
+  for (const row of local) {
+    byKey.set(`${row.tag_id}:${row.pass}`, row);
+  }
+  return passInitialsMap([...byKey.values()], counter);
 }

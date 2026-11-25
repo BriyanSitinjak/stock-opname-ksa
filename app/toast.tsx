@@ -23,9 +23,10 @@ export function ToastHost() {
       }
       const id = Date.now() + Math.random();
       setNotes((current) => [...current, { id, text }]);
+      const hold = text.length > 60 ? 5200 : 3200;
       window.setTimeout(() => {
         setNotes((current) => current.filter((note) => note.id !== id));
-      }, 3200);
+      }, hold);
     }
     window.addEventListener("ksa-toast", onToast);
     return () => window.removeEventListener("ksa-toast", onToast);

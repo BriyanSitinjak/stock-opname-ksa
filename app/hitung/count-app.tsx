@@ -5,7 +5,9 @@ import { LuDoorOpen } from "react-icons/lu";
 import { BrandLockup } from "@/app/brand-lockup";
 import { NumericKeypad } from "@/app/hitung/keypad";
 import { PhoneDenah } from "@/app/hitung/phone-denah";
+import { downloadHitungBackup } from "@/app/hitung/backup-workbook";
 import { buildAisleRecords, sameUserProgressForNomor } from "@/app/hitung/aisle-records";
+import { Pass2ReviewList, type Pass2Item } from "@/app/hitung/pass2-review";
 import {
   ActionColumn,
   AisleMeta,
@@ -23,6 +25,7 @@ import {
   PrefetchDeveloperCredit,
   PrimaryButton,
   QtyRow,
+  SyncBusyOverlay,
   TextLink,
   TopBar,
   UnknownItemOverlay,
@@ -56,11 +59,12 @@ import {
   savePrepare,
   snapshotQueue,
   upsertLine,
-  type Kondisi,
   type LocalLine,
   type PreparePayload,
   type UnknownRow,
 } from "@/lib/offline/queue";
+
+const DEFAULT_KONDISI = "baik" as const;
 
 const edgeIcon =
   "pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-ksa-teal text-ksa-teal-deep";
@@ -200,6 +204,7 @@ export function CountApp() {
   const [pendingItems, setPendingItems] = useState(0);
   const [pendingClosures, setPendingClosures] = useState(0);
   const pending = pendingItems + pendingClosures;
+  const [syncBusy, setSyncBusy] = useState<{ label: string; percent: number } | null>(null);
   const [storageOk, setStorageOk] = useState<boolean | null>(null);
   const [message, setMessage] = useState("");
   useEffect(() => {
@@ -234,6 +239,8 @@ export function CountApp() {
     nomor: string;
     lokasi: string;
     pass: number;
+    pass1?: PreparePayload["assignments"][number]["pass1"];
+    pass1_nomor_kartu?: string | null;
     compare?: PreparePayload["assignments"][number]["compare"];
   } | null>(null);
   const [code, setCode] = useState("");
@@ -243,7 +250,6 @@ export function CountApp() {
   const [doneUnknowns, setDoneUnknowns] = useState<UnknownRow[]>([]);
   const [tagUnknowns, setTagUnknowns] = useState<UnknownRow[]>([]);
   const [qty, setQty] = useState("");
-  const [kondisi, setKondisi] = useState<Kondisi>("baik");
   const [focusField, setFocusField] = useState<"code" | "qty">("code");
   const [lines, setLines] = useState<LocalLine[]>([]);
   const [search, setSearch] = useState("");
@@ -253,6 +259,10 @@ export function CountApp() {
   const [leaveTarget, setLeaveTarget] = useState<"home" | "sync" | null>(null);
   const [unknownOpen, setUnknownOpen] = useState(false);
   const [editingUnknownId, setEditingUnknownId] = useState<string | null>(null);
+  const [pass2EditId, setPass2EditId] = useState<string | null>(null);
+  const [pass2EditQty, setPass2EditQty] = useState("");
+  const [pass2EditNama, setPass2EditNama] = useState("");
+  const [pass2ReplaceFor, setPass2ReplaceFor] = useState<string | null>(null);
   const [exitBlock, setExitBlock] = useState(false);
   const [booting, setBooting] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -288,48 +298,84 @@ export function CountApp() {
     async (silent = false) => {
       const queue = await snapshotQueue();
       const remaining = queueSize(queue);
-      const response = await fetch("/api/counts/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          device_id: deviceId,
-          pending_after: 0,
-          counts: queue.counts,
-          submissions: queue.submissions,
-          unknowns: queue.unknowns,
-        }),
-      });
-      const json = (await response.json()) as {
-        accepted?: string[];
-        rejected?: { client_row_id: string; reason: string }[];
-        error?: string;
-      };
-      if (!response.ok) {
+      if (remaining === 0) {
         if (!silent) {
-          setMessage(json.error ?? "Sinkron gagal.");
+          setMessage("Tidak ada data untuk dikirim.");
         }
         return;
       }
-      await removeAccepted(json.accepted ?? []);
-      await refreshPending();
-      setRejected(json.rejected ?? []);
-      const left = remaining - (json.accepted?.length ?? 0);
-      if (left === 0) {
-        void maybeActivate();
-      }
       if (!silent) {
-        if ((json.rejected?.length ?? 0) > 0) {
-          setMessage(
-            `${json.accepted?.length ?? 0} dari ${remaining} data terkirim. ${json.rejected?.length} ditolak.`,
-          );
-        } else if (left === 0) {
-          setMessage("Semua terkirim. Denah hitung dan Pantau koordinator menampilkan status terbaru.");
-        } else {
-          setMessage(`${json.accepted?.length ?? 0} data terkirim.`);
+        setSyncBusy({ label: "Mengirim data ke server…", percent: 12 });
+      }
+      try {
+        const response = await fetch("/api/counts/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            device_id: deviceId,
+            pending_after: 0,
+            counts: queue.counts,
+            submissions: queue.submissions,
+            unknowns: queue.unknowns,
+          }),
+        });
+        const json = (await response.json()) as {
+          accepted?: string[];
+          rejected?: { client_row_id: string; reason: string }[];
+          error?: string;
+        };
+        if (!response.ok) {
+          if (!silent) {
+            setMessage(json.error ?? "Sinkron gagal.");
+          }
+          return;
+        }
+        if (!silent) {
+          setSyncBusy({ label: "Membuat Excel cadangan…", percent: 58 });
+        }
+        let excelOk = false;
+        if (!silent && prepare) {
+          try {
+            await downloadHitungBackup(prepare, queue);
+            excelOk = true;
+            setSyncBusy({ label: "Menyimpan file Excel…", percent: 88 });
+          } catch {
+            excelOk = false;
+          }
+        }
+        await removeAccepted(json.accepted ?? []);
+        await refreshPending();
+        setRejected(json.rejected ?? []);
+        const left = remaining - (json.accepted?.length ?? 0);
+        if (left === 0) {
+          void maybeActivate();
+        }
+        if (!silent) {
+          setSyncBusy({ label: "Selesai", percent: 100 });
+          await new Promise((resolve) => window.setTimeout(resolve, 450));
+          if ((json.rejected?.length ?? 0) > 0) {
+            setMessage(
+              excelOk
+                ? `Sinkronisasi sebagian: ${json.accepted?.length ?? 0}/${remaining} terkirim, ${json.rejected?.length} ditolak. Excel cadangan diunduh.`
+                : `${json.accepted?.length ?? 0} dari ${remaining} data terkirim. ${json.rejected?.length} ditolak.`,
+            );
+          } else if (excelOk) {
+            setMessage(
+              "Sinkronisasi berhasil. Excel cadangan sudah diunduh. Denah dan Pantau koordinator ikut terbarui.",
+            );
+          } else if (left === 0) {
+            setMessage("Sinkronisasi berhasil. Excel cadangan gagal dibuat.");
+          } else {
+            setMessage(`${json.accepted?.length ?? 0} data terkirim.`);
+          }
+        }
+      } finally {
+        if (!silent) {
+          setSyncBusy(null);
         }
       }
     },
-    [deviceId, refreshPending],
+    [deviceId, prepare, refreshPending],
   );
 
   useEffect(() => {
@@ -594,20 +640,28 @@ export function CountApp() {
       setMessage("Posisi ini bukan tugas Anda.");
       return;
     }
+    const paper =
+      paperNomor?.trim() ||
+      (assignment.pass === 2 ? assignment.pass1_nomor_kartu?.trim() || "" : "");
     setActiveTag({
       id: tag.id,
       nomor: tag.nomor,
       lokasi: tag.lokasi,
       pass: assignment.pass,
+      pass1: assignment.pass === 2 ? assignment.pass1 : undefined,
+      pass1_nomor_kartu: assignment.pass === 2 ? assignment.pass1_nomor_kartu : undefined,
       compare: assignment.pass === 3 ? assignment.compare : undefined,
     });
     setLines(await linesForTag(tag.id, assignment.pass));
     setCode("");
     setSelectedId(null);
-    setCardNo(paperNomor?.trim() || "");
+    setCardNo(paper);
     setQty("");
-    setKondisi("baik");
     setFocusField("qty");
+    setPass2EditId(null);
+    setPass2EditQty("");
+    setPass2EditNama("");
+    setPass2ReplaceFor(null);
     setEmptyConfirm(false);
     setSelesaiConfirm(false);
     setLeaveTarget(null);
@@ -645,10 +699,10 @@ export function CountApp() {
     }
     const typed = tagNomor.trim();
     if (!typed) {
-      setMessage("Ketik nomor dari kertas Anda.");
+      setMessage("Ketik nomor tag Anda.");
       return;
     }
-    // Paper number is random each day and becomes nomor_kartu; it is not the floor place label.
+    // Nomor tag is typed per lorong and stored as nomor_kartu; it is not the floor place label.
     await openTag(pendingAisle.nomor, pendingAisle.pass, typed);
   }
 
@@ -664,7 +718,7 @@ export function CountApp() {
       return { nomor: reusedAisleProgress.nomor_kartu };
     }
     if (isFloorPlace(activeTag.nomor)) {
-      setMessage("Isi nomor pada kartu.");
+      setMessage("Isi nomor tag.");
       return null;
     }
     return { nomor: null };
@@ -684,10 +738,10 @@ export function CountApp() {
         .map((line) => line.nomor_kartu ?? ""),
       card.nomor,
     )) {
-      setMessage("Nomor kartu ini sudah Anda pakai di HP ini.");
+      setMessage("Nomor tag ini sudah Anda pakai di HP ini.");
       return;
     }
-    const key = lineKey(activeTag.id, activeTag.pass, matched.id, kondisi);
+    const key = lineKey(activeTag.id, activeTag.pass, matched.id, DEFAULT_KONDISI);
     const existing = await getLine(key);
     if (existing && !replaceExisting) {
       setDuplicate({ existing, incoming: nextQty });
@@ -700,7 +754,7 @@ export function CountApp() {
       snapshot_item_id: matched.id,
       qty: nextQty,
       qty_note: null,
-      kondisi,
+      kondisi: DEFAULT_KONDISI,
       nomor_kartu: card.nomor,
       client_created_at: new Date().toISOString(),
     };
@@ -713,7 +767,7 @@ export function CountApp() {
       barcode_4: matched.barcode_4,
       nama_barang: matched.nama_barang,
       qty: nextQty,
-      kondisi,
+      kondisi: DEFAULT_KONDISI,
       qty_note: null,
       nomor_kartu: card.nomor,
     });
@@ -724,6 +778,65 @@ export function CountApp() {
     setDuplicate(null);
     setFocusField("code");
     setMessage("");
+  }
+
+  async function savePass2Review(
+    item: Pass2Item,
+    status: "sesuai" | "revisi",
+    nextQty: string,
+    namaRevisi?: string,
+    replacement?: PreparePayload["items"][number],
+  ) {
+    if (!prepare || !activeTag || activeTag.pass !== 2) {
+      return;
+    }
+    const card = readCard();
+    if (!card) {
+      return;
+    }
+    const catalog = replacement ?? prepare.items.find((row) => row.id === item.snapshot_item_id);
+    if (!catalog) {
+      setMessage("Barang tidak ditemukan di katalog sesi.");
+      return;
+    }
+    const noteParts = [
+      namaRevisi?.trim() ? `nama:${namaRevisi.trim().toUpperCase()}` : null,
+      replacement && replacement.id !== item.snapshot_item_id ? `dari:${item.snapshot_item_id}` : null,
+    ].filter(Boolean);
+    const qtyNote = noteParts.length > 0 ? noteParts.join("|") : null;
+    const key = lineKey(activeTag.id, activeTag.pass, catalog.id, DEFAULT_KONDISI);
+    await enqueueCount({
+      client_row_id: newClientRowId(),
+      tag_id: activeTag.id,
+      pass: activeTag.pass,
+      snapshot_item_id: catalog.id,
+      qty: nextQty,
+      qty_note: qtyNote,
+      kondisi: DEFAULT_KONDISI,
+      nomor_kartu: card.nomor,
+      client_created_at: new Date().toISOString(),
+    });
+    await upsertLine({
+      key,
+      tag_id: activeTag.id,
+      pass: activeTag.pass,
+      snapshot_item_id: catalog.id,
+      barcode_4: catalog.barcode_4,
+      nama_barang: namaRevisi?.trim() ? namaRevisi.trim().toUpperCase() : catalog.nama_barang,
+      qty: nextQty,
+      kondisi: DEFAULT_KONDISI,
+      qty_note: qtyNote,
+      nomor_kartu: card.nomor,
+      review_status: status,
+      pass1_snapshot_item_id: item.snapshot_item_id,
+    });
+    setLines(await linesForTag(activeTag.id, activeTag.pass));
+    await refreshPending();
+    setPass2EditId(null);
+    setPass2EditQty("");
+    setPass2EditNama("");
+    setPass2ReplaceFor(null);
+    setMessage(status === "sesuai" ? "Ditandai Stock Sesuai." : "Revisi Hitung ke-2 disimpan.");
   }
 
   async function submitTag(isEmpty: boolean) {
@@ -775,10 +888,10 @@ export function CountApp() {
       client_row_id: editingUnknownId ?? newClientRowId(),
       tag_id: activeTag.id,
       pass: activeTag.pass,
-      kode_input: code || existing?.kode_input || null,
-      nama_input: unknownNama,
+      kode_input: (code || existing?.kode_input || null)?.toUpperCase() ?? null,
+      nama_input: unknownNama.trim().toUpperCase(),
       qty: unknownQty,
-      kondisi: existing?.kondisi ?? kondisi,
+      kondisi: DEFAULT_KONDISI,
       client_created_at: existing?.client_created_at ?? new Date().toISOString(),
     });
     await refreshPending();
@@ -790,6 +903,31 @@ export function CountApp() {
     () => (prepare ? buildAisleRecords(prepare, doneLines, progress) : []),
     [doneLines, prepare, progress],
   );
+
+  const pass2Items: Pass2Item[] = useMemo(() => {
+    if (!activeTag?.pass1) {
+      return [];
+    }
+    return activeTag.pass1.map((row) => {
+      const line = lines.find(
+        (item) =>
+          item.snapshot_item_id === row.snapshot_item_id || item.pass1_snapshot_item_id === row.snapshot_item_id,
+      );
+      const namaRevisi = line?.qty_note
+        ?.split("|")
+        .find((part) => part.startsWith("nama:"))
+        ?.slice(5);
+      return {
+        snapshot_item_id: row.snapshot_item_id,
+        barcode_4: row.barcode_4,
+        nama_barang: row.nama_barang,
+        qty_1: row.qty_1,
+        review_status: line?.review_status,
+        qty_2: line?.qty,
+        nama_revisi: namaRevisi ?? null,
+      };
+    });
+  }, [activeTag?.pass1, lines]);
 
   function onDigit(digit: string) {
     if (focusField === "code") {
@@ -825,7 +963,12 @@ export function CountApp() {
       pending={pendingItems}
       dark={screen === "count" || screen === "search"}
       locked={screen === "prepare"}
-      onSync={() => requestLeaveCount("sync")}
+      onSync={() => {
+        if (syncBusy) {
+          return;
+        }
+        requestLeaveCount("sync");
+      }}
       onHome={() => requestLeaveCount("home")}
     />
   );
@@ -940,7 +1083,7 @@ export function CountApp() {
           Halo, {prepare?.counter.nama?.split(/\s+/)[0] ?? "Petugas"}
         </p>
         <p className="mt-2 text-sm leading-6 text-[#5c5c5c]">
-          Pilih lorong di denah, isi nomor kertas, lalu catat barang. Kirim lewat Data di kanan atas saat ada sinyal.
+          Pilih lorong di denah, isi nomor tag, lalu catat barang. Kirim lewat Data di kanan atas saat ada sinyal.
         </p>
 
         <div className="mt-6 grid grid-cols-2 gap-3">
@@ -965,7 +1108,7 @@ export function CountApp() {
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ksa-teal text-xs font-semibold text-white">
               2
             </span>
-            <span className="pt-1">Ketik nomor kertas, lalu mulai hitung</span>
+            <span className="pt-1">Ketik nomor tag, lalu mulai hitung</span>
           </li>
           <li className="flex gap-3">
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ksa-teal text-xs font-semibold text-white">
@@ -986,7 +1129,7 @@ export function CountApp() {
             }}
           >
             <p className="text-xl font-semibold">Buka Denah</p>
-            <p className="mt-1 text-sm text-white/80">Pilih lorong, lalu isi nomor kertas</p>
+            <p className="mt-1 text-sm text-white/80">Pilih lorong, lalu isi nomor tag</p>
           </button>
         </div>
 
@@ -1050,10 +1193,9 @@ export function CountApp() {
           }}
         />
         {bar}
-        <h1 className="text-2xl font-semibold">Nomor Kertas</h1>
+        <h1 className="text-2xl font-semibold">Nomor Tag</h1>
         <p className="mt-2 text-sm text-[#6b6b6b]">
-          Sebelum mulai hitung, ketik nomor di kertas untuk posisi ini. Nomor kertas tidak harus sama dengan label
-          denah.
+          Sebelum mulai hitung, ketik nomor tag untuk posisi ini. Satu lorong memakai satu nomor tag.
         </p>
         {pendingAisle ? (
           <div className="mt-5 rounded-2xl bg-white px-4 py-4 shadow-sm">
@@ -1078,7 +1220,7 @@ export function CountApp() {
         {bar}
         <h1 className="text-2xl font-semibold">Pilih dari Denah</h1>
         <p className="mt-1 text-sm text-[#6b6b6b]">
-          Huruf di atas, nomor di kiri. Setelah pilih lorong, isi nomor kertas. Kotak hitam menampilkan inisial
+          Huruf di atas, nomor di kiri. Setelah pilih lorong, isi nomor tag. Kotak hitam menampilkan inisial
           Hitung ke-1 / ke-2.
         </p>
         {prepare ? (
@@ -1124,6 +1266,13 @@ export function CountApp() {
                 type="button"
                 className="w-full rounded-2xl bg-ksa-panel px-4 py-3 text-left"
                 onClick={() => {
+                  if (pass2EditId) {
+                    setPass2ReplaceFor(item.id);
+                    setPass2EditNama(item.nama_barang.toUpperCase());
+                    setSearch("");
+                    setScreen("count");
+                    return;
+                  }
                   setSelectedId(item.id);
                   setCode(item.barcode_4 ?? item.kode_barang);
                   setSearch("");
@@ -1151,16 +1300,15 @@ export function CountApp() {
         <BackButton
           className="mb-3"
           onClick={() => {
+            if (syncBusy) {
+              return;
+            }
             setExitBlock(false);
             setScreen("home");
           }}
         />
         {bar}
         <h1 className="text-2xl font-semibold">Data hitung</h1>
-        <p className="mt-1 text-sm text-[#6b6b6b]">
-          Angka di kanan atas = barang + tidak dikenal yang belum terkirim. Lorong Selesai/Kosong ikut dikirim, tapi
-          tidak menambah angka itu.
-        </p>
         <div className="mt-5 rounded-[28px] bg-[#f3e2b0] px-5 py-8 text-center">
           <p className="text-5xl font-semibold">{pendingItems}</p>
           <p className="mt-2 text-sm">barang belum terkirim</p>
@@ -1182,9 +1330,15 @@ export function CountApp() {
           </p>
         ))}
         <div className="mt-4">
-          <PrimaryButton onClick={() => void syncNow(false)}>Kirim Sekarang</PrimaryButton>
+          <PrimaryButton disabled={Boolean(syncBusy)} onClick={() => void syncNow(false)}>
+            Kirim Sekarang
+          </PrimaryButton>
         </div>
-        <h2 className="mt-6 text-sm font-medium text-[#6b6b6b]">Lorong & nomor kertas ({aisleRecords.length})</h2>
+        <p className="mt-2 text-xs text-[#8a8a8a]">
+          Saat kirim, HP juga mengunduh Excel cadangan dari data di perangkat ini.
+        </p>
+        {syncBusy ? <SyncBusyOverlay label={syncBusy.label} percent={syncBusy.percent} /> : null}
+        <h2 className="mt-6 text-sm font-medium text-[#6b6b6b]">Lorong & nomor tag ({aisleRecords.length})</h2>
         <ul className="mt-2 flex flex-col gap-2">
           {aisleRecords.length === 0 ? (
             <li className="rounded-2xl bg-white px-4 py-3 text-sm text-[#6b6b6b]">Belum ada lorong yang dicatat.</li>
@@ -1199,7 +1353,7 @@ export function CountApp() {
                   <PassBadge pass={row.pass} />
                 </div>
                 <p className="mt-2 text-sm">
-                  Nomor kertas: <span className="font-semibold">{row.nomor_kartu || "—"}</span>
+                  Nomor tag: <span className="font-semibold">{row.nomor_kartu || "—"}</span>
                 </p>
                 <p className="mt-1 text-xs text-[#8a8a8a]">
                   {row.is_empty ? "Ditandai kosong" : `${row.items} barang dicatat`}
@@ -1272,12 +1426,13 @@ export function CountApp() {
 
   function editUnknown(row: UnknownRow) {
     setEditingUnknownId(row.client_row_id);
-    setUnknownNama(row.nama_input ?? "");
+    setUnknownNama((row.nama_input ?? "").toUpperCase());
     setUnknownQty(row.qty);
-    setCode(row.kode_input ?? "");
-    setKondisi(row.kondisi);
+    setCode((row.kode_input ?? "").toUpperCase());
     setUnknownOpen(true);
   }
+
+  const isPass2 = activeTag?.pass === 2;
 
   return (
     <Phone tone="ink">
@@ -1287,16 +1442,20 @@ export function CountApp() {
         <AisleMeta nomor={activeTag.nomor} lokasi={activeTag.lokasi} pass={activeTag.pass} tone="ink" />
       ) : null}
       {activeTag ? <PassAckNote pass={activeTag.pass} /> : null}
-      <p className="mt-3 text-base font-medium text-white/70">Cari barang, isi jumlah, lalu simpan.</p>
-      {activeTag && isFloorPlace(activeTag.nomor) && !reusedAisleProgress ? (
+      <p className="mt-3 text-base font-medium text-white/70">
+        {isPass2
+          ? "Cek setiap barang Hitung ke-1: Sesuai atau Tidak Sesuai."
+          : "Cari barang, isi jumlah, lalu simpan."}
+      </p>
+      {activeTag && isFloorPlace(activeTag.nomor) && (!reusedAisleProgress || isPass2) ? (
         <label className="mt-4 block text-sm">
-          <span className="text-white/70">Nomor kertas</span>
+          <span className="text-white/70">Nomor tag{isPass2 ? " (boleh dikoreksi)" : ""}</span>
           <PaperNumberField tone="ink" autoFocus={false} value={cardNo} onChange={setCardNo} />
         </label>
       ) : null}
-      {reusedAisleProgress?.nomor_kartu ? (
+      {reusedAisleProgress?.nomor_kartu && !isPass2 ? (
         <p className="mt-4 text-sm text-white/50">
-          Nomor kertas: <span className="font-medium text-white/80">{reusedAisleProgress.nomor_kartu}</span>
+          Nomor tag: <span className="font-medium text-white/80">{reusedAisleProgress.nomor_kartu}</span>
         </p>
       ) : null}
       {activeTag?.pass === 3 && (activeTag.compare?.length ?? 0) > 0 ? (
@@ -1311,84 +1470,107 @@ export function CountApp() {
           </ul>
         </div>
       ) : null}
-      <button
-        type="button"
-        className="mt-4 w-full rounded-full border border-white/40 py-3 text-sm font-medium"
-        onClick={() => setScreen("search")}
-      >
-        Cari Barang
-      </button>
-      <p className="mt-4 text-lg font-medium leading-snug">{matched ? matched.nama_barang : "Belum ada barang"}</p>
-      <p className="mt-5 text-xs uppercase tracking-wide text-white/40">Jumlah</p>
-      <button
-        type="button"
-        disabled={!matched}
-        className={`mt-1 w-full text-left text-5xl font-semibold disabled:opacity-30 ${focusField === "qty" ? "text-white" : "text-white/50"}`}
-        onClick={() => setFocusField("qty")}
-      >
-        {qty || "0"}
-      </button>
-      <fieldset className="mt-4 flex gap-4 text-sm">
-        {(["baik", "rusak", "kadaluarsa"] as const).map((value) => (
-          <label key={value} className="flex items-center gap-2">
-            <input
-              type="radio"
-              name="kondisi"
-              checked={kondisi === value}
-              onChange={() => setKondisi(value)}
-            />
-            {value[0]?.toUpperCase()}
-            {value.slice(1)}
-          </label>
-        ))}
-      </fieldset>
-      <div className="mt-4">
-        <NumericKeypad onDigit={onDigit} onBack={onBack} />
-      </div>
-      <div className="mt-4">
-        <PrimaryButton disabled={!matched || !qty} onClick={() => void saveLine(qty)}>
-          Simpan Barang
-        </PrimaryButton>
-      </div>
-      <button
-        type="button"
-        className="mt-3 w-full rounded-full border border-ksa-amber bg-ksa-amber/20 py-3 text-sm font-semibold text-ksa-amber"
-        onClick={openUnknownForm}
-      >
-        Tidak dikenal
-      </button>
-      {!matched && code.length >= 4 ? (
-        <p className="mt-3 text-sm text-ksa-amber">
-          Kode {code} tidak ditemukan.{" "}
-          <button type="button" className="underline" onClick={openUnknownForm}>
-            Catat sebagai Tidak Dikenal
+      {isPass2 ? (
+        <Pass2ReviewList
+          items={pass2Items}
+          editingId={pass2EditId}
+          editQty={pass2EditQty}
+          editNama={pass2EditNama}
+          onEditQty={setPass2EditQty}
+          onEditNama={setPass2EditNama}
+          onStartRevisi={(item) => {
+            setPass2EditId(item.snapshot_item_id);
+            setPass2EditQty(item.qty_2 || item.qty_1);
+            setPass2EditNama(item.nama_revisi || "");
+            setPass2ReplaceFor(null);
+          }}
+          onCancelRevisi={() => {
+            setPass2EditId(null);
+            setPass2EditQty("");
+            setPass2EditNama("");
+            setPass2ReplaceFor(null);
+          }}
+          onSesuai={(item) => void savePass2Review(item, "sesuai", item.qty_1)}
+          onSaveRevisi={(item) => {
+            const replacement =
+              pass2ReplaceFor && prepare
+                ? prepare.items.find((row) => row.id === pass2ReplaceFor)
+                : undefined;
+            void savePass2Review(item, "revisi", pass2EditQty.trim(), pass2EditNama, replacement);
+          }}
+          onGantiBarang={(item) => {
+            setPass2EditId(item.snapshot_item_id);
+            setPass2ReplaceFor(null);
+            setScreen("search");
+          }}
+        />
+      ) : (
+        <>
+          <button
+            type="button"
+            className="mt-4 w-full rounded-full border border-white/40 py-3 text-sm font-medium"
+            onClick={() => setScreen("search")}
+          >
+            Cari Barang
           </button>
-        </p>
-      ) : null}
-      <section className="mt-5">
-        <h2 className="mb-2 text-sm text-white/50">Sudah dicatat di lorong ini ({lines.length} barang)</h2>
-        <ul className="flex flex-col gap-2 text-sm">
-          {lines.map((line) => (
-            <QtyRow
-              key={line.key}
-              tone="ink"
-              label={line.nama_barang}
-              qty={line.qty}
-              onEdit={() => {
-                setSelectedId(line.snapshot_item_id);
-                setCode(line.barcode_4 ?? "");
-                setQty(line.qty);
-                setKondisi(line.kondisi);
-                setFocusField("qty");
-              }}
-            />
-          ))}
-        </ul>
-        <h2 className="mb-2 mt-4 text-sm text-white/50">Tidak dikenal ({tagUnknowns.length})</h2>
-        {tagUnknowns.length > 0 ? (
-          <UnknownRowsList rows={tagUnknowns} tone="ink" onEdit={editUnknown} />
-        ) : null}
-      </section>
+          <p className="mt-4 text-lg font-medium leading-snug">{matched ? matched.nama_barang : "Belum ada barang"}</p>
+          <p className="mt-5 text-xs uppercase tracking-wide text-white/40">Jumlah</p>
+          <button
+            type="button"
+            disabled={!matched}
+            className={`mt-1 w-full text-left text-5xl font-semibold disabled:opacity-30 ${focusField === "qty" ? "text-white" : "text-white/50"}`}
+            onClick={() => setFocusField("qty")}
+          >
+            {qty || "0"}
+          </button>
+          <div className="mt-4">
+            <NumericKeypad onDigit={onDigit} onBack={onBack} />
+          </div>
+          <div className="mt-4">
+            <PrimaryButton disabled={!matched || !qty} onClick={() => void saveLine(qty)}>
+              Simpan Barang
+            </PrimaryButton>
+          </div>
+          <button
+            type="button"
+            className="mt-3 w-full rounded-full border border-ksa-amber bg-ksa-amber/20 py-3 text-sm font-semibold text-ksa-amber"
+            onClick={openUnknownForm}
+          >
+            Tidak dikenal
+          </button>
+          {!matched && code.length >= 4 ? (
+            <p className="mt-3 text-sm text-ksa-amber">
+              Kode {code} tidak ditemukan.{" "}
+              <button type="button" className="underline" onClick={openUnknownForm}>
+                Catat sebagai Tidak Dikenal
+              </button>
+            </p>
+          ) : null}
+          <section className="mt-5">
+            <h2 className="mb-2 text-sm text-white/50">Sudah dicatat di lorong ini ({lines.length} barang)</h2>
+            <ul className="flex flex-col gap-2 text-sm">
+              {lines.map((line) => (
+                <QtyRow
+                  key={line.key}
+                  tone="ink"
+                  label={line.nama_barang}
+                  qty={line.qty}
+                  onEdit={() => {
+                    setSelectedId(line.snapshot_item_id);
+                    setCode(line.barcode_4 ?? "");
+                    setQty(line.qty);
+                    setFocusField("qty");
+                  }}
+                />
+              ))}
+            </ul>
+            <h2 className="mb-2 mt-4 text-sm text-white/50">Tidak dikenal ({tagUnknowns.length})</h2>
+            {tagUnknowns.length > 0 ? (
+              <UnknownRowsList rows={tagUnknowns} tone="ink" onEdit={editUnknown} />
+            ) : null}
+          </section>
+        </>
+      )}
       <div className="mt-4 flex gap-2">
         <button
           type="button"
@@ -1411,7 +1593,11 @@ export function CountApp() {
       {selesaiConfirm ? (
         <ConfirmOverlay
           title={`Selesaikan lorong ${activeTag?.nomor}?`}
-          body={`${lines.length} barang sudah dicatat. Setelah selesai, lorong ini ditutup untuk hitung ini.`}
+          body={
+            isPass2
+              ? `${pass2Items.filter((row) => row.review_status).length} dari ${pass2Items.length} barang sudah dicek. Setelah selesai, lorong ditutup untuk Hitung ke-2.`
+              : `${lines.length} barang sudah dicatat. Setelah selesai, lorong ini ditutup untuk hitung ini.`
+          }
           confirmLabel="Ya, selesai"
           onCancel={() => setSelesaiConfirm(false)}
           onConfirm={() => void submitTag(false)}

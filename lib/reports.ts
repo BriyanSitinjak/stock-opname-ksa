@@ -115,6 +115,99 @@ export async function tagCompare(sessionId: string, tagId: string): Promise<Pass
   return (await pass3Compare(sessionId, [tagId])).get(tagId) ?? [];
 }
 
+export type Pass1BaselineRow = {
+  snapshot_item_id: string;
+  barcode_4: string | null;
+  nama_barang: string;
+  qty_1: string;
+};
+
+type TagProgressRaw = {
+  tag_id: string;
+  pass: number;
+  user_id: string;
+  user_nama: string;
+  nomor_kartu: string | null;
+  is_empty: boolean;
+};
+
+/** Latest Hitung ke-1 / ke-2 lorong closures for denah initials after sync. */
+export async function sessionTagProgress(sessionId: string): Promise<TagProgressRaw[]> {
+  const rows = await prisma.$queryRaw<TagProgressRaw[]>`
+    SELECT DISTINCT ON (ts.tag_id, ts.pass)
+           ts.tag_id,
+           ts.pass,
+           ts.submitted_by AS user_id,
+           u.nama AS user_nama,
+           ts.nomor_kartu,
+           ts.is_empty
+    FROM tag_submissions ts
+    JOIN users u ON u.id = ts.submitted_by
+    WHERE ts.session_id = ${sessionId}
+      AND ts.pass IN (1, 2)
+    ORDER BY ts.tag_id, ts.pass, ts.client_created_at DESC
+  `;
+  return rows.map((row) => ({ ...row, pass: Number(row.pass) }));
+}
+
+/** Pass-1 counts for Hitung ke-2 review. One lorong / one tag; pass 2 checks these rows. */
+export async function pass1Baseline(
+  sessionId: string,
+  tagIds: string[],
+  tagProgress?: TagProgressRaw[],
+): Promise<Map<string, { items: Pass1BaselineRow[]; nomor_kartu: string | null }>> {
+  const map = new Map<string, { items: Pass1BaselineRow[]; nomor_kartu: string | null }>();
+  if (tagIds.length === 0) {
+    return map;
+  }
+  const wanted = new Set(tagIds);
+  for (const tagId of tagIds) {
+    map.set(tagId, { items: [], nomor_kartu: null });
+  }
+  const items = await prisma.$queryRaw<
+    Array<{
+      tag_id: string;
+      snapshot_item_id: string;
+      barcode_4: string | null;
+      nama_barang: string;
+      qty_1: unknown;
+    }>
+  >`
+    SELECT tip.tag_id, tip.snapshot_item_id, si.barcode_4, si.nama_barang, tip.qty AS qty_1
+    FROM v_tag_item_pass tip
+    JOIN snapshot_items si ON si.id = tip.snapshot_item_id
+    WHERE tip.session_id = ${sessionId}
+      AND tip.pass = 1
+    ORDER BY si.nama_barang
+  `;
+  for (const row of items) {
+    if (!wanted.has(row.tag_id)) {
+      continue;
+    }
+    const current = map.get(row.tag_id) ?? { items: [], nomor_kartu: null };
+    const qty = decString(row.qty_1);
+    if (qty) {
+      current.items.push({
+        snapshot_item_id: row.snapshot_item_id,
+        barcode_4: row.barcode_4,
+        nama_barang: row.nama_barang,
+        qty_1: qty,
+      });
+    }
+    map.set(row.tag_id, current);
+  }
+  for (const row of tagProgress ?? []) {
+    if (row.pass !== 1 || !wanted.has(row.tag_id)) {
+      continue;
+    }
+    const current = map.get(row.tag_id);
+    if (current) {
+      current.nomor_kartu = row.nomor_kartu;
+    }
+  }
+  return map;
+}
+
 export async function selisihSistem(sessionId: string) {
   const rows = await prisma.$queryRaw<
     Array<{

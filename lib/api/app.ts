@@ -22,7 +22,9 @@ import {
   masterBarang,
   masterBarangChoices,
   kondisiReport,
+  pass1Baseline,
   pass3Compare,
+  sessionTagProgress,
   petaBarang,
   rekapTag,
   selisihHitung,
@@ -740,7 +742,10 @@ app.get("/sessions/:id/prepare", async (c) => {
     where: { sessionId: id, userId: binding.userId },
     select: { tagId: true, pass: true },
   });
+  const pass2Ids = assignments.filter((row) => row.pass === 2).map((row) => row.tagId);
   const pass3Ids = assignments.filter((row) => row.pass === 3).map((row) => row.tagId);
+  const tagProgress = await sessionTagProgress(id);
+  const pass1ByTag = await pass1Baseline(id, pass2Ids, tagProgress);
   const compareByTag = await pass3Compare(id, pass3Ids);
   const payload = {
     session: {
@@ -762,11 +767,22 @@ app.get("/sessions/:id/prepare", async (c) => {
     })),
     denah: await prepareDenah(id, session.status),
     crosses: await aisleCrosses(id),
-    assignments: assignments.map((row) => ({
-      tag_id: row.tagId,
-      pass: row.pass,
-      ...(row.pass === 3 ? { compare: compareByTag.get(row.tagId) ?? [] } : {}),
-    })),
+    /** Lorong selesai/kosong already on the server — denah initials after unduh ulang. */
+    tag_progress: tagProgress,
+    assignments: assignments.map((row) => {
+      const pass1 = row.pass === 2 ? pass1ByTag.get(row.tagId) : null;
+      return {
+        tag_id: row.tagId,
+        pass: row.pass,
+        ...(pass1
+          ? {
+              pass1: pass1.items,
+              pass1_nomor_kartu: pass1.nomor_kartu,
+            }
+          : {}),
+        ...(row.pass === 3 ? { compare: compareByTag.get(row.tagId) ?? [] } : {}),
+      };
+    }),
   };
   return c.json(payload);
 });
