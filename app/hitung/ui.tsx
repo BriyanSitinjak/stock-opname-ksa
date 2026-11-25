@@ -491,14 +491,15 @@ export function PaperNumberField({
     <input
       className={field}
       type="text"
-      inputMode="text"
-      autoCapitalize="characters"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      autoCapitalize="off"
       autoCorrect="off"
       spellCheck={false}
       enterKeyHint="done"
       autoFocus={autoFocus}
       value={value}
-      onChange={(event) => onChange(event.target.value)}
+      onChange={(event) => onChange(event.target.value.replace(/\D/g, ""))}
       placeholder="—"
       aria-label="Nomor tag"
     />

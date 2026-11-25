@@ -3,10 +3,17 @@
 import type { ReactNode } from "react";
 import { placeAt, type Floor, type FloorPlace } from "@/lib/floor-plan";
 
+export const UNAVAILABLE_PLACE_TONE = "bg-[#e8e4dc] text-[#8a8a8a]";
+
 const DEFAULT_PLACE =
   "bg-ksa-sage text-ksa-teal-deep disabled:bg-[#e8e4dc] disabled:text-[#8a8a8a]";
 
 const PLACE_LAYOUT = "flex flex-col items-center justify-center";
+
+/** Shared label for unavailable / crossed denah cells. */
+export function UnavailablePlaceLabel() {
+  return <span className="text-[9px] font-medium leading-tight">N/A</span>;
+}
 
 type PlaceHooks = {
   selectedId: string | null;
@@ -26,9 +33,15 @@ function PlaceButton({
   className,
   fallback,
 }: PlaceHooks & { place: FloorPlace; className: string; fallback: string }) {
-  const disabled = disabledPlace?.(place) ?? false;
-  const tone = placeClassName?.(place) ?? DEFAULT_PLACE;
+  const unavailable = Boolean(place.unavailable);
+  const disabled = unavailable || (disabledPlace?.(place) ?? false);
+  const tone = placeClassName?.(place) ?? (unavailable ? UNAVAILABLE_PLACE_TONE : DEFAULT_PLACE);
   const selected = selectedId === place.id ? "ring-2 ring-[#1c1c1c]" : "";
+  const body = unavailable ? (
+    <UnavailablePlaceLabel />
+  ) : (
+    (placeContent?.(place, fallback) ?? fallback)
+  );
   return (
     <button
       type="button"
@@ -36,7 +49,7 @@ function PlaceButton({
       onClick={() => onSelect(place)}
       className={`${className} disabled:cursor-not-allowed ${tone} ${selected}`}
     >
-      {placeContent?.(place, fallback) ?? fallback}
+      {body}
     </button>
   );
 }

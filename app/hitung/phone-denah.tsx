@@ -1,14 +1,14 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
-import { FloorDrawing } from "@/app/denah/floor-drawing";
+import { useMemo, useState } from "react";
+import { FloorDrawing, UNAVAILABLE_PLACE_TONE, UnavailablePlaceLabel } from "@/app/denah/floor-drawing";
 import { GudangTabs } from "@/app/denah/gudang-tabs";
 import { mergedTagPlaceMarks, type LocalProgress, type TagPlaceMark } from "@/app/hitung/local-progress";
 import { floorByGudang, floors, type FloorPlace } from "@/lib/floor-plan";
 import { latestAssignment, locatePrepareTagByNomor, type LocatedPrepareTag } from "@/lib/prepare-locate";
 import type { PreparePayload } from "@/lib/offline/queue";
 
-type PlaceStatus = "mine" | "done" | "other" | "crossed" | "empty";
+type PlaceStatus = "mine1" | "mine2" | "done" | "other" | "crossed" | "empty";
 
 type PlaceInfo = {
   status: PlaceStatus;
@@ -19,15 +19,24 @@ type PlaceInfo = {
 };
 
 const PLACE_TONE: Record<PlaceStatus, string> = {
-  mine: "bg-ksa-teal text-white",
+  mine1: "bg-ksa-teal text-white",
+  mine2: "bg-ksa-amber text-[#5a3b00]",
   done: "bg-[#1c1c1c] text-white",
-  crossed: "bg-[#e8e4dc] text-[#8a8a8a]",
+  crossed: UNAVAILABLE_PLACE_TONE,
   other: "bg-ksa-sage/60 text-ksa-teal-deep/70",
   empty: "bg-[#f3eee4] text-[#b0b0b0]",
 };
 
-const SELECTABLE: PlaceStatus[] = ["mine", "done"];
+const SELECTABLE: PlaceStatus[] = ["mine1", "mine2", "done"];
 const EMPTY_MARK: TagPlaceMark = { pass1: "", pass2: "", nomor_kartu: null };
+
+const LEGEND: { tone: string; label: string }[] = [
+  { tone: "bg-ksa-teal", label: "Tugas H1" },
+  { tone: "bg-ksa-amber", label: "Tugas H2" },
+  { tone: "bg-[#1c1c1c]", label: "Selesai" },
+  { tone: "bg-[#e8e4dc]", label: "Tidak tersedia" },
+  { tone: "bg-ksa-sage/60", label: "Bukan tugas" },
+];
 
 function resolvePlace(
   prepare: PreparePayload,
@@ -35,7 +44,7 @@ function resolvePlace(
   byTag: Map<string, TagPlaceMark>,
   place: FloorPlace,
 ): PlaceInfo {
-  if (crossed.has(place.aisle) || crossed.has(place.label)) {
+  if (place.unavailable || crossed.has(place.aisle) || crossed.has(place.label)) {
     return { status: "crossed", tag: null, ...EMPTY_MARK };
   }
   const tag = locatePrepareTagByNomor(prepare, place.label);
@@ -46,8 +55,15 @@ function resolvePlace(
   if (mark.pass1 || mark.pass2) {
     return { status: "done", tag, ...mark };
   }
-  const mine = prepare.assignments.some((row) => row.tag_id === tag.id);
-  return { status: mine ? "mine" : "other", tag, ...EMPTY_MARK };
+  const assignment = latestAssignment(prepare, tag.id);
+  if (!assignment) {
+    return { status: "other", tag, ...EMPTY_MARK };
+  }
+  return {
+    status: assignment.pass === 2 ? "mine2" : "mine1",
+    tag,
+    ...EMPTY_MARK,
+  };
 }
 
 function PlaceMark({ pass1, pass2, nomor_kartu }: TagPlaceMark) {
@@ -61,14 +77,6 @@ function PlaceMark({ pass1, pass2, nomor_kartu }: TagPlaceMark) {
           {nomor_kartu}
         </span>
       ) : null}
-    </span>
-  );
-}
-
-function LegendSwatch({ className, children }: { className: string; children?: ReactNode }) {
-  return (
-    <span className={`flex items-center justify-center rounded ${className}`} aria-hidden>
-      {children}
     </span>
   );
 }
@@ -121,40 +129,14 @@ export function PhoneDenah({
           setSelectedId(null);
         }}
       />
-      <ul className="mt-4 space-y-2.5 text-xs leading-snug text-[#5c5c5c]">
-        <li className="flex items-start gap-2">
-          <LegendSwatch className="mt-0.5 h-4 w-4 shrink-0 bg-ksa-teal" />
-          <span>
-            <span className="font-semibold text-[#1c1c1c]">Tugas Anda</span>
-            {" — "}lorong yang ditugaskan ke Anda (Hitung ke-1 atau ke-2)
-          </span>
-        </li>
-        <li className="flex items-start gap-2">
-          <LegendSwatch className="mt-0.5 h-8 w-7 shrink-0 bg-[#1c1c1c] text-white">
-            <PlaceMark pass1="A" pass2="B" nomor_kartu="12" />
-          </LegendSwatch>
-          <span>
-            <span className="font-semibold text-[#1c1c1c]">Sudah dihitung</span>
-            {" — "}inisial atas = Hitung ke-1, bawah = Hitung ke-2. Nomor tag muncul setelah petugas 1
-            sinkron (lalu unduh ulang).
-          </span>
-        </li>
-        <li className="flex items-start gap-2">
-          <LegendSwatch className="mt-0.5 h-4 w-4 shrink-0 bg-[#e8e4dc]" />
-          <span>
-            <span className="font-semibold text-[#1c1c1c]">Tidak tersedia</span>
-            {" — "}lorong disilang / tidak dipakai
-          </span>
-        </li>
-        <li className="flex items-start gap-2">
-          <LegendSwatch className="mt-0.5 h-4 w-4 shrink-0 bg-ksa-sage/60" />
-          <span>
-            <span className="font-semibold text-[#1c1c1c]">Bukan tugas Anda</span>
-            {" — "}lorong petugas lain
-          </span>
-        </li>
+      <ul className="mt-3 flex flex-wrap gap-x-3 gap-y-2 text-[11px] text-[#5c5c5c]">
+        {LEGEND.map((item) => (
+          <li key={item.label} className="flex items-center gap-1.5">
+            <span className={`inline-block h-3.5 w-3.5 rounded ${item.tone}`} aria-hidden />
+            {item.label}
+          </li>
+        ))}
       </ul>
-      <p className="mt-3 text-sm text-[#5c5c5c]">{floor.note}</p>
       <FloorDrawing
         floor={floor}
         selectedId={selectedId}
@@ -166,6 +148,14 @@ export function PhoneDenah({
           if (info?.status === "done") {
             return (
               <PlaceMark pass1={info.pass1} pass2={info.pass2} nomor_kartu={info.nomor_kartu} />
+            );
+          }
+          if (info?.status === "crossed") {
+            return <UnavailablePlaceLabel />;
+          }
+          if (info?.status === "mine1" || info?.status === "mine2") {
+            return (
+              <span className="text-[10px] font-semibold">{info.status === "mine1" ? "H1" : "H2"}</span>
             );
           }
           return fallback;

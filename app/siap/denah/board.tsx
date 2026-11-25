@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { FloorDrawing } from "@/app/denah/floor-drawing";
 import { GudangTabs } from "@/app/denah/gudang-tabs";
-import { floorByGudang, floors, type FloorPlace } from "@/lib/floor-plan";
+import { activePlaceCount, floorByGudang, floors, type FloorPlace } from "@/lib/floor-plan";
 
 export function FloorBoard() {
   const [gudang, setGudang] = useState(floors[0]?.gudang ?? 17);
@@ -20,7 +20,7 @@ export function FloorBoard() {
         }}
       />
       <p className="mt-4 text-sm text-[#5c5c5c]">{floor.note}</p>
-      <p className="mt-1 text-sm text-[#6b6b6b]">{floor.places.length + floor.extras.places.length} posisi</p>
+      <p className="mt-1 text-sm text-[#6b6b6b]">{activePlaceCount(floor)} posisi aktif</p>
       <FloorDrawing floor={floor} selectedId={selected?.id ?? null} onSelect={setSelected} />
       <aside className="mt-4 rounded-3xl bg-white p-5 shadow-sm">
         {selected ? (

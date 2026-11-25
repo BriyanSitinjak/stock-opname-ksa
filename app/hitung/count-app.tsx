@@ -1258,9 +1258,7 @@ export function CountApp() {
         <BackButton className="mb-3" onClick={() => setScreen("home")} />
         {bar}
         <h1 className="text-2xl font-semibold">Pilih dari Denah</h1>
-        <p className="mt-1 text-sm text-[#6b6b6b]">
-          Huruf di atas, nomor di kiri. Kotak hitam: inisial Hitung ke-1 / ke-2 dan nomor tag setelah sinkron.
-        </p>
+        <p className="mt-1 text-sm text-[#6b6b6b]">Huruf di atas, nomor di kiri. Pilih lorong tugas Anda.</p>
         {prepare ? (
           <PhoneDenah
             prepare={prepare}

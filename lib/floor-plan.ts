@@ -9,6 +9,8 @@ export type FloorPlace = {
   row: number | null;
   side: "A" | "B" | null;
   label: string;
+  /** Drawn as Tidak tersedia; excluded from assignable place labels. */
+  unavailable?: boolean;
 };
 
 export type FloorAisle = {
@@ -45,7 +47,13 @@ function rackRows(role: "outer" | "center", options?: { from?: number; to?: numb
   return rows;
 }
 
-function rackPlace(gudang: number, aisle: string, row: number, side: "A" | "B"): FloorPlace {
+function rackPlace(
+  gudang: number,
+  aisle: string,
+  row: number,
+  side: "A" | "B",
+  options?: { unavailable?: boolean },
+): FloorPlace {
   return {
     id: `${gudang}:${aisle}:${row}:${side}`,
     gudang,
@@ -53,6 +61,7 @@ function rackPlace(gudang: number, aisle: string, row: number, side: "A" | "B"):
     row,
     side,
     label: `${aisle}-${row}-${side}`,
+    unavailable: options?.unavailable || undefined,
   };
 }
 
@@ -64,23 +73,29 @@ function standardFloor(
   gudang: number,
   letters: [string, string, string, string],
   note: string,
-  options?: { to?: number },
+  options?: { unavailableFrom?: number },
 ): Floor {
-  const to = options?.to ?? 19;
+  const unavailableFrom = options?.unavailableFrom;
   const aisles: FloorAisle[] = letters.map((letter, index) => ({
     id: letter,
     label: letter,
     role: index === 0 || index === 3 ? "outer" : "center",
   }));
   const places = aisles.flatMap((aisle) =>
-    rackRows(aisle.role, { to }).flatMap((row) => SIDES.map((side) => rackPlace(gudang, aisle.id, row, side))),
+    rackRows(aisle.role).flatMap((row) =>
+      SIDES.map((side) =>
+        rackPlace(gudang, aisle.id, row, side, {
+          unavailable: unavailableFrom != null && row >= unavailableFrom,
+        }),
+      ),
+    ),
   );
   return {
     gudang,
     nama: `Gudang ${gudang}`,
     note,
     aisles,
-    rows: rackRows("outer", { to }),
+    rows: rackRows("outer"),
     places,
     extras: { placement: "door", title: "", places: [] },
   };
@@ -96,27 +111,28 @@ function gudang21(): Floor {
   const places: FloorPlace[] = [];
   for (const aisle of aisles) {
     const from = aisle.id === "Q" ? 6 : 7;
-    const rows = rackRows(aisle.role, { from, to: 16, keepRow9: true });
+    const rows = rackRows(aisle.role, { from, keepRow9: true });
     for (const row of rows) {
       for (const side of SIDES) {
-        places.push(rackPlace(21, aisle.id, row, side));
+        places.push(
+          rackPlace(21, aisle.id, row, side, {
+            unavailable: row >= 18,
+          }),
+        );
       }
     }
   }
   return {
     gudang: 21,
     nama: "Gudang 21",
-    note: "U dan V masing-masing satu tempat. Ruang arsip dan tangga tidak dihitung. Tidak ada baris 18–19.",
+    note: "U dan V masing-masing satu tempat. Ruang arsip dan tangga tidak dihitung. Baris 18–19 ditandai tidak tersedia.",
     aisles,
-    rows: rackRows("outer", { from: 6, to: 16 }),
+    rows: rackRows("outer", { from: 6 }),
     places,
     extras: {
       placement: "far",
       title: "Lantai atas",
-      places: [
-        namedPlace(21, "V", "V"),
-        namedPlace(21, "U", "U"),
-      ],
+      places: [namedPlace(21, "V", "V"), namedPlace(21, "U", "U")],
     },
   };
 }
@@ -137,11 +153,11 @@ function gudang22(): Floor {
       }
     }
   }
-  const gypsum = ["20-A"].map((label) => namedPlace(22, label, label));
+  const gypsum = ["20-A", "19-B", "19-A", "18-B", "18-A"].map((label) => namedPlace(22, label, label));
   return {
     gudang: 22,
     nama: "Gudang 22",
-    note: "Lorong W, X, Y, dan Z. Baris 16 hanya sisi A. Tidak ada 16B dan tidak ada baris 18–19. Area gypsum: 20-A.",
+    note: "Lorong W, X, Y, dan Z. Baris 16 hanya sisi A. Lima petak gypsum memakai nama yang tertulis.",
     aisles,
     rows: rackRows("outer", { to: 16 }),
     places,
@@ -150,19 +166,25 @@ function gudang22(): Floor {
 }
 
 export const floors: Floor[] = [
-  standardFloor(17, ["A", "B", "C", "D"], "Lorong A dan D di rak pinggir, termasuk baris 9. Lorong B dan C di rak tengah, tanpa baris 9. Tidak ada baris 17."),
-  standardFloor(18, ["E", "F", "G", "H"], "Pola yang sama dengan Gudang 17. Tidak ada baris 18–19.", { to: 16 }),
+  standardFloor(
+    17,
+    ["A", "B", "C", "D"],
+    "Lorong A dan D di rak pinggir, termasuk baris 9. Lorong B dan C di rak tengah, tanpa baris 9. Tidak ada baris 17.",
+  ),
+  standardFloor(18, ["E", "F", "G", "H"], "Pola yang sama dengan Gudang 17. Baris 18–19 ditandai tidak tersedia.", {
+    unavailableFrom: 18,
+  }),
   standardFloor(
     19,
     ["I", "J", "K", "L"],
-    "Pola yang sama dengan Gudang 17. Tidak ada baris 18–19. Cat di lantai, misalnya J-16-A, adalah lorong, baris, lalu sisi.",
-    { to: 16 },
+    "Pola yang sama dengan Gudang 17. Baris 18–19 ditandai tidak tersedia. Cat di lantai, misalnya J-16-A, adalah lorong, baris, lalu sisi.",
+    { unavailableFrom: 18 },
   ),
   standardFloor(
     20,
     ["M", "N", "O", "P"],
-    "Huruf lorong mengikuti urutan lembar, di antara L pada Gudang 19 dan Q pada Gudang 21. Tidak ada baris 18–19.",
-    { to: 16 },
+    "Huruf lorong mengikuti urutan lembar, di antara L pada Gudang 19 dan Q pada Gudang 21. Baris 18–19 ditandai tidak tersedia.",
+    { unavailableFrom: 18 },
   ),
   gudang21(),
   gudang22(),
@@ -174,6 +196,14 @@ export function floorByGudang(gudang: number): Floor | undefined {
 
 export function placeAt(floor: Floor, aisle: string, row: number): FloorPlace[] {
   return floor.places.filter((place) => place.aisle === aisle && place.row === row);
+}
+
+/** Count of places that can be assigned (excludes unavailable blocks). */
+export function activePlaceCount(floor: Floor): number {
+  return (
+    floor.places.filter((place) => !place.unavailable).length +
+    floor.extras.places.filter((place) => !place.unavailable).length
+  );
 }
 
 export type FloorAisleRef = {
@@ -191,15 +221,19 @@ export function floorAisles(): FloorAisleRef[] {
       gudangNama: floor.nama,
       aisle: aisle.id,
       label: aisle.label,
-      placeLabels: floor.places.filter((place) => place.aisle === aisle.id).map((place) => place.label),
+      placeLabels: floor.places
+        .filter((place) => place.aisle === aisle.id && !place.unavailable)
+        .map((place) => place.label),
     }));
-    const extras = floor.extras.places.map((place) => ({
-      gudang: floor.gudang,
-      gudangNama: floor.nama,
-      aisle: place.aisle,
-      label: place.label,
-      placeLabels: [place.label],
-    }));
+    const extras = floor.extras.places
+      .filter((place) => !place.unavailable)
+      .map((place) => ({
+        gudang: floor.gudang,
+        gudangNama: floor.nama,
+        aisle: place.aisle,
+        label: place.label,
+        placeLabels: [place.label],
+      }));
     return [...racks, ...extras];
   });
 }
