@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { PaperNumberField, PrimaryButton, StruckText, TextLink } from "@/app/hitung/ui";
 import { qtyOrDash } from "@/lib/qty-display";
 
@@ -12,6 +13,94 @@ export type Pass2Item = {
   qty_2?: string;
   nama_revisi?: string | null;
 };
+
+const ACTION_TONE = {
+  sesuai: "border-ksa-sage bg-ksa-sage/20 text-ksa-sage",
+  revisi: "border-ksa-amber/60 text-ksa-amber",
+} as const;
+
+function ReviewActionButton({
+  tone,
+  onClick,
+  children,
+  size = "md",
+}: {
+  tone: "sesuai" | "revisi";
+  onClick: () => void;
+  children: ReactNode;
+  size?: "sm" | "md";
+}) {
+  const sizing =
+    size === "sm"
+      ? "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium"
+      : "rounded-full border px-4 py-2.5 text-sm font-medium";
+  return (
+    <button type="button" className={`${sizing} ${ACTION_TONE[tone]}`} onClick={onClick}>
+      {children}
+    </button>
+  );
+}
+
+function StatusPill({ tone, children }: { tone: "sesuai" | "revisi"; children: ReactNode }) {
+  const style =
+    tone === "sesuai"
+      ? "bg-ksa-sage text-ksa-teal-deep"
+      : "bg-ksa-amber/25 text-ksa-amber";
+  return (
+    <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${style}`}>{children}</span>
+  );
+}
+
+function BarcodeLine({ code }: { code: string | null }) {
+  if (!code) {
+    return null;
+  }
+  return <p className="mt-0.5 text-xs text-white/45">Kode {code}</p>;
+}
+
+function ItemSummary({ item, mode }: { item: Pass2Item; mode: "sesuai" | "revisi" | "pending" }) {
+  if (mode === "sesuai") {
+    return (
+      <>
+        <p className="text-sm font-medium leading-5">
+          <StruckText>{item.nama_barang}</StruckText>
+        </p>
+        <p className="mt-1 text-xs">
+          <StruckText>Qty {qtyOrDash(item.qty_1)}</StruckText>
+        </p>
+      </>
+    );
+  }
+  if (mode === "revisi") {
+    const showNamaRevisi = Boolean(item.nama_revisi && item.nama_revisi !== item.nama_barang);
+    return (
+      <>
+        <p className="text-sm font-medium leading-5 text-white">
+          {showNamaRevisi ? (
+            <>
+              <StruckText>{item.nama_barang}</StruckText>
+              <span className="ml-2">{item.nama_revisi}</span>
+            </>
+          ) : (
+            item.nama_barang
+          )}
+        </p>
+        <BarcodeLine code={item.barcode_4} />
+        <p className="mt-1 text-xs text-white/70">
+          <StruckText>Qty {qtyOrDash(item.qty_1)}</StruckText>
+          {item.qty_2 ? <span className="ml-2 font-semibold text-white">{item.qty_2}</span> : null}
+        </p>
+      </>
+    );
+  }
+  return (
+    <>
+      <p className="text-sm font-medium leading-5 text-white">{item.nama_barang}</p>
+      <BarcodeLine code={item.barcode_4} />
+      <p className="mt-1 text-xs text-white/50">Qty Hitung 1: {qtyOrDash(item.qty_1)}</p>
+    </>
+  );
+}
 
 /** Nomor tag for Hitung ke-2: show H1 value, edit via action button, strike old when changed. */
 export function Pass2TagEditor({
@@ -63,13 +152,9 @@ export function Pass2TagEditor({
               <span className="font-semibold text-white">{current || pass1Card || "—"}</span>
             )}
           </p>
-          <button
-            type="button"
-            className="shrink-0 rounded-full border border-ksa-amber/60 px-3 py-1.5 text-xs font-medium text-ksa-amber"
-            onClick={() => onToggleEdit(true)}
-          >
+          <ReviewActionButton tone="revisi" size="sm" onClick={() => onToggleEdit(true)}>
             Ubah
-          </button>
+          </ReviewActionButton>
         </div>
       )}
     </div>
@@ -115,7 +200,7 @@ export function Pass2ReviewList({
         const editing = editingId === item.snapshot_item_id;
         const sesuai = item.review_status === "sesuai";
         const revisi = item.review_status === "revisi";
-        const showNamaRevisi = Boolean(item.nama_revisi && item.nama_revisi !== item.nama_barang);
+        const summaryMode = sesuai ? "sesuai" : revisi && !editing ? "revisi" : "pending";
         return (
           <li
             key={item.snapshot_item_id}
@@ -123,49 +208,12 @@ export function Pass2ReviewList({
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                {sesuai ? (
-                  <>
-                    <p className="text-sm font-medium leading-5">
-                      <StruckText>{item.nama_barang}</StruckText>
-                    </p>
-                    <p className="mt-1 text-xs">
-                      <StruckText>Qty {qtyOrDash(item.qty_1)}</StruckText>
-                    </p>
-                  </>
-                ) : revisi && !editing ? (
-                  <>
-                    <p className="text-sm font-medium leading-5 text-white">
-                      {showNamaRevisi ? (
-                        <>
-                          <StruckText>{item.nama_barang}</StruckText>
-                          <span className="ml-2">{item.nama_revisi}</span>
-                        </>
-                      ) : (
-                        item.nama_barang
-                      )}
-                    </p>
-                    {item.barcode_4 ? <p className="mt-0.5 text-xs text-white/45">Kode {item.barcode_4}</p> : null}
-                    <p className="mt-1 text-xs text-white/70">
-                      <StruckText>Qty {qtyOrDash(item.qty_1)}</StruckText>
-                      {item.qty_2 ? <span className="ml-2 font-semibold text-white">{item.qty_2}</span> : null}
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm font-medium leading-5 text-white">{item.nama_barang}</p>
-                    {item.barcode_4 ? <p className="mt-0.5 text-xs text-white/45">Kode {item.barcode_4}</p> : null}
-                    <p className="mt-1 text-xs text-white/50">Qty Hitung 1: {qtyOrDash(item.qty_1)}</p>
-                  </>
-                )}
+                <ItemSummary item={item} mode={summaryMode} />
               </div>
               {sesuai ? (
-                <span className="shrink-0 rounded-full bg-ksa-sage px-2.5 py-1 text-xs font-semibold text-ksa-teal-deep">
-                  Stock Sesuai
-                </span>
+                <StatusPill tone="sesuai">Stock Sesuai</StatusPill>
               ) : revisi && !editing ? (
-                <span className="shrink-0 rounded-full bg-ksa-amber/25 px-2.5 py-1 text-xs font-semibold text-ksa-amber">
-                  Direvisi
-                </span>
+                <StatusPill tone="revisi">Direvisi</StatusPill>
               ) : null}
             </div>
             {editing ? (
@@ -209,24 +257,20 @@ export function Pass2ReviewList({
                   </TextLink>
                 </div>
               </div>
+            ) : sesuai ? null : revisi ? (
+              <div className="mt-3 flex justify-end">
+                <ReviewActionButton tone="revisi" onClick={() => onStartRevisi(item)}>
+                  Ubah
+                </ReviewActionButton>
+              </div>
             ) : (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {!sesuai ? (
-                  <button
-                    type="button"
-                    className="rounded-full border border-ksa-sage bg-ksa-sage/20 px-3 py-2 text-sm font-medium text-ksa-sage"
-                    onClick={() => onSesuai(item)}
-                  >
-                    Sesuai
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  className="rounded-full border border-ksa-amber/60 px-3 py-2 text-sm font-medium text-ksa-amber"
-                  onClick={() => onStartRevisi(item)}
-                >
-                  {revisi || sesuai ? "Ubah" : "Tidak Sesuai"}
-                </button>
+              <div className="mt-3 flex items-center justify-between gap-6">
+                <ReviewActionButton tone="sesuai" onClick={() => onSesuai(item)}>
+                  Sesuai
+                </ReviewActionButton>
+                <ReviewActionButton tone="revisi" onClick={() => onStartRevisi(item)}>
+                  Tidak Sesuai
+                </ReviewActionButton>
               </div>
             )}
           </li>
