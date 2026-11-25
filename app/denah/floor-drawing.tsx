@@ -85,10 +85,10 @@ function Row({ floor, row, ...hooks }: { floor: Floor; row: number } & PlaceHook
       {floor.aisles.map((aisle) => {
         const places = placeAt(floor, aisle.id, row);
         if (places.length === 0) {
-          return <span key={aisle.id} className="min-h-12 rounded-lg bg-[#f3eee4]" />;
+          return <span key={aisle.id} className="min-h-14 rounded-lg bg-[#f3eee4]" />;
         }
         return (
-          <span key={aisle.id} className="flex min-h-12 gap-1">
+          <span key={aisle.id} className="flex min-h-14 gap-1">
             {places.map((place) => (
               <PlaceButton
                 key={place.id}

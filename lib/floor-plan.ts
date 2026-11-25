@@ -29,9 +29,9 @@ export type Floor = {
 
 const SIDES = ["A", "B"] as const;
 
-function rackRows(role: "outer" | "center", options?: { from?: number; to?: number; keepRow9?: boolean; through?: number }) {
+function rackRows(role: "outer" | "center", options?: { from?: number; to?: number; keepRow9?: boolean }) {
   const from = options?.from ?? 1;
-  const to = options?.to ?? options?.through ?? 19;
+  const to = options?.to ?? 19;
   const rows: number[] = [];
   for (let row = from; row <= to; row += 1) {
     if (row === 17) {
@@ -60,21 +60,27 @@ function namedPlace(gudang: number, aisle: string, label: string): FloorPlace {
   return { id: `${gudang}:${aisle}`, gudang, aisle, row: null, side: null, label };
 }
 
-function standardFloor(gudang: number, letters: [string, string, string, string], note: string): Floor {
+function standardFloor(
+  gudang: number,
+  letters: [string, string, string, string],
+  note: string,
+  options?: { to?: number },
+): Floor {
+  const to = options?.to ?? 19;
   const aisles: FloorAisle[] = letters.map((letter, index) => ({
     id: letter,
     label: letter,
     role: index === 0 || index === 3 ? "outer" : "center",
   }));
   const places = aisles.flatMap((aisle) =>
-    rackRows(aisle.role).flatMap((row) => SIDES.map((side) => rackPlace(gudang, aisle.id, row, side))),
+    rackRows(aisle.role, { to }).flatMap((row) => SIDES.map((side) => rackPlace(gudang, aisle.id, row, side))),
   );
   return {
     gudang,
     nama: `Gudang ${gudang}`,
     note,
     aisles,
-    rows: rackRows("outer"),
+    rows: rackRows("outer", { to }),
     places,
     extras: { placement: "door", title: "", places: [] },
   };
@@ -90,7 +96,7 @@ function gudang21(): Floor {
   const places: FloorPlace[] = [];
   for (const aisle of aisles) {
     const from = aisle.id === "Q" ? 6 : 7;
-    const rows = rackRows(aisle.role, { from, keepRow9: true });
+    const rows = rackRows(aisle.role, { from, to: 16, keepRow9: true });
     for (const row of rows) {
       for (const side of SIDES) {
         places.push(rackPlace(21, aisle.id, row, side));
@@ -100,9 +106,9 @@ function gudang21(): Floor {
   return {
     gudang: 21,
     nama: "Gudang 21",
-    note: "U dan V masing-masing satu tempat. Ruang arsip dan tangga tidak dihitung. Baris 12 ke atas mengikuti pola lembar yang sama, karena foto berhenti di baris 11.",
+    note: "U dan V masing-masing satu tempat. Ruang arsip dan tangga tidak dihitung. Tidak ada baris 18–19.",
     aisles,
-    rows: rackRows("outer", { from: 6 }),
+    rows: rackRows("outer", { from: 6, to: 16 }),
     places,
     extras: {
       placement: "far",
@@ -131,11 +137,11 @@ function gudang22(): Floor {
       }
     }
   }
-  const gypsum = ["20-A", "19-B", "19-A", "18-B", "18-A"].map((label) => namedPlace(22, label, label));
+  const gypsum = ["20-A"].map((label) => namedPlace(22, label, label));
   return {
     gudang: 22,
     nama: "Gudang 22",
-    note: "Lorong W, X, Y, dan Z. Baris 16 hanya sisi A. Lima petak gypsum memakai nama yang tertulis.",
+    note: "Lorong W, X, Y, dan Z. Baris 16 hanya sisi A. Tidak ada 16B dan tidak ada baris 18–19. Area gypsum: 20-A.",
     aisles,
     rows: rackRows("outer", { to: 16 }),
     places,
@@ -145,12 +151,18 @@ function gudang22(): Floor {
 
 export const floors: Floor[] = [
   standardFloor(17, ["A", "B", "C", "D"], "Lorong A dan D di rak pinggir, termasuk baris 9. Lorong B dan C di rak tengah, tanpa baris 9. Tidak ada baris 17."),
-  standardFloor(18, ["E", "F", "G", "H"], "Pola yang sama dengan Gudang 17."),
-  standardFloor(19, ["I", "J", "K", "L"], "Pola yang sama dengan Gudang 17. Cat di lantai, misalnya J-16-A, adalah lorong, baris, lalu sisi."),
+  standardFloor(18, ["E", "F", "G", "H"], "Pola yang sama dengan Gudang 17. Tidak ada baris 18–19.", { to: 16 }),
+  standardFloor(
+    19,
+    ["I", "J", "K", "L"],
+    "Pola yang sama dengan Gudang 17. Tidak ada baris 18–19. Cat di lantai, misalnya J-16-A, adalah lorong, baris, lalu sisi.",
+    { to: 16 },
+  ),
   standardFloor(
     20,
     ["M", "N", "O", "P"],
-    "Huruf lorong mengikuti urutan lembar, di antara L pada Gudang 19 dan Q pada Gudang 21.",
+    "Huruf lorong mengikuti urutan lembar, di antara L pada Gudang 19 dan Q pada Gudang 21. Tidak ada baris 18–19.",
+    { to: 16 },
   ),
   gudang21(),
   gudang22(),

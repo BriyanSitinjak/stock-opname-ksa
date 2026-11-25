@@ -63,3 +63,8 @@ export function sameUserProgressForNomor(
   }
   return progressForSameUser(progress, tag.id, pass, prepare.counter.id);
 }
+
+/** True when every downloaded assignment is Hitung ke-2 (no H1 tasks on this phone). */
+export function isPass2OnlyCounter(prepare: PreparePayload | null | undefined): boolean {
+  return !!prepare?.assignments.length && prepare.assignments.every((row) => row.pass === 2);
+}

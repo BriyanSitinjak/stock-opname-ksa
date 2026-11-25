@@ -16,7 +16,12 @@ export type LocalProgress = {
   user_nama?: string;
 };
 
-export type PassInitials = { pass1: string; pass2: string };
+/** Denah cell mark: initials + nomor tag from Hitung ke-1 when known. */
+export type TagPlaceMark = {
+  pass1: string;
+  pass2: string;
+  nomor_kartu: string | null;
+};
 
 function key(sessionId: string) {
   return `hitung_progress:${sessionId}`;
@@ -63,6 +68,29 @@ export function progressForSameUser(
   );
 }
 
+/**
+ * Nomor tag from Hitung ke-1 for a lorong: assignment payload, then server
+ * tag_progress, then local progress.
+ */
+export function pass1NomorKartu(
+  tagId: string,
+  sources: {
+    preferred?: string | null;
+    local?: LocalProgress[];
+    server?: TagProgressRow[];
+  },
+): string {
+  const preferred = sources.preferred?.trim();
+  if (preferred) {
+    return preferred;
+  }
+  const fromServer = sources.server?.find((row) => row.tag_id === tagId && row.pass === 1)?.nomor_kartu?.trim();
+  if (fromServer) {
+    return fromServer;
+  }
+  return sources.local?.find((row) => row.tag_id === tagId && row.pass === 1)?.nomor_kartu?.trim() || "";
+}
+
 function initialsForRow(
   row: LocalProgress,
   counter: { id: string; nama: string },
@@ -75,34 +103,10 @@ function initialsForRow(
   );
 }
 
-function passInitialsMap(
-  progress: LocalProgress[],
-  counter: { id: string; nama: string },
-): Map<string, PassInitials> {
-  const map = new Map<string, PassInitials>();
-  const selfInitials = nameInitials(counter.nama);
-  for (const row of progress) {
-    const current = map.get(row.tag_id) ?? { pass1: "", pass2: "" };
-    const initials = initialsForRow(row, counter, selfInitials);
-    if (row.pass === 1) {
-      current.pass1 = initials;
-    } else if (row.pass === 2) {
-      current.pass2 = initials;
-    }
-    map.set(row.tag_id, current);
-  }
-  return map;
-}
-
-/**
- * Merge server tag_progress (from unduh ulang after sync) with local progress.
- * Local wins on the same tag+pass so unfinished phone work stays visible.
- */
-export function mergedPassInitials(
+function mergeProgressRows(
   local: LocalProgress[],
   server: TagProgressRow[] | undefined,
-  counter: { id: string; nama: string },
-): Map<string, PassInitials> {
+): LocalProgress[] {
   const byKey = new Map<string, LocalProgress>();
   for (const row of server ?? []) {
     byKey.set(`${row.tag_id}:${row.pass}`, {
@@ -117,5 +121,36 @@ export function mergedPassInitials(
   for (const row of local) {
     byKey.set(`${row.tag_id}:${row.pass}`, row);
   }
-  return passInitialsMap([...byKey.values()], counter);
+  return [...byKey.values()];
+}
+
+/**
+ * Merge server tag_progress (from unduh ulang after sync) with local progress.
+ * Local wins on the same tag+pass so unfinished phone work stays visible.
+ */
+export function mergedTagPlaceMarks(
+  local: LocalProgress[],
+  server: TagProgressRow[] | undefined,
+  counter: { id: string; nama: string },
+): Map<string, TagPlaceMark> {
+  const rows = mergeProgressRows(local, server);
+  const map = new Map<string, TagPlaceMark>();
+  const selfInitials = nameInitials(counter.nama);
+  for (const row of rows) {
+    const current = map.get(row.tag_id) ?? { pass1: "", pass2: "", nomor_kartu: null };
+    const initials = initialsForRow(row, counter, selfInitials);
+    if (row.pass === 1) {
+      current.pass1 = initials;
+      if (row.nomor_kartu) {
+        current.nomor_kartu = row.nomor_kartu;
+      }
+    } else if (row.pass === 2) {
+      current.pass2 = initials;
+      if (!current.nomor_kartu && row.nomor_kartu) {
+        current.nomor_kartu = row.nomor_kartu;
+      }
+    }
+    map.set(row.tag_id, current);
+  }
+  return map;
 }

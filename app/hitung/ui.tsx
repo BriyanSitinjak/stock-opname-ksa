@@ -111,24 +111,29 @@ export function PassAckNote({ pass }: { pass: number }) {
   const copy =
     pass === 1
       ? {
-          title: "Ingat untuk Hitung ke-2",
-          body: "Satu lorong satu nomor tag. Setelah selesai, beritahu petugas Hitung ke-2 untuk cek ulang qty dan nama. Data tetap di HP meski offline.",
+          title: "Hitung ke-1",
+          body: "Satu lorong satu nomor tag. Setelah selesai, petugas Hitung ke-2 akan cek ulang.",
         }
       : pass === 2
         ? {
-            title: "Cek ulang Hitung ke-1",
-            body: "Tandai Sesuai atau Tidak Sesuai per barang. Revisi tidak menghapus data petugas 1. Nomor tag boleh dikoreksi.",
+            title: "Hitung ke-2",
+            body: "Tandai Sesuai atau Tidak Sesuai. Data petugas 1 tetap tersimpan.",
           }
         : null;
   if (!copy) {
     return null;
   }
   return (
-    <div className="mt-3 rounded-2xl bg-[#f3d4a0] px-4 py-3 text-[#5a3b00]">
-      <p className="text-sm font-semibold">{copy.title}</p>
-      <p className="mt-1 text-sm leading-5">{copy.body}</p>
-    </div>
+    <p className="mt-3 border-l-2 border-ksa-amber/80 pl-3 text-sm leading-5 text-white/65">
+      <span className="font-semibold text-white/90">{copy.title}. </span>
+      {copy.body}
+    </p>
   );
+}
+
+/** Struck Hitung ke-1 value kept visible after Sesuai / revisi / ubah nomor tag. */
+export function StruckText({ children }: { children: ReactNode }) {
+  return <span className="text-white/45 line-through decoration-white/50">{children}</span>;
 }
 
 export function QtyRow({

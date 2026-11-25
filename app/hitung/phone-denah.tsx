@@ -3,7 +3,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { FloorDrawing } from "@/app/denah/floor-drawing";
 import { GudangTabs } from "@/app/denah/gudang-tabs";
-import { mergedPassInitials, type LocalProgress, type PassInitials } from "@/app/hitung/local-progress";
+import { mergedTagPlaceMarks, type LocalProgress, type TagPlaceMark } from "@/app/hitung/local-progress";
 import { floorByGudang, floors, type FloorPlace } from "@/lib/floor-plan";
 import { latestAssignment, locatePrepareTagByNomor, type LocatedPrepareTag } from "@/lib/prepare-locate";
 import type { PreparePayload } from "@/lib/offline/queue";
@@ -15,6 +15,7 @@ type PlaceInfo = {
   tag: LocatedPrepareTag | null;
   pass1: string;
   pass2: string;
+  nomor_kartu: string | null;
 };
 
 const PLACE_TONE: Record<PlaceStatus, string> = {
@@ -26,35 +27,40 @@ const PLACE_TONE: Record<PlaceStatus, string> = {
 };
 
 const SELECTABLE: PlaceStatus[] = ["mine", "done"];
-const EMPTY_PASSES: PassInitials = { pass1: "", pass2: "" };
+const EMPTY_MARK: TagPlaceMark = { pass1: "", pass2: "", nomor_kartu: null };
 
 function resolvePlace(
   prepare: PreparePayload,
   crossed: Set<string>,
-  byTag: Map<string, PassInitials>,
+  byTag: Map<string, TagPlaceMark>,
   place: FloorPlace,
 ): PlaceInfo {
   if (crossed.has(place.aisle) || crossed.has(place.label)) {
-    return { status: "crossed", tag: null, ...EMPTY_PASSES };
+    return { status: "crossed", tag: null, ...EMPTY_MARK };
   }
   const tag = locatePrepareTagByNomor(prepare, place.label);
   if (!tag) {
-    return { status: "empty", tag: null, ...EMPTY_PASSES };
+    return { status: "empty", tag: null, ...EMPTY_MARK };
   }
-  const passes = byTag.get(tag.id) ?? EMPTY_PASSES;
-  if (passes.pass1 || passes.pass2) {
-    return { status: "done", tag, ...passes };
+  const mark = byTag.get(tag.id) ?? EMPTY_MARK;
+  if (mark.pass1 || mark.pass2) {
+    return { status: "done", tag, ...mark };
   }
   const mine = prepare.assignments.some((row) => row.tag_id === tag.id);
-  return { status: mine ? "mine" : "other", tag, ...EMPTY_PASSES };
+  return { status: mine ? "mine" : "other", tag, ...EMPTY_MARK };
 }
 
-function PassInitialsStack({ pass1, pass2 }: PassInitials) {
+function PlaceMark({ pass1, pass2, nomor_kartu }: TagPlaceMark) {
   return (
     <span className="flex w-full flex-col items-center justify-center gap-0.5 leading-none">
       <span className="text-[10px] font-semibold tracking-wide">{pass1 || "·"}</span>
       <span className="h-px w-3/4 bg-white/45" aria-hidden />
       <span className="text-[10px] font-semibold tracking-wide">{pass2 || "·"}</span>
+      {nomor_kartu ? (
+        <span className="mt-0.5 max-w-full truncate px-0.5 text-[8px] font-medium tracking-tight text-white/80">
+          {nomor_kartu}
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -81,7 +87,7 @@ export function PhoneDenah({
   const floor = floorByGudang(gudang) ?? floors[0]!;
   const crossed = useMemo(() => new Set((prepare.crosses ?? []).map((row) => row.aisle)), [prepare.crosses]);
   const byTag = useMemo(
-    () => mergedPassInitials(progress, prepare.tag_progress, prepare.counter),
+    () => mergedTagPlaceMarks(progress, prepare.tag_progress, prepare.counter),
     [prepare.counter, prepare.tag_progress, progress],
   );
   const placeInfo = useMemo(() => {
@@ -115,24 +121,37 @@ export function PhoneDenah({
           setSelectedId(null);
         }}
       />
-      <ul className="mt-4 flex flex-wrap gap-3 text-xs text-[#6b6b6b]">
-        <li className="flex items-center gap-2">
-          <LegendSwatch className="h-4 w-4 bg-ksa-teal" />
-          Tugas Anda
+      <ul className="mt-4 space-y-2.5 text-xs leading-snug text-[#5c5c5c]">
+        <li className="flex items-start gap-2">
+          <LegendSwatch className="mt-0.5 h-4 w-4 shrink-0 bg-ksa-teal" />
+          <span>
+            <span className="font-semibold text-[#1c1c1c]">Tugas Anda</span>
+            {" — "}lorong yang ditugaskan ke Anda (Hitung ke-1 atau ke-2)
+          </span>
         </li>
-        <li className="flex items-center gap-2">
-          <LegendSwatch className="h-5 w-5 bg-[#1c1c1c] text-white">
-            <PassInitialsStack pass1="A" pass2="B" />
+        <li className="flex items-start gap-2">
+          <LegendSwatch className="mt-0.5 h-8 w-7 shrink-0 bg-[#1c1c1c] text-white">
+            <PlaceMark pass1="A" pass2="B" nomor_kartu="12" />
           </LegendSwatch>
-          Selesai · inisial H1 / H2
+          <span>
+            <span className="font-semibold text-[#1c1c1c]">Sudah dihitung</span>
+            {" — "}inisial atas = Hitung ke-1, bawah = Hitung ke-2. Nomor tag muncul setelah petugas 1
+            sinkron (lalu unduh ulang).
+          </span>
         </li>
-        <li className="flex items-center gap-2">
-          <LegendSwatch className="h-4 w-4 bg-[#e8e4dc]" />
-          Tidak tersedia
+        <li className="flex items-start gap-2">
+          <LegendSwatch className="mt-0.5 h-4 w-4 shrink-0 bg-[#e8e4dc]" />
+          <span>
+            <span className="font-semibold text-[#1c1c1c]">Tidak tersedia</span>
+            {" — "}lorong disilang / tidak dipakai
+          </span>
         </li>
-        <li className="flex items-center gap-2">
-          <LegendSwatch className="h-4 w-4 bg-ksa-sage/60" />
-          Bukan tugas Anda
+        <li className="flex items-start gap-2">
+          <LegendSwatch className="mt-0.5 h-4 w-4 shrink-0 bg-ksa-sage/60" />
+          <span>
+            <span className="font-semibold text-[#1c1c1c]">Bukan tugas Anda</span>
+            {" — "}lorong petugas lain
+          </span>
         </li>
       </ul>
       <p className="mt-3 text-sm text-[#5c5c5c]">{floor.note}</p>
@@ -145,7 +164,9 @@ export function PhoneDenah({
         placeContent={(place, fallback) => {
           const info = placeInfo.get(place.id);
           if (info?.status === "done") {
-            return <PassInitialsStack pass1={info.pass1} pass2={info.pass2} />;
+            return (
+              <PlaceMark pass1={info.pass1} pass2={info.pass2} nomor_kartu={info.nomor_kartu} />
+            );
           }
           return fallback;
         }}

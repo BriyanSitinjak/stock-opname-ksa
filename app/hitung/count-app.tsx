@@ -6,8 +6,8 @@ import { BrandLockup } from "@/app/brand-lockup";
 import { NumericKeypad } from "@/app/hitung/keypad";
 import { PhoneDenah } from "@/app/hitung/phone-denah";
 import { downloadHitungBackup } from "@/app/hitung/backup-workbook";
-import { buildAisleRecords, sameUserProgressForNomor } from "@/app/hitung/aisle-records";
-import { Pass2ReviewList, type Pass2Item } from "@/app/hitung/pass2-review";
+import { buildAisleRecords, isPass2OnlyCounter, sameUserProgressForNomor } from "@/app/hitung/aisle-records";
+import { Pass2ReviewList, Pass2TagEditor, type Pass2Item } from "@/app/hitung/pass2-review";
 import {
   ActionColumn,
   AisleMeta,
@@ -32,7 +32,7 @@ import {
   UnknownRowsList,
   WaitNote,
 } from "@/app/hitung/ui";
-import { loadProgress, progressForSameUser, upsertProgress } from "@/app/hitung/local-progress";
+import { loadProgress, pass1NomorKartu, progressForSameUser, upsertProgress } from "@/app/hitung/local-progress";
 import { toast } from "@/app/toast";
 import { cardAlreadyUsed } from "@/lib/aisle-rules";
 import { isFloorPlace } from "@/lib/floor-plan";
@@ -67,7 +67,7 @@ import {
 const DEFAULT_KONDISI = "baik" as const;
 
 const edgeIcon =
-  "pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-ksa-teal text-ksa-teal-deep";
+  "pointer-events-auto flex flex-col items-center justify-center gap-0.5 rounded-2xl border border-ksa-teal px-2 py-1.5 text-ksa-teal-deep";
 
 type Screen =
   | "bind"
@@ -263,6 +263,7 @@ export function CountApp() {
   const [pass2EditQty, setPass2EditQty] = useState("");
   const [pass2EditNama, setPass2EditNama] = useState("");
   const [pass2ReplaceFor, setPass2ReplaceFor] = useState<string | null>(null);
+  const [tagEditOpen, setTagEditOpen] = useState(false);
   const [exitBlock, setExitBlock] = useState(false);
   const [booting, setBooting] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -640,16 +641,22 @@ export function CountApp() {
       setMessage("Posisi ini bukan tugas Anda.");
       return;
     }
-    const paper =
-      paperNomor?.trim() ||
-      (assignment.pass === 2 ? assignment.pass1_nomor_kartu?.trim() || "" : "");
+    const fromPass1 =
+      assignment.pass === 2
+        ? pass1NomorKartu(tag.id, {
+            preferred: assignment.pass1_nomor_kartu,
+            local: progress,
+            server: prepare.tag_progress,
+          })
+        : "";
+    const paper = paperNomor?.trim() || fromPass1;
     setActiveTag({
       id: tag.id,
       nomor: tag.nomor,
       lokasi: tag.lokasi,
       pass: assignment.pass,
       pass1: assignment.pass === 2 ? assignment.pass1 : undefined,
-      pass1_nomor_kartu: assignment.pass === 2 ? assignment.pass1_nomor_kartu : undefined,
+      pass1_nomor_kartu: assignment.pass === 2 ? fromPass1 || null : undefined,
       compare: assignment.pass === 3 ? assignment.compare : undefined,
     });
     setLines(await linesForTag(tag.id, assignment.pass));
@@ -662,6 +669,7 @@ export function CountApp() {
     setPass2EditQty("");
     setPass2EditNama("");
     setPass2ReplaceFor(null);
+    setTagEditOpen(false);
     setEmptyConfirm(false);
     setSelesaiConfirm(false);
     setLeaveTarget(null);
@@ -685,6 +693,11 @@ export function CountApp() {
     const prior = prepare ? sameUserProgressForNomor(prepare, progress, nomor, pass) : null;
     if (prior) {
       void openTag(nomor, pass, prior.nomor_kartu ?? "");
+      return;
+    }
+    // Petugas 2 only corrects Hitung ke-1; nomor tag comes from petugas 1 (no Input Nomor Tag screen).
+    if (pass === 2) {
+      void openTag(nomor, pass);
       return;
     }
     setPendingAisle({ nomor, pass, lokasi });
@@ -716,6 +729,19 @@ export function CountApp() {
     }
     if (reusedAisleProgress) {
       return { nomor: reusedAisleProgress.nomor_kartu };
+    }
+    if (activeTag.pass === 2) {
+      const fromPass1 = pass1NomorKartu(activeTag.id, {
+        preferred: activeTag.pass1_nomor_kartu,
+        local: progress,
+        server: prepare?.tag_progress,
+      });
+      if (fromPass1) {
+        return { nomor: fromPass1 };
+      }
+      setMessage("Nomor tag Hitung ke-1 belum ada. Tekan Ubah untuk mengisi, atau minta petugas 1 sinkron lalu unduh ulang.");
+      setTagEditOpen(true);
+      return null;
     }
     if (isFloorPlace(activeTag.nomor)) {
       setMessage("Isi nomor tag.");
@@ -1071,6 +1097,7 @@ export function CountApp() {
 
   if (screen === "home") {
     const finishedLorong = progress.length;
+    const isPass2Home = isPass2OnlyCounter(prepare);
     return (
       <Phone>
         <PrefetchDeveloperCredit />
@@ -1083,7 +1110,9 @@ export function CountApp() {
           Halo, {prepare?.counter.nama?.split(/\s+/)[0] ?? "Petugas"}
         </p>
         <p className="mt-2 text-sm leading-6 text-[#5c5c5c]">
-          Pilih lorong di denah, isi nomor tag, lalu catat barang. Kirim lewat Data di kanan atas saat ada sinyal.
+          {isPass2Home
+            ? "Pilih lorong di denah, lalu cek ulang hasil Hitung ke-1. Kirim lewat Data di kanan atas saat ada sinyal."
+            : "Pilih lorong di denah, isi nomor tag, lalu catat barang. Kirim lewat Data di kanan atas saat ada sinyal."}
         </p>
 
         <div className="mt-6 grid grid-cols-2 gap-3">
@@ -1108,13 +1137,19 @@ export function CountApp() {
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ksa-teal text-xs font-semibold text-white">
               2
             </span>
-            <span className="pt-1">Ketik nomor tag, lalu mulai hitung</span>
+            <span className="pt-1">
+              {isPass2Home
+                ? "Cek setiap barang: Sesuai atau Tidak Sesuai"
+                : "Ketik nomor tag, lalu mulai hitung"}
+            </span>
           </li>
           <li className="flex gap-3">
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ksa-teal text-xs font-semibold text-white">
               3
             </span>
-            <span className="pt-1">Simpan barang, tutup lorong, sinkronkan</span>
+            <span className="pt-1">
+              {isPass2Home ? "Tutup lorong, lalu sinkronkan" : "Simpan barang, tutup lorong, sinkronkan"}
+            </span>
           </li>
         </ol>
 
@@ -1129,21 +1164,24 @@ export function CountApp() {
             }}
           >
             <p className="text-xl font-semibold">Buka Denah</p>
-            <p className="mt-1 text-sm text-white/80">Pilih lorong, lalu isi nomor tag</p>
+            <p className="mt-1 text-sm text-white/80">
+              {isPass2Home ? "Pilih lorong untuk cek ulang" : "Pilih lorong, lalu isi nomor tag"}
+            </p>
           </button>
         </div>
 
         {message ? <p className="mt-4 text-sm">{message}</p> : null}
-        <div className="h-16 shrink-0" />
+        <div className="h-20 shrink-0" />
         <div className="pointer-events-none fixed inset-x-0 bottom-0 z-20">
           <div className="mx-auto flex w-full max-w-[390px] items-center justify-between px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
             <button
               type="button"
-              aria-label="Tentang"
-              className={`${edgeIcon} text-lg font-semibold`}
+              aria-label="Info"
+              className={edgeIcon}
               onClick={() => setScreen("about")}
             >
-              i
+              <span className="text-lg font-semibold leading-none">i</span>
+              <span className="text-[10px] font-medium leading-none">Info</span>
             </button>
             <button
               type="button"
@@ -1154,7 +1192,8 @@ export function CountApp() {
                 setLeaveOpen(true);
               }}
             >
-              <LuDoorOpen size={22} />
+              <LuDoorOpen size={20} />
+              <span className="text-[10px] font-medium leading-none">Keluar</span>
             </button>
           </div>
         </div>
@@ -1220,8 +1259,7 @@ export function CountApp() {
         {bar}
         <h1 className="text-2xl font-semibold">Pilih dari Denah</h1>
         <p className="mt-1 text-sm text-[#6b6b6b]">
-          Huruf di atas, nomor di kiri. Setelah pilih lorong, isi nomor tag. Kotak hitam menampilkan inisial
-          Hitung ke-1 / ke-2.
+          Huruf di atas, nomor di kiri. Kotak hitam: inisial Hitung ke-1 / ke-2 dan nomor tag setelah sinkron.
         </p>
         {prepare ? (
           <PhoneDenah
@@ -1433,6 +1471,13 @@ export function CountApp() {
   }
 
   const isPass2 = activeTag?.pass === 2;
+  const pass1Card = activeTag
+    ? pass1NomorKartu(activeTag.id, {
+        preferred: activeTag.pass1_nomor_kartu,
+        local: progress,
+        server: prepare?.tag_progress,
+      })
+    : "";
 
   return (
     <Phone tone="ink">
@@ -1447,9 +1492,17 @@ export function CountApp() {
           ? "Cek setiap barang Hitung ke-1: Sesuai atau Tidak Sesuai."
           : "Cari barang, isi jumlah, lalu simpan."}
       </p>
-      {activeTag && isFloorPlace(activeTag.nomor) && (!reusedAisleProgress || isPass2) ? (
+      {isPass2 ? (
+        <Pass2TagEditor
+          pass1Card={pass1Card}
+          cardNo={cardNo}
+          editing={tagEditOpen}
+          onChangeCard={setCardNo}
+          onToggleEdit={setTagEditOpen}
+        />
+      ) : activeTag && isFloorPlace(activeTag.nomor) && !reusedAisleProgress ? (
         <label className="mt-4 block text-sm">
-          <span className="text-white/70">Nomor tag{isPass2 ? " (boleh dikoreksi)" : ""}</span>
+          <span className="text-white/70">Nomor tag</span>
           <PaperNumberField tone="ink" autoFocus={false} value={cardNo} onChange={setCardNo} />
         </label>
       ) : null}

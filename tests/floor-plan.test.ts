@@ -19,7 +19,7 @@ describe("floor plan", () => {
     expect(floor?.places.some((place) => place.aisle === "R" && place.row === 9)).toBe(true);
   });
 
-  it("keeps row 16 on gudang 22 to side A and names the gypsum bays", () => {
+  it("keeps row 16 on gudang 22 to side A and names the gypsum bay", () => {
     const floor = floorByGudang(22);
     const row16 = floor?.places.filter((place) => place.row === 16) ?? [];
     expect(row16.every((place) => place.side === "A")).toBe(true);
@@ -27,6 +27,16 @@ describe("floor plan", () => {
     expect(floor?.aisles.map((aisle) => aisle.label)).toEqual(["W", "X", "Y", "Z"]);
     expect(floor?.places.some((place) => place.label === "W-1-A")).toBe(true);
     expect(floor?.places.some((place) => place.label === "Z-16-A")).toBe(true);
-    expect(floor?.extras.places.map((place) => place.label)).toEqual(["20-A", "19-B", "19-A", "18-B", "18-A"]);
+    expect(floor?.places.some((place) => place.row === 18 || place.row === 19)).toBe(false);
+    expect(floor?.extras.places.map((place) => place.label)).toEqual(["20-A"]);
+  });
+
+  it("stops at row 16 for gudang 18–21 (no rows 18–19)", () => {
+    for (const gudang of [18, 19, 20, 21]) {
+      const floor = floorByGudang(gudang);
+      expect(floor?.places.some((place) => place.row === 18 || place.row === 19)).toBe(false);
+      expect(floor?.rows.includes(18)).toBe(false);
+      expect(floor?.rows.includes(19)).toBe(false);
+    }
   });
 });
