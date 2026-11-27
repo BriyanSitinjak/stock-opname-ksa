@@ -35,9 +35,9 @@ import {
 import { loadProgress, pass1NomorKartu, progressForSameUser, upsertProgress } from "@/app/hitung/local-progress";
 import { toast } from "@/app/toast";
 import { cardAlreadyUsed } from "@/lib/aisle-rules";
-import { isFloorPlace } from "@/lib/floor-plan";
+import { isFloorPlace, isFreeTextTagNomor } from "@/lib/floor-plan";
 import { SESSION_ID } from "@/lib/fixture";
-import { latestAssignment, locatePrepareTagByNomor } from "@/lib/prepare-locate";
+import { latestAssignment, locatePrepareTagById, locatePrepareTagByNomor } from "@/lib/prepare-locate";
 import { SHARE_CURRENT_SESSION } from "@/lib/testing";
 import { maybeActivate } from "@/lib/offline/register-sw";
 import { qtyOrDash } from "@/lib/qty-display";
@@ -74,6 +74,7 @@ type Screen =
   | "prepare"
   | "home"
   | "confirm-aisle"
+  | "g16-slots"
   | "denah"
   | "count"
   | "search"
@@ -233,7 +234,9 @@ export function CountApp() {
     nomor: string;
     pass: number;
     lokasi: string;
+    freeText?: boolean;
   } | null>(null);
+  const [freeLokasi, setFreeLokasi] = useState("");
   const [activeTag, setActiveTag] = useState<{
     id: string;
     nomor: string;
@@ -241,6 +244,7 @@ export function CountApp() {
     pass: number;
     pass1?: PreparePayload["assignments"][number]["pass1"];
     pass1_nomor_kartu?: string | null;
+    pass1_counter_nama?: string;
     compare?: PreparePayload["assignments"][number]["compare"];
   } | null>(null);
   const [code, setCode] = useState("");
@@ -263,6 +267,9 @@ export function CountApp() {
   const [pass2EditQty, setPass2EditQty] = useState("");
   const [pass2EditNama, setPass2EditNama] = useState("");
   const [pass2ReplaceFor, setPass2ReplaceFor] = useState<string | null>(null);
+  const [pass2AddConfirm, setPass2AddConfirm] = useState(false);
+  const [pass2Adding, setPass2Adding] = useState(false);
+  const [pass2AddQty, setPass2AddQty] = useState("");
   const [tagEditOpen, setTagEditOpen] = useState(false);
   const [exitBlock, setExitBlock] = useState(false);
   const [booting, setBooting] = useState(true);
@@ -627,13 +634,17 @@ export function CountApp() {
     : [];
   const ready = ticks.length > 0 && ticks.every((tick) => tick.ok);
 
-  async function openTag(nomor: string, pass?: number, paperNomor?: string) {
+  async function openTag(nomor: string, pass?: number, paperNomor?: string, lokasiOverride?: string) {
     if (!prepare) {
       return;
     }
     const tag = locatePrepareTagByNomor(prepare, nomor);
     if (!tag) {
-      setMessage(`Posisi ${nomor} tidak ada di denah sesi ini.`);
+      setMessage(
+        isFreeTextTagNomor(nomor)
+          ? `Slot ${nomor} belum ada di unduhan. Minta koordinator membuat tag G16, lalu unduh ulang.`
+          : `Posisi ${nomor} tidak ada di denah sesi ini.`,
+      );
       return;
     }
     const assignment = latestAssignment(prepare, tag.id, pass);
@@ -653,10 +664,11 @@ export function CountApp() {
     setActiveTag({
       id: tag.id,
       nomor: tag.nomor,
-      lokasi: tag.lokasi,
+      lokasi: lokasiOverride?.trim() || tag.lokasi,
       pass: assignment.pass,
       pass1: assignment.pass === 2 ? assignment.pass1 : undefined,
       pass1_nomor_kartu: assignment.pass === 2 ? fromPass1 || null : undefined,
+      pass1_counter_nama: assignment.pass === 2 ? assignment.pass1_counter_nama : undefined,
       compare: assignment.pass === 3 ? assignment.compare : undefined,
     });
     setLines(await linesForTag(tag.id, assignment.pass));
@@ -669,6 +681,9 @@ export function CountApp() {
     setPass2EditQty("");
     setPass2EditNama("");
     setPass2ReplaceFor(null);
+    setPass2AddConfirm(false);
+    setPass2Adding(false);
+    setPass2AddQty("");
     setTagEditOpen(false);
     setEmptyConfirm(false);
     setSelesaiConfirm(false);
@@ -677,18 +692,32 @@ export function CountApp() {
     setMessage("");
     setPendingAisle(null);
     setTagNomor("");
+    setFreeLokasi("");
     setScreen("count");
+  }
+
+  function hasWorkInAisle() {
+    return lines.length > 0 || tagUnknowns.length > 0;
   }
 
   function requestLeaveCount(target: "home" | "sync") {
     if (screen === "count" || screen === "search") {
-      setLeaveTarget(target);
+      if (hasWorkInAisle()) {
+        setLeaveTarget(target);
+        return;
+      }
+      setPass2Adding(false);
+      setPass2AddConfirm(false);
+      setPass2ReplaceFor(null);
+      setPass2EditId(null);
+      setTagNomor("");
+      setScreen(target);
       return;
     }
     setScreen(target);
   }
 
-  function pickPlace(nomor: string, pass: number, lokasi: string) {
+  function pickPlace(nomor: string, pass: number, lokasi: string, freeText = false) {
     // Same counter who already marked Lorong Selesai/Kosong on this phone may reopen without paper.
     const prior = prepare ? sameUserProgressForNomor(prepare, progress, nomor, pass) : null;
     if (prior) {
@@ -700,8 +729,9 @@ export function CountApp() {
       void openTag(nomor, pass);
       return;
     }
-    setPendingAisle({ nomor, pass, lokasi });
+    setPendingAisle({ nomor, pass, lokasi, freeText });
     setTagNomor("");
+    setFreeLokasi(freeText ? "" : lokasi);
     setMessage("");
     setScreen("confirm-aisle");
   }
@@ -710,13 +740,22 @@ export function CountApp() {
     if (!pendingAisle) {
       return;
     }
+    if (pendingAisle.freeText && !freeLokasi.trim()) {
+      setMessage("Ketik lokasi bebas untuk area yang dihitung.");
+      return;
+    }
     const typed = tagNomor.trim();
     if (!typed) {
       setMessage("Ketik nomor tag Anda.");
       return;
     }
     // Nomor tag is typed per lorong and stored as nomor_kartu; it is not the floor place label.
-    await openTag(pendingAisle.nomor, pendingAisle.pass, typed);
+    await openTag(
+      pendingAisle.nomor,
+      pendingAisle.pass,
+      typed,
+      pendingAisle.freeText ? freeLokasi.trim() : undefined,
+    );
   }
 
   function readCard(): { nomor: string | null } | null {
@@ -865,6 +904,62 @@ export function CountApp() {
     setMessage(status === "sesuai" ? "Ditandai Stock Sesuai." : "Revisi Hitung ke-2 disimpan.");
   }
 
+  async function savePass2Added(nextQty: string) {
+    if (!prepare || !activeTag || activeTag.pass !== 2 || !matched) {
+      return;
+    }
+    const trimmed = nextQty.trim();
+    if (!trimmed) {
+      setMessage("Isi jumlah barang baru.");
+      return;
+    }
+    const card = readCard();
+    if (!card) {
+      return;
+    }
+    const alreadyInPass1 = activeTag.pass1?.some((row) => row.snapshot_item_id === matched.id);
+    if (alreadyInPass1) {
+      setMessage("Barang ini sudah ada di Hitung ke-1. Gunakan Tidak Sesuai untuk revisi.");
+      setPass2Adding(false);
+      setPass2AddQty("");
+      setSelectedId(null);
+      return;
+    }
+    const key = lineKey(activeTag.id, activeTag.pass, matched.id, DEFAULT_KONDISI);
+    await enqueueCount({
+      client_row_id: newClientRowId(),
+      tag_id: activeTag.id,
+      pass: activeTag.pass,
+      snapshot_item_id: matched.id,
+      qty: trimmed,
+      qty_note: "tambah",
+      kondisi: DEFAULT_KONDISI,
+      nomor_kartu: card.nomor,
+      client_created_at: new Date().toISOString(),
+    });
+    await upsertLine({
+      key,
+      tag_id: activeTag.id,
+      pass: activeTag.pass,
+      snapshot_item_id: matched.id,
+      barcode_4: matched.barcode_4,
+      nama_barang: matched.nama_barang,
+      qty: trimmed,
+      kondisi: DEFAULT_KONDISI,
+      qty_note: "tambah",
+      nomor_kartu: card.nomor,
+      review_status: "revisi",
+      pass1_snapshot_item_id: null,
+    });
+    setLines(await linesForTag(activeTag.id, activeTag.pass));
+    await refreshPending();
+    setPass2Adding(false);
+    setPass2AddQty("");
+    setSelectedId(null);
+    setCode("");
+    setMessage("Barang baru Hitung ke-2 disimpan.");
+  }
+
   async function submitTag(isEmpty: boolean) {
     if (!activeTag) {
       return;
@@ -931,28 +1026,50 @@ export function CountApp() {
   );
 
   const pass2Items: Pass2Item[] = useMemo(() => {
-    if (!activeTag?.pass1) {
-      return [];
-    }
-    return activeTag.pass1.map((row) => {
-      const line = lines.find(
-        (item) =>
-          item.snapshot_item_id === row.snapshot_item_id || item.pass1_snapshot_item_id === row.snapshot_item_id,
+    const fromPass1 =
+      activeTag?.pass1?.map((row) => {
+        const line = lines.find(
+          (item) =>
+            item.snapshot_item_id === row.snapshot_item_id || item.pass1_snapshot_item_id === row.snapshot_item_id,
+        );
+        const namaRevisi = line?.qty_note
+          ?.split("|")
+          .find((part) => part.startsWith("nama:"))
+          ?.slice(5);
+        return {
+          snapshot_item_id: row.snapshot_item_id,
+          barcode_4: row.barcode_4,
+          nama_barang: row.nama_barang,
+          qty_1: row.qty_1,
+          review_status: line?.review_status,
+          qty_2: line?.qty,
+          nama_revisi: namaRevisi ?? null,
+        } satisfies Pass2Item;
+      }) ?? [];
+    const covered = new Set(
+      fromPass1.flatMap((row) => {
+        const line = lines.find(
+          (item) =>
+            item.snapshot_item_id === row.snapshot_item_id || item.pass1_snapshot_item_id === row.snapshot_item_id,
+        );
+        return [row.snapshot_item_id, line?.snapshot_item_id].filter(Boolean) as string[];
+      }),
+    );
+    const added = lines
+      .filter((line) => line.review_status === "revisi" && !covered.has(line.snapshot_item_id))
+      .map(
+        (line) =>
+          ({
+            snapshot_item_id: line.snapshot_item_id,
+            barcode_4: line.barcode_4,
+            nama_barang: line.nama_barang,
+            qty_1: "0",
+            review_status: "revisi" as const,
+            qty_2: line.qty,
+            nama_revisi: line.nama_barang,
+          }) satisfies Pass2Item,
       );
-      const namaRevisi = line?.qty_note
-        ?.split("|")
-        .find((part) => part.startsWith("nama:"))
-        ?.slice(5);
-      return {
-        snapshot_item_id: row.snapshot_item_id,
-        barcode_4: row.barcode_4,
-        nama_barang: row.nama_barang,
-        qty_1: row.qty_1,
-        review_status: line?.review_status,
-        qty_2: line?.qty,
-        nama_revisi: namaRevisi ?? null,
-      };
-    });
+    return [...fromPass1, ...added];
   }, [activeTag?.pass1, lines]);
 
   function onDigit(digit: string) {
@@ -1098,6 +1215,19 @@ export function CountApp() {
   if (screen === "home") {
     const finishedLorong = progress.length;
     const isPass2Home = isPass2OnlyCounter(prepare);
+    const g16Tasks =
+      prepare?.assignments.flatMap((assignment) => {
+        const tag = locatePrepareTagById(prepare, assignment.tag_id);
+        if (!tag || !isFreeTextTagNomor(tag.nomor)) {
+          return [];
+        }
+        return [{ id: tag.id, nomor: tag.nomor, lokasi: tag.lokasi, pass: assignment.pass }];
+      }) ?? [];
+    const hasRackTasks =
+      prepare?.assignments.some((assignment) => {
+        const tag = locatePrepareTagById(prepare, assignment.tag_id);
+        return tag && !isFreeTextTagNomor(tag.nomor);
+      }) ?? false;
     return (
       <Phone>
         <PrefetchDeveloperCredit />
@@ -1110,9 +1240,11 @@ export function CountApp() {
           Halo, {prepare?.counter.nama?.split(/\s+/)[0] ?? "Petugas"}
         </p>
         <p className="mt-2 text-sm leading-6 text-[#5c5c5c]">
-          {isPass2Home
-            ? "Pilih lorong di denah, lalu cek ulang hasil Hitung ke-1. Kirim lewat Data di kanan atas saat ada sinyal."
-            : "Pilih lorong di denah, isi nomor tag, lalu catat barang. Kirim lewat Data di kanan atas saat ada sinyal."}
+          {g16Tasks.length > 0 && !hasRackTasks
+            ? "Hitung Gudang 16 lewat lokasi bebas (tanpa denah palet). Kirim lewat Data di kanan atas saat ada sinyal."
+            : isPass2Home
+              ? "Pilih lorong di denah, lalu cek ulang hasil Hitung ke-1. Kirim lewat Data di kanan atas saat ada sinyal."
+              : "Pilih lorong di denah, isi nomor tag, lalu catat barang. Kirim lewat Data di kanan atas saat ada sinyal."}
         </p>
 
         <div className="mt-6 grid grid-cols-2 gap-3">
@@ -1131,7 +1263,11 @@ export function CountApp() {
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ksa-teal text-xs font-semibold text-white">
               1
             </span>
-            <span className="pt-1">Buka denah dan pilih lorong tugas Anda</span>
+            <span className="pt-1">
+              {g16Tasks.length > 0 && !hasRackTasks
+                ? "Buka Gudang 16 dan pilih slot tugas Anda"
+                : "Buka denah dan pilih lorong tugas Anda"}
+            </span>
           </li>
           <li className="flex gap-3">
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ksa-teal text-xs font-semibold text-white">
@@ -1140,7 +1276,9 @@ export function CountApp() {
             <span className="pt-1">
               {isPass2Home
                 ? "Cek setiap barang: Sesuai atau Tidak Sesuai"
-                : "Ketik nomor tag, lalu mulai hitung"}
+                : g16Tasks.length > 0 && !hasRackTasks
+                  ? "Isi lokasi bebas dan nomor tag, lalu hitung"
+                  : "Ketik nomor tag, lalu mulai hitung"}
             </span>
           </li>
           <li className="flex gap-3">
@@ -1153,21 +1291,38 @@ export function CountApp() {
           </li>
         </ol>
 
-        <div className="mt-auto pt-8">
-          <button
-            type="button"
-            className="w-full rounded-[28px] bg-ksa-teal px-5 py-7 text-left text-white shadow-sm transition active:scale-[0.99]"
-            onClick={() => {
-              setTagNomor("");
-              setMessage("");
-              setScreen("denah");
-            }}
-          >
-            <p className="text-xl font-semibold">Buka Denah</p>
-            <p className="mt-1 text-sm text-white/80">
-              {isPass2Home ? "Pilih lorong untuk cek ulang" : "Pilih lorong, lalu isi nomor tag"}
-            </p>
-          </button>
+        <div className="mt-auto flex flex-col gap-3 pt-8">
+          {g16Tasks.length > 0 ? (
+            <button
+              type="button"
+              className="w-full rounded-[28px] bg-ksa-amber px-5 py-7 text-left text-[#5a3b00] shadow-sm transition active:scale-[0.99]"
+              onClick={() => {
+                setMessage("");
+                setScreen("g16-slots");
+              }}
+            >
+              <p className="text-xl font-semibold">Mulai Gudang 16</p>
+              <p className="mt-1 text-sm text-[#5a3b00]/80">
+                Barang rusak · {g16Tasks.length} slot · lokasi bebas
+              </p>
+            </button>
+          ) : null}
+          {hasRackTasks || g16Tasks.length === 0 ? (
+            <button
+              type="button"
+              className="w-full rounded-[28px] bg-ksa-teal px-5 py-7 text-left text-white shadow-sm transition active:scale-[0.99]"
+              onClick={() => {
+                setTagNomor("");
+                setMessage("");
+                setScreen("denah");
+              }}
+            >
+              <p className="text-xl font-semibold">Buka Denah</p>
+              <p className="mt-1 text-sm text-white/80">
+                {isPass2Home ? "Pilih lorong untuk cek ulang" : "Pilih lorong, lalu isi nomor tag"}
+              </p>
+            </button>
+          ) : null}
         </div>
 
         {message ? <p className="mt-4 text-sm">{message}</p> : null}
@@ -1220,30 +1375,91 @@ export function CountApp() {
     );
   }
 
+  if (screen === "g16-slots") {
+    const slots =
+      prepare?.assignments.flatMap((assignment) => {
+        const tag = locatePrepareTagById(prepare, assignment.tag_id);
+        if (!tag || !isFreeTextTagNomor(tag.nomor)) {
+          return [];
+        }
+        return [{ id: tag.id, nomor: tag.nomor, lokasi: tag.lokasi, pass: assignment.pass }];
+      }) ?? [];
+    return (
+      <Phone>
+        <BackButton className="mb-3" onClick={() => setScreen("home")} />
+        {bar}
+        <h1 className="text-2xl font-semibold">Gudang 16</h1>
+        <p className="mt-1 text-sm text-[#6b6b6b]">
+          Barang rusak tanpa denah palet. Pilih slot tugas, lalu isi lokasi bebas.
+        </p>
+        <ul className="mt-5 flex flex-col gap-3">
+          {slots.map((slot) => (
+            <li key={`${slot.id}:${slot.pass}`}>
+              <button
+                type="button"
+                className="w-full rounded-2xl bg-white px-4 py-4 text-left shadow-sm"
+                onClick={() => pickPlace(slot.nomor, slot.pass, slot.lokasi, true)}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-lg font-semibold">{slot.nomor}</span>
+                  <PassBadge pass={slot.pass} />
+                </div>
+                <p className="mt-1 text-sm text-[#6b6b6b]">{slot.lokasi}</p>
+              </button>
+            </li>
+          ))}
+        </ul>
+        {slots.length === 0 ? (
+          <p className="mt-4 text-sm text-[#6b6b6b]">Tidak ada slot Gudang 16 pada tugas Anda.</p>
+        ) : null}
+        {message ? <p className="mt-3 text-sm">{message}</p> : null}
+      </Phone>
+    );
+  }
+
   if (screen === "confirm-aisle") {
+    const backScreen = pendingAisle?.freeText ? "g16-slots" : "denah";
+    const canStart = Boolean(tagNomor.trim() && (!pendingAisle?.freeText || freeLokasi.trim()));
     return (
       <Phone>
         <BackButton
           className="mb-3"
           onClick={() => {
             setPendingAisle(null);
+            setFreeLokasi("");
             setMessage("");
-            setScreen("denah");
+            setScreen(backScreen);
           }}
         />
         {bar}
-        <h1 className="text-2xl font-semibold">Nomor Tag</h1>
+        <h1 className="text-2xl font-semibold">{pendingAisle?.freeText ? "Lokasi & Nomor Tag" : "Nomor Tag"}</h1>
         <p className="mt-2 text-sm text-[#6b6b6b]">
-          Sebelum mulai hitung, ketik nomor tag untuk posisi ini. Satu lorong memakai satu nomor tag.
+          {pendingAisle?.freeText
+            ? "Isi lokasi bebas area yang dihitung, lalu nomor tag. Satu slot memakai satu nomor tag."
+            : "Sebelum mulai hitung, ketik nomor tag untuk posisi ini. Satu lorong memakai satu nomor tag."}
         </p>
         {pendingAisle ? (
           <div className="mt-5 rounded-2xl bg-white px-4 py-4 shadow-sm">
             <AisleMeta nomor={pendingAisle.nomor} lokasi={pendingAisle.lokasi} pass={pendingAisle.pass} />
           </div>
         ) : null}
-        <PaperNumberField value={tagNomor} onChange={setTagNomor} />
+        {pendingAisle?.freeText ? (
+          <label className="mt-4 block text-sm text-[#5c5c5c]">
+            Lokasi bebas
+            <input
+              className="mt-1 w-full rounded-2xl bg-white px-4 py-3 text-base text-[#1c1c1c] shadow-sm outline-none"
+              value={freeLokasi}
+              onChange={(event) => setFreeLokasi(event.target.value.toUpperCase())}
+              autoCapitalize="characters"
+              autoFocus
+              placeholder="Contoh: RAK RUSAK DEPAN"
+              aria-label="Lokasi bebas"
+            />
+          </label>
+        ) : null}
+        <PaperNumberField value={tagNomor} onChange={setTagNomor} autoFocus={!pendingAisle?.freeText} />
         <ActionColumn>
-          <PrimaryButton disabled={!tagNomor.trim()} onClick={() => void confirmAisleAndOpen()}>
+          <PrimaryButton disabled={!canStart} onClick={() => void confirmAisleAndOpen()}>
             Mulai Hitung
           </PrimaryButton>
         </ActionColumn>
@@ -1284,9 +1500,23 @@ export function CountApp() {
     return (
       <Phone tone="ink">
         <div className="sticky top-0 z-10 -mx-5 bg-ksa-ink px-5 pb-3">
-          <BackButton light className="mb-3" onClick={() => setScreen("count")} />
+          <BackButton
+            light
+            className="mb-3"
+            onClick={() => {
+              if (pass2Adding) {
+                setPass2Adding(false);
+                setPass2AddQty("");
+                setSelectedId(null);
+              }
+              setScreen("count");
+            }}
+          />
           {bar}
-          <h1 className="text-2xl font-semibold">Cari Barang</h1>
+          <h1 className="text-2xl font-semibold">{pass2Adding ? "Tambah Barang Baru" : "Cari Barang"}</h1>
+          {pass2Adding ? (
+            <p className="mt-2 text-sm text-white/60">Pilih barang yang belum ada di Hitung ke-1, lalu isi jumlah.</p>
+          ) : null}
           <input
             className="mt-3 w-full rounded-2xl bg-ksa-panel px-4 py-3 text-white outline-none placeholder:text-white/40"
             value={search}
@@ -1312,6 +1542,11 @@ export function CountApp() {
                   setSelectedId(item.id);
                   setCode(item.barcode_4 ?? item.kode_barang);
                   setSearch("");
+                  if (pass2Adding) {
+                    setPass2AddQty("");
+                    setScreen("count");
+                    return;
+                  }
                   setQty("");
                   setScreen("count");
                   setFocusField("qty");
@@ -1479,7 +1714,7 @@ export function CountApp() {
 
   return (
     <Phone tone="ink">
-      <BackButton light className="mb-3" onClick={() => setLeaveTarget("home")} />
+      <BackButton light className="mb-3" onClick={() => requestLeaveCount("home")} />
       {bar}
       {activeTag ? (
         <AisleMeta nomor={activeTag.nomor} lokasi={activeTag.lokasi} pass={activeTag.pass} tone="ink" />
@@ -1522,39 +1757,52 @@ export function CountApp() {
         </div>
       ) : null}
       {isPass2 ? (
-        <Pass2ReviewList
-          items={pass2Items}
-          editingId={pass2EditId}
-          editQty={pass2EditQty}
-          editNama={pass2EditNama}
-          onEditQty={setPass2EditQty}
-          onEditNama={setPass2EditNama}
-          onStartRevisi={(item) => {
-            setPass2EditId(item.snapshot_item_id);
-            setPass2EditQty(item.qty_2 || item.qty_1);
-            setPass2EditNama(item.nama_revisi || "");
-            setPass2ReplaceFor(null);
-          }}
-          onCancelRevisi={() => {
-            setPass2EditId(null);
-            setPass2EditQty("");
-            setPass2EditNama("");
-            setPass2ReplaceFor(null);
-          }}
-          onSesuai={(item) => void savePass2Review(item, "sesuai", item.qty_1)}
-          onSaveRevisi={(item) => {
-            const replacement =
-              pass2ReplaceFor && prepare
-                ? prepare.items.find((row) => row.id === pass2ReplaceFor)
-                : undefined;
-            void savePass2Review(item, "revisi", pass2EditQty.trim(), pass2EditNama, replacement);
-          }}
-          onGantiBarang={(item) => {
-            setPass2EditId(item.snapshot_item_id);
-            setPass2ReplaceFor(null);
-            setScreen("search");
-          }}
-        />
+        <>
+          <Pass2ReviewList
+            items={pass2Items}
+            editingId={pass2EditId}
+            editQty={pass2EditQty}
+            editNama={pass2EditNama}
+            onEditQty={setPass2EditQty}
+            onEditNama={setPass2EditNama}
+            onStartRevisi={(item) => {
+              setPass2EditId(item.snapshot_item_id);
+              setPass2EditQty(item.qty_2 || item.qty_1);
+              setPass2EditNama(item.nama_revisi || "");
+              setPass2ReplaceFor(null);
+            }}
+            onCancelRevisi={() => {
+              setPass2EditId(null);
+              setPass2EditQty("");
+              setPass2EditNama("");
+              setPass2ReplaceFor(null);
+            }}
+            onSesuai={(item) => void savePass2Review(item, "sesuai", item.qty_1)}
+            onSaveRevisi={(item) => {
+              const replacement =
+                pass2ReplaceFor && prepare
+                  ? prepare.items.find((row) => row.id === pass2ReplaceFor)
+                  : undefined;
+              void savePass2Review(item, "revisi", pass2EditQty.trim(), pass2EditNama, replacement);
+            }}
+            onGantiBarang={(item) => {
+              setPass2EditId(item.snapshot_item_id);
+              setPass2ReplaceFor(null);
+              setScreen("search");
+            }}
+          />
+          <button
+            type="button"
+            className="mt-4 w-full rounded-full border border-ksa-amber bg-ksa-amber/15 py-3 text-sm font-semibold text-ksa-amber"
+            onClick={() => {
+              setPass2EditId(null);
+              setPass2ReplaceFor(null);
+              setPass2AddConfirm(true);
+            }}
+          >
+            Tambah barang baru
+          </button>
+        </>
       ) : (
         <>
           <button
@@ -1638,7 +1886,7 @@ export function CountApp() {
           Lorong Kosong
         </button>
       </div>
-      <button type="button" className="mt-3 text-sm text-white/50" onClick={() => setLeaveTarget("home")}>
+      <button type="button" className="mt-3 text-sm text-white/50" onClick={() => requestLeaveCount("home")}>
         Tutup lorong
       </button>
       {selesaiConfirm ? (
@@ -1647,7 +1895,7 @@ export function CountApp() {
           body={
             isPass2
               ? `${pass2Items.filter((row) => row.review_status).length} dari ${pass2Items.length} barang sudah dicek. Setelah selesai, lorong ditutup untuk Hitung ke-2.`
-              : `${lines.length} barang sudah dicatat. Setelah selesai, lorong ini ditutup untuk hitung ini.`
+              : `${lines.length} barang sudah dicatat${tagUnknowns.length > 0 ? ` dan ${tagUnknowns.length} tidak dikenal` : ""}. Setelah selesai, lorong ini ditutup untuk hitung ini.`
           }
           confirmLabel="Ya, selesai"
           onCancel={() => setSelesaiConfirm(false)}
@@ -1657,7 +1905,7 @@ export function CountApp() {
       {emptyConfirm ? (
         <ConfirmOverlay
           title={`Tandai lorong ${activeTag?.nomor} sebagai kosong?`}
-          body="Artinya Anda sudah mengecek dan tidak ada barang di area ini."
+          body="Apakah anda yakin lorong ini kosong dan tidak ada barang sama sekali?"
           confirmLabel="Ya, kosong"
           onCancel={() => setEmptyConfirm(false)}
           onConfirm={() => void submitTag(true)}
@@ -1665,21 +1913,88 @@ export function CountApp() {
       ) : null}
       {leaveTarget ? (
         <ConfirmOverlay
-          title={leaveTarget === "sync" ? "Buka data hitung?" : `Tutup lorong ${activeTag?.nomor}?`}
+          title="Ada barang yang sudah anda catat. Yakin mau keluar?"
           body={
             leaveTarget === "sync"
               ? "Barang yang sudah disimpan tetap di HP. Anda bisa kembali ke lorong ini dari denah."
               : "Barang yang sudah disimpan tetap di HP. Anda bisa membuka lorong ini lagi nanti."
           }
-          confirmLabel={leaveTarget === "sync" ? "Ya, buka data" : "Ya, tutup"}
+          confirmLabel={leaveTarget === "sync" ? "Ya, buka data" : "Ya, keluar"}
           onCancel={() => setLeaveTarget(null)}
           onConfirm={() => {
             const target = leaveTarget;
             setLeaveTarget(null);
+            setPass2Adding(false);
+            setPass2AddConfirm(false);
             setTagNomor("");
             setScreen(target);
           }}
         />
+      ) : null}
+      {pass2AddConfirm ? (
+        <ConfirmOverlay
+          title="Tambah barang baru?"
+          body={`Apakah anda sudah berkomunikasi dengan petugas 1 ${activeTag?.pass1_counter_nama ?? "(nama belum ada)"}?`}
+          confirmLabel="Ya, sudah"
+          cancelLabel="Belum"
+          onCancel={() => {
+            setPass2AddConfirm(false);
+            setMessage("Tambah barang dibatalkan. Komunikasi dulu dengan petugas 1.");
+          }}
+          onConfirm={() => {
+            setPass2AddConfirm(false);
+            setPass2Adding(true);
+            setPass2AddQty("");
+            setSelectedId(null);
+            setSearch("");
+            setScreen("search");
+          }}
+        />
+      ) : null}
+      {pass2Adding && matched ? (
+        <Overlay>
+          <p className="text-lg font-semibold">Barang baru Hitung ke-2</p>
+          <p className="mt-2 text-sm font-medium text-[#1c1c1c]">{matched.nama_barang}</p>
+          <p className="mt-1 text-xs text-[#8a8a8a]">{matched.kode_barang}</p>
+          <label className="mt-4 block text-sm">
+            <span className="text-[#5c5c5c]">Jumlah</span>
+            <input
+              className="mt-1 w-full rounded-2xl bg-white px-4 py-3 text-2xl font-semibold shadow-sm outline-none"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              autoFocus
+              value={pass2AddQty}
+              onChange={(event) => setPass2AddQty(event.target.value.replace(/\D/g, ""))}
+              placeholder="0"
+              aria-label="Jumlah"
+            />
+          </label>
+          <div className="mt-5 flex gap-3">
+            <GhostButton
+              onClick={() => {
+                setSelectedId(null);
+                setPass2AddQty("");
+                setScreen("search");
+              }}
+            >
+              Ganti barang
+            </GhostButton>
+            <PrimaryButton disabled={!pass2AddQty.trim()} onClick={() => void savePass2Added(pass2AddQty)}>
+              Simpan
+            </PrimaryButton>
+          </div>
+          <TextLink
+            className="mt-3"
+            onClick={() => {
+              setPass2Adding(false);
+              setPass2AddQty("");
+              setSelectedId(null);
+            }}
+          >
+            Batal
+          </TextLink>
+        </Overlay>
       ) : null}
       {duplicate ? (
         <Overlay>

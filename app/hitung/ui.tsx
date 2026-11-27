@@ -353,12 +353,14 @@ export function ConfirmOverlay({
   title,
   body,
   confirmLabel,
+  cancelLabel = "Batal",
   onConfirm,
   onCancel,
 }: {
   title: string;
   body: string;
   confirmLabel: string;
+  cancelLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -367,7 +369,7 @@ export function ConfirmOverlay({
       <p className="text-lg font-semibold">{title}</p>
       <p className="mt-2 text-sm text-[#5c5c5c]">{body}</p>
       <div className="mt-5 flex gap-3">
-        <GhostButton onClick={onCancel}>Batal</GhostButton>
+        <GhostButton onClick={onCancel}>{cancelLabel}</GhostButton>
         <PrimaryButton onClick={onConfirm}>{confirmLabel}</PrimaryButton>
       </div>
     </Overlay>

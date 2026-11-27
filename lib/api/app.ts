@@ -34,6 +34,7 @@ import {
 } from "@/lib/reports";
 import { readScope } from "@/lib/scope-display";
 import { catalogNames, liveTags, missingAssignments } from "@/lib/setup";
+import { syncFloorTags } from "@/lib/sync-floor-tags";
 import { listStaffActions, recordSessionAction, recordStaffAction } from "@/lib/staff-log";
 import {
   checkPassword,
@@ -209,6 +210,17 @@ app.get("/setup/catalog", async (c) => {
   const counters = await activeStaff();
   const names = await catalogNames();
   return c.json({ brands: names.brands, groups: names.groups, gudang, counters });
+});
+
+/** Create/rename master tags so aisle expand matches padded floor-plan labels (incl. G16 + transit). */
+app.post("/setup/floor-tags", async (c) => {
+  const result = await syncFloorTags();
+  await recordStaffAction({
+    actorId: c.get("staff").id,
+    action: "floor-tags-sync",
+    summary: `Sinkron denah: +${result.tags_created} tag, ${result.tags_renamed} diganti nomor, ${result.gudang_created} gudang baru`,
+  });
+  return c.json({ ok: true, ...result });
 });
 
 app.get("/sessions", async (c) => {
@@ -744,9 +756,49 @@ app.get("/sessions/:id/prepare", async (c) => {
   });
   const pass2Ids = assignments.filter((row) => row.pass === 2).map((row) => row.tagId);
   const pass3Ids = assignments.filter((row) => row.pass === 3).map((row) => row.tagId);
+  const pass1CounterRows =
+    pass2Ids.length > 0
+      ? await prisma.tagAssignment.findMany({
+          where: { sessionId: id, pass: 1, tagId: { in: pass2Ids } },
+          select: { tagId: true, user: { select: { nama: true } } },
+        })
+      : [];
+  const pass1CounterByTag = new Map(pass1CounterRows.map((row) => [row.tagId, row.user.nama]));
   const tagProgress = await sessionTagProgress(id);
   const pass1ByTag = await pass1Baseline(id, pass2Ids, tagProgress);
   const compareByTag = await pass3Compare(id, pass3Ids);
+  const denah = await prepareDenah(id, session.status);
+  // Counting sessions pin denah at open; tags added later (e.g. G16) must still reach the phone.
+  const denahTagIds = new Set(denah.flatMap((group) => group.tags.map((tag) => tag.id)));
+  const missingAssignedIds = [...new Set(assignments.map((row) => row.tagId))].filter(
+    (tagId) => !denahTagIds.has(tagId),
+  );
+  if (missingAssignedIds.length > 0) {
+    const missingTags = await prisma.tag.findMany({
+      where: { id: { in: missingAssignedIds }, retiredAt: null },
+      select: {
+        id: true,
+        nomor: true,
+        weight: true,
+        lokasi: { select: { nama: true } },
+      },
+    });
+    for (const group of foldPrepareDenah(
+      missingTags.map((tag) => ({
+        lokasi: tag.lokasi.nama,
+        id: tag.id,
+        nomor: tag.nomor,
+        weight: tag.weight,
+      })),
+    )) {
+      const existing = denah.find((row) => row.lokasi === group.lokasi);
+      if (existing) {
+        existing.tags.push(...group.tags);
+      } else {
+        denah.push(group);
+      }
+    }
+  }
   const payload = {
     session: {
       id: session.id,
@@ -765,12 +817,13 @@ app.get("/sessions/:id/prepare", async (c) => {
       nama_group: item.namaGroup,
       uom: item.uom,
     })),
-    denah: await prepareDenah(id, session.status),
+    denah,
     crosses: await aisleCrosses(id),
     /** Lorong selesai/kosong already on the server — denah initials after unduh ulang. */
     tag_progress: tagProgress,
     assignments: assignments.map((row) => {
       const pass1 = row.pass === 2 ? pass1ByTag.get(row.tagId) : null;
+      const pass1CounterNama = row.pass === 2 ? pass1CounterByTag.get(row.tagId) : undefined;
       return {
         tag_id: row.tagId,
         pass: row.pass,
@@ -780,6 +833,7 @@ app.get("/sessions/:id/prepare", async (c) => {
               pass1_nomor_kartu: pass1.nomor_kartu,
             }
           : {}),
+        ...(pass1CounterNama ? { pass1_counter_nama: pass1CounterNama } : {}),
         ...(row.pass === 3 ? { compare: compareByTag.get(row.tagId) ?? [] } : {}),
       };
     }),

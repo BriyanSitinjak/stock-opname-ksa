@@ -71,6 +71,8 @@ export type PreparePayload = {
       qty_1: string;
     }[];
     pass1_nomor_kartu?: string | null;
+    /** Nama petugas Hitung ke-1 for this tag — shown before Pass-2 adds stock. */
+    pass1_counter_nama?: string;
     compare?: {
       snapshot_item_id: string;
       barcode_4: string | null;

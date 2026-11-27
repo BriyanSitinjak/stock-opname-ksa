@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { placeAt, type Floor, type FloorPlace } from "@/lib/floor-plan";
+import { placeAt, type Floor, type FloorExtrasBand, type FloorPlace } from "@/lib/floor-plan";
 
 export const UNAVAILABLE_PLACE_TONE = "bg-[#e8e4dc] text-[#8a8a8a]";
 
@@ -65,27 +65,43 @@ export function FloorDrawing({
   floor: Floor;
 } & PlaceHooks) {
   const hooks = { selectedId, onSelect, placeClassName, disabledPlace, placeContent };
+  if (floor.freeText) {
+    return (
+      <div className="mt-4 rounded-3xl bg-white p-5 shadow-sm">
+        <p className="text-sm font-medium text-[#1c1c1c]">Tanpa denah palet</p>
+        <p className="mt-1 text-sm text-[#5c5c5c]">
+          Gudang Barang Rusak dihitung lewat lokasi bebas. Pilih slot tugas dari beranda, bukan dari denah.
+        </p>
+      </div>
+    );
+  }
+  const far = floor.extras.filter((band) => band.placement === "far" && band.places.length > 0);
+  const door = floor.extras.filter((band) => band.placement === "door" && band.places.length > 0);
   return (
     <div className="mt-4 overflow-x-auto rounded-3xl bg-white p-4 shadow-sm">
       <p className="mb-3 text-center text-xs tracking-wide text-[#8a8a8a] uppercase">Ujung jauh</p>
-      {floor.extras.placement === "far" ? <ExtraBand floor={floor} {...hooks} /> : null}
-      <div
-        className="grid min-w-max gap-2"
-        style={{ gridTemplateColumns: `2.5rem repeat(${floor.aisles.length}, minmax(3.5rem, 4.5rem))` }}
-      >
-        <span />
-        {floor.aisles.map((aisle) => (
-          <span key={aisle.id} className="text-center text-sm font-semibold">
-            {aisle.label}
-          </span>
-        ))}
-        {floor.rows.map((row) => (
-          <Row key={row} floor={floor} row={row} {...hooks} />
-        ))}
-      </div>
-      {floor.extras.placement === "door" && floor.extras.places.length > 0 ? (
-        <ExtraBand floor={floor} {...hooks} />
+      {far.map((band) => (
+        <ExtraBand key={`far:${band.title}`} band={band} {...hooks} />
+      ))}
+      {floor.aisles.length > 0 && floor.rows.length > 0 ? (
+        <div
+          className="grid min-w-max gap-2"
+          style={{ gridTemplateColumns: `2.5rem repeat(${floor.aisles.length}, minmax(3.5rem, 4.5rem))` }}
+        >
+          <span />
+          {floor.aisles.map((aisle) => (
+            <span key={aisle.id} className="text-center text-sm font-semibold">
+              {aisle.label}
+            </span>
+          ))}
+          {floor.rows.map((row) => (
+            <Row key={row} floor={floor} row={row} {...hooks} />
+          ))}
+        </div>
       ) : null}
+      {door.map((band) => (
+        <ExtraBand key={`door:${band.title}`} band={band} className="mt-3" {...hooks} />
+      ))}
       <p className="mt-3 text-center text-xs tracking-wide text-[#8a8a8a] uppercase">Pintu</p>
     </div>
   );
@@ -118,12 +134,16 @@ function Row({ floor, row, ...hooks }: { floor: Floor; row: number } & PlaceHook
   );
 }
 
-function ExtraBand({ floor, ...hooks }: { floor: Floor } & PlaceHooks) {
+function ExtraBand({
+  band,
+  className = "mb-3",
+  ...hooks
+}: { band: FloorExtrasBand; className?: string } & PlaceHooks) {
   return (
-    <div className={floor.extras.placement === "door" ? "mt-3" : "mb-3"}>
-      <p className="mb-2 text-xs text-[#6b6b6b]">{floor.extras.title}</p>
+    <div className={className}>
+      <p className="mb-2 text-xs text-[#6b6b6b]">{band.title}</p>
       <div className="flex flex-wrap gap-2">
-        {floor.extras.places.map((place) => (
+        {band.places.map((place) => (
           <PlaceButton
             key={place.id}
             place={place}

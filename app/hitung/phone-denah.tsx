@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { FloorDrawing, UNAVAILABLE_PLACE_TONE, UnavailablePlaceLabel } from "@/app/denah/floor-drawing";
 import { GudangTabs } from "@/app/denah/gudang-tabs";
 import { mergedTagPlaceMarks, type LocalProgress, type TagPlaceMark } from "@/app/hitung/local-progress";
-import { floorByGudang, floors, type FloorPlace } from "@/lib/floor-plan";
+import { allFloorPlaces, floorByGudang, floors, type FloorPlace } from "@/lib/floor-plan";
 import { latestAssignment, locatePrepareTagByNomor, type LocatedPrepareTag } from "@/lib/prepare-locate";
 import type { PreparePayload } from "@/lib/offline/queue";
 
@@ -90,7 +90,9 @@ export function PhoneDenah({
   progress: LocalProgress[];
   onPick: (tag: LocatedPrepareTag, pass: number) => void;
 }) {
-  const [gudang, setGudang] = useState(floors[0]?.gudang ?? 17);
+  const [gudang, setGudang] = useState(
+    () => floors.find((floor) => !floor.freeText)?.gudang ?? floors[0]?.gudang ?? 17,
+  );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const floor = floorByGudang(gudang) ?? floors[0]!;
   const crossed = useMemo(() => new Set((prepare.crosses ?? []).map((row) => row.aisle)), [prepare.crosses]);
@@ -100,11 +102,11 @@ export function PhoneDenah({
   );
   const placeInfo = useMemo(() => {
     const map = new Map<string, PlaceInfo>();
-    for (const place of [...floor.places, ...floor.extras.places]) {
+    for (const place of allFloorPlaces(floor)) {
       map.set(place.id, resolvePlace(prepare, crossed, byTag, place));
     }
     return map;
-  }, [byTag, crossed, floor.extras.places, floor.places, prepare]);
+  }, [byTag, crossed, floor, prepare]);
 
   function onSelect(place: FloorPlace) {
     const resolved = placeInfo.get(place.id) ?? resolvePlace(prepare, crossed, byTag, place);

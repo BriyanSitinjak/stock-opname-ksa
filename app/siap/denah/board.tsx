@@ -5,8 +5,10 @@ import { FloorDrawing } from "@/app/denah/floor-drawing";
 import { GudangTabs } from "@/app/denah/gudang-tabs";
 import { activePlaceCount, floorByGudang, floors, type FloorPlace } from "@/lib/floor-plan";
 
+const defaultGudang = floors.find((floor) => !floor.freeText)?.gudang ?? floors[0]?.gudang ?? 17;
+
 export function FloorBoard() {
-  const [gudang, setGudang] = useState(floors[0]?.gudang ?? 17);
+  const [gudang, setGudang] = useState(defaultGudang);
   const [selected, setSelected] = useState<FloorPlace | null>(null);
   const floor = floorByGudang(gudang) ?? floors[0]!;
 
@@ -23,7 +25,11 @@ export function FloorBoard() {
       <p className="mt-1 text-sm text-[#6b6b6b]">{activePlaceCount(floor)} posisi aktif</p>
       <FloorDrawing floor={floor} selectedId={selected?.id ?? null} onSelect={setSelected} />
       <aside className="mt-4 rounded-3xl bg-white p-5 shadow-sm">
-        {selected ? (
+        {floor.freeText ? (
+          <p className="text-sm text-[#5c5c5c]">
+            Gudang ini tanpa denah palet. Tugas diisi lewat Slot 01–10 pada layar Tugas lorong.
+          </p>
+        ) : selected ? (
           <>
             <p className="text-sm text-[#6b6b6b]">{floor.nama}</p>
             <h2 className="text-2xl font-semibold">{selected.label}</h2>

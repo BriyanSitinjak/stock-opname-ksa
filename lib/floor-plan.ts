@@ -1,6 +1,6 @@
 // The warehouse drawing is this list. The screen only reads it.
-// A place is a spot on the floor (aisle, row, side). It is not the cardboard
-// tag number. That number is typed during the count.
+// Hierarchy: Gudang → lorong (letter pairs) → blok → binlok (zero-padded row) → palet (A/B).
+// A place is a spot on the floor. It is not the cardboard tag number.
 
 export type FloorPlace = {
   id: string;
@@ -19,6 +19,12 @@ export type FloorAisle = {
   role: "outer" | "center";
 };
 
+export type FloorExtrasBand = {
+  placement: "far" | "door";
+  title: string;
+  places: FloorPlace[];
+};
+
 export type Floor = {
   gudang: number;
   nama: string;
@@ -26,10 +32,60 @@ export type Floor = {
   aisles: FloorAisle[];
   rows: number[];
   places: FloorPlace[];
-  extras: { placement: "far" | "door"; title: string; places: FloorPlace[] };
+  extras: FloorExtrasBand[];
+  /** Gudang Barang Rusak: no palette denah; assignable free-text slots only. */
+  freeText?: boolean;
 };
 
 const SIDES = ["A", "B"] as const;
+
+/** Default free-text slot count for Gudang 16. */
+export const GUDANG_16_SLOTS = 10;
+
+const TRANSIT_LABELS = [
+  "Transit-1",
+  "Transit-2-A",
+  "Transit-2-B",
+  "Transit-3",
+  "Transit-4",
+  "Transit-5-A",
+  "Transit-5-B",
+  "Transit-6-A",
+  "Transit-6-B",
+  "Transit-7",
+  "Transit-8-A",
+  "Transit-8-B",
+  "Transit-9-A",
+  "Transit-9-B",
+  "Transit-10-A",
+  "Transit-10-B",
+  "Transit-11-A",
+  "Transit-11-B",
+  "Transit-12-A",
+  "Transit-12-B",
+  "Transit-13-A",
+  "Transit-13-B",
+  "Transit-14-A",
+  "Transit-14-B",
+  "Transit-15-A",
+  "Transit-15-B",
+  "Transit-16-A",
+  "Transit-16-B",
+  "Transit-17-A",
+  "Transit-17-B",
+  "Transit-18",
+  "Transit-19",
+  "Transit-20",
+  "Transit-21",
+  "Transit-22",
+  "Transit-23",
+  "Transit-24",
+  "Transit-25",
+] as const;
+
+function padBinlok(row: number): string {
+  return String(row).padStart(2, "0");
+}
 
 function rackRows(role: "outer" | "center", options?: { from?: number; to?: number; keepRow9?: boolean }) {
   const from = options?.from ?? 1;
@@ -60,7 +116,7 @@ function rackPlace(
     aisle,
     row,
     side,
-    label: `${aisle}-${row}-${side}`,
+    label: `${aisle}-${padBinlok(row)}-${side}`,
     unavailable: options?.unavailable || undefined,
   };
 }
@@ -69,11 +125,19 @@ function namedPlace(gudang: number, aisle: string, label: string): FloorPlace {
   return { id: `${gudang}:${aisle}`, gudang, aisle, row: null, side: null, label };
 }
 
+function transitPlaces(gudang: number, labels: readonly string[]): FloorPlace[] {
+  return labels.map((label) => namedPlace(gudang, label, label));
+}
+
+function transitSlice(from: number, count: number): string[] {
+  return TRANSIT_LABELS.slice(from, from + count).map((label) => label);
+}
+
 function standardFloor(
   gudang: number,
   letters: [string, string, string, string],
   note: string,
-  options?: { unavailableFrom?: number },
+  options?: { unavailableFrom?: number; transit?: string[] },
 ): Floor {
   const unavailableFrom = options?.unavailableFrom;
   const aisles: FloorAisle[] = letters.map((letter, index) => ({
@@ -90,6 +154,14 @@ function standardFloor(
       ),
     ),
   );
+  const extras: FloorExtrasBand[] = [];
+  if (options?.transit?.length) {
+    extras.push({
+      placement: "door",
+      title: "Area Transit Barang",
+      places: transitPlaces(gudang, options.transit),
+    });
+  }
   return {
     gudang,
     nama: `Gudang ${gudang}`,
@@ -97,8 +169,51 @@ function standardFloor(
     aisles,
     rows: rackRows("outer"),
     places,
-    extras: { placement: "door", title: "", places: [] },
+    extras,
   };
+}
+
+function gudang16(): Floor {
+  return {
+    gudang: 16,
+    nama: "Gudang 16 · Barang Rusak",
+    note: "Tanpa denah palet. Petugas mengisi lokasi bebas saat hitung.",
+    aisles: [],
+    rows: [],
+    places: [],
+    extras: [],
+    freeText: true,
+  };
+}
+
+function gudang21UvPlaces(): FloorPlace[] {
+  // U kanan / kiri; U-07-A, U-07-B, U-09-A merge into Pretelan Barang Renovo.
+  const uLabels = [
+    "U-01-B",
+    "U-02-B",
+    "U-03-A",
+    "U-03-B",
+    "U-04-A",
+    "U-04-B",
+    "U-05-A",
+    "U-05-B",
+    "U-06-A",
+    "U-06-B",
+    "U-08-A",
+    "U-08-B",
+    "U-10-A",
+  ];
+  const uPlaces = uLabels.map((label) => namedPlace(21, label, label));
+  const pretelan = namedPlace(21, "PRETELAN", "Pretelan Barang Renovo");
+  const vOnlyA = new Set([13, 14, 27, 28]);
+  const vPlaces: FloorPlace[] = [];
+  for (let row = 1; row <= 28; row += 1) {
+    const sides = vOnlyA.has(row) ? (["A"] as const) : SIDES;
+    for (const side of sides) {
+      vPlaces.push(rackPlace(21, "V", row, side));
+    }
+  }
+  return [...uPlaces, pretelan, ...vPlaces];
 }
 
 function gudang21(): Floor {
@@ -125,15 +240,22 @@ function gudang21(): Floor {
   return {
     gudang: 21,
     nama: "Gudang 21",
-    note: "U dan V masing-masing satu tempat. Ruang arsip dan tangga tidak dihitung. Baris 18–19 ditandai tidak tersedia.",
+    note: "U dan V di lantai atas. Pretelan Barang Renovo menggantikan U-07-A/B dan U-09-A. Baris 18–19 ditandai tidak tersedia.",
     aisles,
     rows: rackRows("outer", { from: 6 }),
     places,
-    extras: {
-      placement: "far",
-      title: "Lantai atas",
-      places: [namedPlace(21, "V", "V"), namedPlace(21, "U", "U")],
-    },
+    extras: [
+      {
+        placement: "far",
+        title: "Lantai atas · U, V, Pretelan",
+        places: gudang21UvPlaces(),
+      },
+      {
+        placement: "door",
+        title: "Area Transit Barang",
+        places: transitPlaces(21, transitSlice(10, 10)),
+      },
+    ],
   };
 }
 
@@ -154,22 +276,30 @@ function gudang22(): Floor {
     }
   }
   const gypsum = ["20-A", "19-B", "19-A", "18-B", "18-A"].map((label) => namedPlace(22, label, label));
+  const transit = transitPlaces(22, transitSlice(0, 10));
   return {
     gudang: 22,
     nama: "Gudang 22",
-    note: "Lorong W, X, Y, dan Z. Baris 16 hanya sisi A. Lima petak gypsum memakai nama yang tertulis.",
+    note: "Lorong W, X, Y, dan Z. Baris 16 hanya sisi A. Gypsum/triplek dan Area Transit di pintu.",
     aisles,
     rows: rackRows("outer", { to: 16 }),
     places,
-    extras: { placement: "door", title: "Area gypsum dan triplek", places: gypsum },
+    extras: [
+      {
+        placement: "door",
+        title: "Gypsum, triplek, dan Area Transit Barang",
+        places: [...gypsum, ...transit],
+      },
+    ],
   };
 }
 
 export const floors: Floor[] = [
+  gudang16(),
   standardFloor(
     17,
     ["A", "B", "C", "D"],
-    "Lorong A dan D di rak pinggir, termasuk baris 9. Lorong B dan C di rak tengah, tanpa baris 9. Tidak ada baris 17.",
+    "Lorong A/B dan C/D. Binlok zero-padded (A-01-A). Lorong luar termasuk baris 9; tengah tanpa baris 9. Tidak ada baris 17.",
   ),
   standardFloor(18, ["E", "F", "G", "H"], "Pola yang sama dengan Gudang 17. Baris 18–19 ditandai tidak tersedia.", {
     unavailableFrom: 18,
@@ -177,14 +307,14 @@ export const floors: Floor[] = [
   standardFloor(
     19,
     ["I", "J", "K", "L"],
-    "Pola yang sama dengan Gudang 17. Baris 18–19 ditandai tidak tersedia. Cat di lantai, misalnya J-16-A, adalah lorong, baris, lalu sisi.",
-    { unavailableFrom: 18 },
+    "Pola yang sama dengan Gudang 17. Baris 18–19 ditandai tidak tersedia. Area Transit di pintu.",
+    { unavailableFrom: 18, transit: transitSlice(30, 8) },
   ),
   standardFloor(
     20,
     ["M", "N", "O", "P"],
-    "Huruf lorong mengikuti urutan lembar, di antara L pada Gudang 19 dan Q pada Gudang 21. Baris 18–19 ditandai tidak tersedia.",
-    { unavailableFrom: 18 },
+    "Huruf lorong mengikuti urutan lembar. Baris 18–19 ditandai tidak tersedia. Area Transit di pintu.",
+    { unavailableFrom: 18, transit: transitSlice(20, 10) },
   ),
   gudang21(),
   gudang22(),
@@ -198,12 +328,20 @@ export function placeAt(floor: Floor, aisle: string, row: number): FloorPlace[] 
   return floor.places.filter((place) => place.aisle === aisle && place.row === row);
 }
 
+export function allFloorPlaces(floor: Floor): FloorPlace[] {
+  return [...floor.places, ...floor.extras.flatMap((band) => band.places)];
+}
+
 /** Count of places that can be assigned (excludes unavailable blocks). */
 export function activePlaceCount(floor: Floor): number {
-  return (
-    floor.places.filter((place) => !place.unavailable).length +
-    floor.extras.places.filter((place) => !place.unavailable).length
-  );
+  if (floor.freeText) {
+    return GUDANG_16_SLOTS;
+  }
+  return allFloorPlaces(floor).filter((place) => !place.unavailable).length;
+}
+
+export function isFreeTextTagNomor(nomor: string): boolean {
+  return /^G16-\d{2}$/.test(nomor);
 }
 
 export type FloorAisleRef = {
@@ -214,8 +352,24 @@ export type FloorAisleRef = {
   placeLabels: string[];
 };
 
+function gudang16Slots(floor: Floor): FloorAisleRef[] {
+  return Array.from({ length: GUDANG_16_SLOTS }, (_, index) => {
+    const n = padBinlok(index + 1);
+    return {
+      gudang: floor.gudang,
+      gudangNama: floor.nama,
+      aisle: `S${n}`,
+      label: `Slot ${n}`,
+      placeLabels: [`G16-${n}`],
+    };
+  });
+}
+
 export function floorAisles(): FloorAisleRef[] {
   return floors.flatMap((floor) => {
+    if (floor.freeText) {
+      return gudang16Slots(floor);
+    }
     const racks = floor.aisles.map((aisle) => ({
       gudang: floor.gudang,
       gudangNama: floor.nama,
@@ -225,16 +379,27 @@ export function floorAisles(): FloorAisleRef[] {
         .filter((place) => place.aisle === aisle.id && !place.unavailable)
         .map((place) => place.label),
     }));
-    const extras = floor.extras.places
-      .filter((place) => !place.unavailable)
-      .map((place) => ({
-        gudang: floor.gudang,
-        gudangNama: floor.nama,
-        aisle: place.aisle,
-        label: place.label,
-        placeLabels: [place.label],
-      }));
-    return [...racks, ...extras];
+    const extrasByAisle = new Map<string, FloorAisleRef>();
+    for (const band of floor.extras) {
+      for (const place of band.places) {
+        if (place.unavailable) {
+          continue;
+        }
+        const current = extrasByAisle.get(place.aisle);
+        if (current) {
+          current.placeLabels.push(place.label);
+          continue;
+        }
+        extrasByAisle.set(place.aisle, {
+          gudang: floor.gudang,
+          gudangNama: floor.nama,
+          aisle: place.aisle,
+          label: place.aisle === place.label ? place.label : place.aisle,
+          placeLabels: [place.label],
+        });
+      }
+    }
+    return [...racks, ...extrasByAisle.values()];
   });
 }
 
